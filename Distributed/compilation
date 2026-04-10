@@ -92,7 +92,7 @@ CC="" cargo run
 CC="" cargo run
 
 
-to run manually:
+## to run manually:
 /home/eiumgat/wace2026/code/distributed/receivers
 wasmtime run --wasi inherit-network --dir . grayscaleFinal.wasm 8081
 wasmtime run --wasi inherit-network --dir . sobelFinal.wasm 8082
