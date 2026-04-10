@@ -1,0 +1,22 @@
+    package planner:grayscaleworld;
+
+interface plan {
+
+    record imagedata {
+        width: u32,
+        height: u32,
+        pixels: list<u8>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32
+    }
+  
+    grayscale: func(img: imagedata) -> imagedata;
+    
+}
+
+world grayscaleworld {
+
+    export plan;
+
+}

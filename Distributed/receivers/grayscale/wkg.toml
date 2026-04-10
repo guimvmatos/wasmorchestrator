@@ -1,0 +1,2 @@
+[overrides]
+"planner:grayscaleworld" = { path = "../../kernel/grayscale/" }

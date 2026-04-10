@@ -1,0 +1,2 @@
+[overrides]
+"planner:sobelworld" = { path = "../../kernel/sobel/" }

@@ -1,0 +1,19 @@
+package planner:sobelworld;
+
+interface plan {
+
+    record imagedata {
+        width: u32,
+        height: u32,
+        pixels: list<u8>,
+        reply-to: string
+    }
+  
+    sobel: func(img: imagedata) -> imagedata;
+}
+
+world sobelworld {
+
+    export plan;
+
+}

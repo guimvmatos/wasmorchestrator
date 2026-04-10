@@ -1,0 +1,21 @@
+package planner:path;
+
+interface plan {
+
+    record imagedata {
+        width: u32,
+        height: u32,
+        pixels: list<u8>
+    }
+  
+    grayscale: func(img: imagedata) -> imagedata;
+    invert: func(img: imagedata) -> imagedata;
+    sobel: func(img: imagedata) -> imagedata;
+
+}
+
+world path {
+
+    export plan;
+
+}
