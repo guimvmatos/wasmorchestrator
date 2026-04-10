@@ -110,16 +110,16 @@ CC="" cargo run
 
 
 ## Client
-cd /home/eiumgat/wace2026/code/distributed/client
+Distributed/client
 CC="" cargo run
 convert resultado.ppm resultado.jpg
 
 ## orchestrator
-/home/eiumgat/wace2026/code/distributed/orchestrator
+Distributed/orchestrator
 CC="" cargo run
 
 ## sys
-/home/eiumgat/wace2026/code/distributed/sys
+Distributed/sys
 CC="" cargo run
 
 
@@ -128,3 +128,8 @@ CC="" cargo run
 wasmtime run --wasi inherit-network --dir . grayscaleFinal.wasm 8081
 wasmtime run --wasi inherit-network --dir . sobelFinal.wasm 8082
 wasmtime run --wasi inherit-network --dir . negativeFinal.wasm 8083
+
+
+
+
+git reset --hard origin/main

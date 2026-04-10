@@ -142,7 +142,7 @@ fn main() -> std::io::Result<()> {
             });
 
             // 2. Definimos a demanda (O que queremos que aconteça no cluster)
-            let current_demand = vec![1, 3]; 
+            let current_demand = vec![1,2,3]; 
 
             // 3. Calculamos QUEM faz O QUE baseado no 190/180
             let (new_table, scores) = decide_routing(&nodes_health, &current_demand);

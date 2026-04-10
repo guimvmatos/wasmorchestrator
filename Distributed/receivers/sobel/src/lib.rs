@@ -126,17 +126,14 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
 impl bindings::exports::wasi::cli::run::Guest for Component {
     fn run() -> Result<(), ()> {
-        // Bind a TCP listener to localhost on port 8081 to accept incoming connections
-        //let listener = TcpListener::bind("127.0.0.1:8081").expect("Não conseguiu abrir a porta 8081");
-        //println!("Listening on 127.0.0.1:8081");
 
         let args: Vec<String> = env::args().collect();
         let port = args.get(1).map(|s| s.as_str()).unwrap_or("8080"); //fallback.. se nao passar por argumento ele vai coloar essa
-        let bind_addr = format!("127.0.0.1:{}", port);
+        let ip = args.get(2).map(|s| s.as_str()).unwrap_or("0.0.0.0");
+        let bind_addr = format!("{}:{}", ip, port);
         let listener = TcpListener::bind(&bind_addr).expect(&format!("Não conseguiu abrir a porta {}", port));
 
         println!("Listening on {}", bind_addr);
-
 
         let mut init = 0;
         for stream in listener.incoming() {

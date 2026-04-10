@@ -29,16 +29,16 @@ struct SystemMetrics {
     functions: Vec<FunctionInfo>,
 }
 
-//fn spawn_wasm_worker(func_id: u8) -> Child {
-fn spawn_wasm_worker(func_id: u8, port: u16) -> Child {    
+//fn spawn_wasm_worker(func_id: u8, port: u16) -> Child {    
+fn spawn_wasm_worker(func_id: u8, port: u16, node_ip: &str) -> Child {    
     let wasm_file = format!("kernel_{}.wasm", func_id);
     
     Command::new("wasmtime")
         .arg("run")
         .args(["--wasi", "inherit-network", "--dir", "."])
         .arg(&wasm_file)
-        //.arg(port_str) 
         .arg(port.to_string())
+        .arg(node_ip)
         .spawn()
         .expect("Falha ao iniciar o worker WASM")
 }
@@ -130,10 +130,10 @@ fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, C
                 _ => 8080, // Fallback
             };
 
-            let child = spawn_wasm_worker(*func_id, port);
+            //let child = spawn_wasm_worker(*func_id, port);
+            let child = spawn_wasm_worker(*func_id, port, my_ip);
             let pid = child.id();
             active_workers.insert(*func_id, child);
-            //println!("[WATCHDOG] Iniciado Kernel {} no processo {}", func_id, pid);
             println!("[WATCHDOG] Iniciado Kernel {} na porta {} (PID {})", func_id, port, pid);
         }
     }
@@ -166,19 +166,18 @@ fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, C
 
 fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:9999")?;
-    //let port_range = 8081..8090; // Exemplo: permite até 10 instâncias simultâneas
     let my_node_id = 1;
+    let my_ip = "10.68.119.168";
     let my_functions = vec![
-        FunctionInfo { id: 1, endpoint: "127.0.0.1:8081".to_string() },
-        FunctionInfo { id: 2, endpoint: "127.0.0.1:8082".to_string() },
-        FunctionInfo { id: 3, endpoint: "127.0.0.1:8083".to_string() },
+        FunctionInfo { id: 1, endpoint: format!("{}:8081", my_ip) },
+        FunctionInfo { id: 2, endpoint: format!("{}:8082", my_ip) },
+        FunctionInfo { id: 3, endpoint: format!("{}:8083", my_ip) },
     ];
 
     listener.set_nonblocking(true)?;
     let mut sys = System::new_all();
     let mut networks = sysinfo::Networks::new_with_refreshed_list(); // Adicione esta linha
     let mut last_telemetry = std::time::Instant::now();
-    //let mut active_workers: HashMap<u8, Child> = HashMap::new(); (id>processo)
     let mut active_workers: HashMap<u8, Child> = HashMap::new(); //(port>processo)
 
     println!("SYS iniciado. Aguardando atualizações na porta 9999...");
