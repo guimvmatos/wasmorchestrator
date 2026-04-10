@@ -92,7 +92,7 @@ fn main() -> std::io::Result<()> {
     let mut nodes_health: HashMap<String, NodeStatus> = HashMap::new();
 
     // 2. Listener de Telemetria (Non-blocking)
-    let listener = TcpListener::bind("0.0.0.0:9998")?;
+    let listener = TcpListener::bind("10.68.119.168:9998")?; //#### Ip do orquestrador
     listener.set_nonblocking(true)?;
 
     let mut last_table_update = std::time::Instant::now();

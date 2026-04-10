@@ -78,7 +78,7 @@ fn collect_free_metrics(node_id: u8, sys: &mut System, networks: &mut sysinfo::N
 }
 
 fn send_to_orchestrator(metrics: SystemMetrics) {
-    let addr = "127.0.0.1:9998"; // Porta onde o Orchestrador estará ouvindo telemetria
+    let addr = "10.68.119.168:9998"; // #### TODO: Porta onde o Orchestrador estará ouvindo telemetria. Colocar o Ip do nó onde esta o orquestrador
     
     match TcpStream::connect(addr) {
         Ok(mut stream) => {
@@ -100,8 +100,8 @@ fn send_to_orchestrator(metrics: SystemMetrics) {
     }
 }
 
-//fn handle_orchestrator(mut stream: TcpStream) -> std::io::Result<()> {
-fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, Child>) -> std::io::Result<()> {
+fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, Child>, node_ip: &str) -> std::io::Result<()> {
+
     let mut len_buf = [0u8; 4];
     
     // 1. Lê o tamanho do payload
@@ -131,7 +131,7 @@ fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, C
             };
 
             //let child = spawn_wasm_worker(*func_id, port);
-            let child = spawn_wasm_worker(*func_id, port, my_ip);
+            let child = spawn_wasm_worker(*func_id, port, node_ip);
             let pid = child.id();
             active_workers.insert(*func_id, child);
             println!("[WATCHDOG] Iniciado Kernel {} na porta {} (PID {})", func_id, port, pid);
@@ -165,9 +165,10 @@ fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, C
 }
 
 fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:9999")?;
-    let my_node_id = 1;
-    let my_ip = "10.68.119.168";
+    //let listener = TcpListener::bind("127.0.0.1:9999")?; 
+    let listener = TcpListener::bind("10.68.119.168:9999")?; //#### TODO: colocar o ip da maquina local ou 0.0.0.0. é por onde o seu sys vai ouvir
+    let my_node_id = 1; //#### TODO: Trocar o numero do nó
+    let my_ip = "10.68.119.168"; //#### TODO: Colocar o numero do ip da maquina onde esta nó esta.
     let my_functions = vec![
         FunctionInfo { id: 1, endpoint: format!("{}:8081", my_ip) },
         FunctionInfo { id: 2, endpoint: format!("{}:8082", my_ip) },
@@ -185,7 +186,7 @@ fn main() -> std::io::Result<()> {
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
-                if let Err(e) = handle_orchestrator(stream, &mut active_workers) {
+                if let Err(e) = handle_orchestrator(stream, &mut active_workers, my_ip) {
                     eprintln!("Erro ao processar atualização: {:?}", e);
                 }
             }
