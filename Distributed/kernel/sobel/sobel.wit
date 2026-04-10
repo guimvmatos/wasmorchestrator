@@ -6,9 +6,11 @@ interface plan {
         width: u32,
         height: u32,
         pixels: list<u8>,
-        reply-to: string
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32
     }
-  
+
     sobel: func(img: imagedata) -> imagedata;
 }
 
