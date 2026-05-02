@@ -11,12 +11,13 @@ use std::process::{Child, Command};
 struct RoutingTable {
     table: HashMap<u8, String>,
     node_scores: HashMap<u8, f32>,
+    assignments: HashMap<u8, Vec<u8>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct FunctionInfo {
     id: u8,
-    endpoint: String, // Agora aceita "127.0.0.1:8081"
+    endpoint: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -61,8 +62,8 @@ fn collect_free_metrics(node_id: u8, sys: &mut System, networks: &mut sysinfo::N
 
     let health_score = cpu_free + mem_free;
 
-    let total_rx = networks.into_iter() // Mude .iter() para .into_iter()
-        .map(|(_, data)| data.received()) // Pode tirar os tipos agora, o Rust vai inferir
+    let total_rx = networks.into_iter() 
+        .map(|(_, data)| data.received()) 
         .sum();
 
     println!("Node ID: {} | Memory Free: {:.2}% | CPU Free: {:.2}% | Functions: {} | Health: {}", node_id, mem_free, cpu_free, functions.len(), health_score);
@@ -82,11 +83,9 @@ fn send_to_orchestrator(metrics: SystemMetrics) {
     
     match TcpStream::connect(addr) {
         Ok(mut stream) => {
-            // 1. Serializa a struct SystemMetrics para MessagePack
             let payload = rmp_serde::to_vec(&metrics)
                 .expect("Falha ao serializar telemetria");
             
-            // 2. Protocolo: Envia o Tamanho (4 bytes) -> Envia os Dados
             let len = (payload.len() as u32).to_be_bytes();
             
             if stream.write_all(&len).is_ok() && stream.write_all(&payload).is_ok() {
@@ -100,59 +99,68 @@ fn send_to_orchestrator(metrics: SystemMetrics) {
     }
 }
 
-fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, Child>, node_ip: &str) -> std::io::Result<()> {
+fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, Child>, node_ip: &str)-> Result<Vec<FunctionInfo>, std::io::Error> {
 
     let mut len_buf = [0u8; 4];
+
+    let node_id = 1; //#### TODO TROCAR O NUMERO DO NÓ AQUI
+    let mut current_functions = Vec::new();
     
-    // 1. Lê o tamanho do payload
     stream.read_exact(&mut len_buf)?;
     let len = u32::from_be_bytes(len_buf) as usize;
 
-    // 2. Lê o payload MessagePack
     let mut buffer = vec![0u8; len];
     stream.read_exact(&mut buffer)?;
 
-    // 3. Deserializa para garantir que o dado está íntegro
     let routing_data: RoutingTable = rmp_serde::from_slice(&buffer)
         .expect("Falha ao deserializar tabela do Orchestrador");
 
     println!("Nova tabela recebida: {:?}", routing_data.table);
 
-    //let used_ports: Vec<u16> = active_workers.keys().cloned().collect();
+    if let Some(my_tasks) = routing_data.assignments.get(&node_id) {
+        for &func_id in my_tasks {
+            if !active_workers.contains_key(&func_id) {
+                let port = match func_id {
+                    1 => 8081,
+                    2 => 8082,
+                    3 => 8083,
+                    _ => 8080,
+                };
 
-    for (func_id, endpoint) in &routing_data.table {
-        if !active_workers.contains_key(func_id) {
-
-            let port = match func_id {
-                1 => 8081,
-                2 => 8082,
-                3 => 8083,
-                _ => 8080, // Fallback
-            };
-
-            //let child = spawn_wasm_worker(*func_id, port);
-            let child = spawn_wasm_worker(*func_id, port, node_ip);
-            let pid = child.id();
-            active_workers.insert(*func_id, child);
-            println!("[WATCHDOG] Iniciado Kernel {} na porta {} (PID {})", func_id, port, pid);
+                let child = spawn_wasm_worker(func_id, port, node_ip);
+                let pid = child.id();
+                active_workers.insert(func_id, child);
+                println!("[WATCHDOG] Iniciado Kernel {} solicitado via ASSIGNMENTS na porta {} (PID {})", func_id, port, pid);
+            }
         }
     }
 
     let to_kill: Vec<u8> = active_workers.keys()
-        .filter(|id| !routing_data.table.contains_key(id))
-        .cloned()
-        .collect();
+    .filter(|id| {
+        match routing_data.assignments.get(&node_id) {
+            Some(tasks) => !tasks.contains(id), 
+            None => true, 
+        }
+    })
+    .cloned()
+    .collect();
 
-    // 2. Mata esses processos
     for id in to_kill {
         if let Some(mut child) = active_workers.remove(&id) {
             let _ = child.kill();
-            let _ = child.wait(); // Limpa o processo do sistema
+            let _ = child.wait(); 
             println!("[WATCHDOG] Kernel {} encerrado por falta de demanda.", id);
         }
     }
 
-    // 4. Salva em JSON para os WASMs lerem (mais fácil de debugar que binário)
+    for &id in active_workers.keys() {
+        let port = match id { 1 => 8081, 2 => 8082, 3 => 8083, _ => 8080 };
+        current_functions.push(FunctionInfo {
+            id,
+            endpoint: format!("{}:{}", node_ip, port),
+        });
+    }
+
     let json_data = serde_json::to_string_pretty(&routing_data)
         .expect("Falha ao converter para JSON");
     
@@ -161,19 +169,15 @@ fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, C
     file.flush()?;
 
     println!("[{}] Tabela recebida e salva com sucesso.", Local::now().format("%H:%M:%S"));
-    Ok(())
+    Ok(current_functions)
 }
 
 fn main() -> std::io::Result<()> {
-    //let listener = TcpListener::bind("127.0.0.1:9999")?; 
     let listener = TcpListener::bind("10.68.119.168:9999")?; //#### TODO: colocar o ip da maquina local ou 0.0.0.0. é por onde o seu sys vai ouvir
     let my_node_id = 1; //#### TODO: Trocar o numero do nó
     let my_ip = "10.68.119.168"; //#### TODO: Colocar o numero do ip da maquina onde esta nó esta.
-    let my_functions = vec![
-        FunctionInfo { id: 1, endpoint: format!("{}:8081", my_ip) },
-        FunctionInfo { id: 2, endpoint: format!("{}:8082", my_ip) },
-        FunctionInfo { id: 3, endpoint: format!("{}:8083", my_ip) },
-    ];
+
+    let mut my_functions: Vec<FunctionInfo> = Vec::new();
 
     listener.set_nonblocking(true)?;
     let mut sys = System::new_all();
@@ -186,8 +190,9 @@ fn main() -> std::io::Result<()> {
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
-                if let Err(e) = handle_orchestrator(stream, &mut active_workers, my_ip) {
-                    eprintln!("Erro ao processar atualização: {:?}", e);
+                match handle_orchestrator(stream, &mut active_workers, my_ip) {
+                    Ok(updated_list) => my_functions = updated_list,
+                    Err(e) => eprintln!("Erro ao processar atualização: {:?}", e),
                 }
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -203,7 +208,7 @@ fn main() -> std::io::Result<()> {
             
             send_to_orchestrator(metrics);
             
-            last_telemetry = std::time::Instant::now(); // Reseta o cronômetro
+            last_telemetry = std::time::Instant::now();
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }

@@ -25,11 +25,12 @@ struct Component;
 struct RoutingTable {
     table: std::collections::HashMap<u8, String>,
     node_scores: std::collections::HashMap<u8, f32>,
+    assignments: HashMap<u8, Vec<u8>>,
 }
 
 fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Result<()> {
 
-    let MY_ID: u8 = 1;
+    let MY_ID: u8 = 1; //#### TODO colocar o numero da funcao aqui...
 
     let mut len_buf = [0u8; 4];
 
@@ -45,11 +46,9 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         let len = u32::from_be_bytes(len_buf) as usize;
         println!("Recebendo payload de {} bytes...", len);
 
-        // 3. Criar o buffer para os dados binários (o seu payload MessagePack)
         let mut buffer = vec![0u8; len];
         stream.read_exact(&mut buffer)?;
 
-        // 4. Deserializar os bytes recebidos para a struct Imagedata
         let input_img: WitImagedata = rmp_serde::from_slice(&buffer).expect("Failed to deserialize MessagePack response");
 
         let start_exec = Instant::now();
@@ -58,12 +57,11 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
         let duration = start_exec.elapsed().as_millis();
 
-        // --- UNIFICAÇÃO DA LEITURA DO JSON E LOG ---
         let file = std::fs::File::open("routing_table.json").expect("Erro ao abrir JSON");
         let routing: RoutingTable = serde_json::from_reader(file).expect("Erro no JSON");
 
         // Captura o score deste nó (estou assumindo que este nó físico é o ID 1)
-        let current_score = routing.node_scores.get(&1).cloned().unwrap_or(0.0);
+        let current_score = routing.node_scores.get(&1).cloned().unwrap_or(0.0); //#### TODO colocar ip numero do NÓ aqui
 
         println!(
             "METRIC_DATA: id={}, w={}, h={}, time_ms={}, score={:.2}",
