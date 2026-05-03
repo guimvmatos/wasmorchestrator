@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::env;
 
-type WitImagedata = bindings::planner::grayscaleworld::plan::Imagedata;
+type WitImagedata = bindings::planner::kernelworld::plan::Imagedata;
 
 mod bindings {
     use super::Component;
@@ -53,7 +53,11 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
         let start_exec = Instant::now();
 
-        let mut status = bindings::planner::grayscaleworld::plan::grayscale(&input_img);
+        //let mut status = bindings::planner::kernelworld::plan::grayscale(&input_img);
+
+        let status_gray = bindings::planner::kernelworld::plan::grayscale(&input_img);
+        let status_sobel = bindings::planner::kernelworld::plan::sobel(&status_gray);
+        let mut status = bindings::planner::kernelworld::plan::invert(&status_sobel);
 
         let duration = start_exec.elapsed().as_millis();
 
