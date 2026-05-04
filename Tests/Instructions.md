@@ -13,4 +13,4 @@ CC="" cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug receiver/target/wasm32-wasip2/release/kernelserver.wasm --plug kernel/kernelworld_component.wasm -o final.wasm
 
- wasmtime run --wasi inherit-network --dir . final.wasm 8081 10.68.119.168
+wasmtime run --wasi inherit-network --dir . final.wasm 8081 10.68.119.168
