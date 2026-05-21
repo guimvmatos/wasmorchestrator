@@ -6,6 +6,8 @@ use std::net::{TcpListener, TcpStream};
 use chrono::Local;
 use sysinfo::{System, Cpu};
 use std::process::{Child, Command};
+use std::time::Instant;
+
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct RoutingTable {
@@ -127,10 +129,30 @@ fn handle_orchestrator(mut stream: TcpStream, active_workers: &mut HashMap<u8, C
                     _ => 8080,
                 };
 
+
+                let start_exec = Instant::now();
                 let child = spawn_wasm_worker(func_id, port, node_ip);
+                let mut ready = false;
+                for _ in 0..100 {
+                    if TcpStream::connect(format!("{}:{}", node_ip, port)).is_ok() {
+                        ready = true;
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                let duration_micros = start_exec.elapsed().as_micros(); 
+                let duration_millis = duration_micros as f64 / 1000.0;
+                //let duration = start_exec.elapsed().as_micros();
+
                 let pid = child.id();
                 active_workers.insert(func_id, child);
-                println!("[WATCHDOG] Iniciado Kernel {} solicitado via ASSIGNMENTS na porta {} (PID {})", func_id, port, pid);
+                println!("[WATCHDOG] Iniciado Kernel {} solicitado via ASSIGNMENTS na porta {} (PID {}) Tempo: {}µs ({:.3}ms)", func_id, port, pid, duration_micros, duration_millis);
+                
+                //original
+                //let child = spawn_wasm_worker(func_id, port, node_ip);
+                //let pid = child.id();
+                //active_workers.insert(func_id, child);
+                //println!("[WATCHDOG] Iniciado Kernel {} solicitado via ASSIGNMENTS na porta {} (PID {})", func_id, port, pid);
             }
         }
     }

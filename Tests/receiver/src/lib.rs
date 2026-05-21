@@ -144,10 +144,13 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
                 Ok(stream) => {
                     //call function to handle client
                     println!("entrei!!");
-
+                    let start_exec = Instant::now();
                     if let Err(e) = handle_client(stream, &mut init) {
                         eprintln!("Error handling client: {:?}", e);
                     }
+                    let duration_micros = start_exec.elapsed().as_micros(); 
+                    let duration_millis = duration_micros as f64 / 1000.0;
+                    println!("RECEIVER Total time: {}µs ({:.3}ms)", duration_micros, duration_millis);
                 }
                 Err(e) => {
                     eprintln!("Connection failed: {:?}", e);

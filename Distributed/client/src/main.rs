@@ -4,6 +4,8 @@ use std::net::{TcpStream, TcpListener};
 use std::collections::HashMap;
 use rmp_serde::{Deserializer, Serializer};
 use std::fs::File;
+use std::time::Instant;
+
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ImageData {
@@ -61,13 +63,13 @@ fn main() -> std::io::Result<()> {
 
     
     let data = ImageData {
-        reply_to: "127.0.0.1:9000".to_string(),
-        kernels: vec![1, 2, 3],
+        reply_to: "10.68.119.168:9000".to_string(),
+        kernels: vec![1],
         current_kernel: 1,
         ..data_raw
     };
     
-    let mut stream = TcpStream::connect("127.0.0.1:8081")?;  
+    let mut stream = TcpStream::connect("10.68.119.168:8081")?;  
 
     let serialized_msgpack = rmp_serde::to_vec(&data).expect("MSGPACK Serialization failed");
     let len = serialized_msgpack.len() as u32;
@@ -75,12 +77,13 @@ fn main() -> std::io::Result<()> {
 
     stream.write_all(&serialized_msgpack)?;
     stream.flush()?;
+    let start_exec = Instant::now();
 
     println!("Enviado: {} bytes de payload.", len);
 
     drop(stream);
     //===============
-    let listener = TcpListener::bind("127.0.0.1:9000")?;
+    let listener = TcpListener::bind("10.68.119.168:9000")?;
     let (mut stream_resposta, addr) = listener.accept()?; 
     println!("Conexão de resposta vinda de: {}", addr);
 
@@ -95,8 +98,11 @@ fn main() -> std::io::Result<()> {
     stream_resposta.read_exact(&mut response_payload).expect("Failed to read payload");
 
     let result: ImageData = rmp_serde::from_slice(&response_payload).expect("Failed to deserialize MessagePack response");
-
-    println!("Sucesso! Recebida imagem de {}x{}", result.width, result.height);
+    
+    let duration_micros = start_exec.elapsed().as_micros(); 
+    let duration_millis = duration_micros as f64 / 1000.0;
+    
+    println!("Sucesso! Recebida imagem de {}x{} Tempo: {}µs ({:.3}ms", result.width, result.height, duration_micros, duration_millis);
 
     save_ppm("resultado.ppm", &result).expect("Erro ao salvar o arquivo de saída");
     
