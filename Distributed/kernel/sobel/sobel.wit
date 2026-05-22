@@ -8,7 +8,8 @@ interface plan {
         pixels: list<u8>,
         reply-to: string,
         kernels: list<u8>,
-        current-kernel: u32
+        current-kernel: u32,
+        request: u32
     }
 
     sobel: func(img: imagedata) -> imagedata;

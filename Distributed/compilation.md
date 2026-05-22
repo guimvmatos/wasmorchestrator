@@ -90,6 +90,7 @@ cd ../sys/
 mv grayscaleFinal.wasm kernel_1.wasm
 mv sobelFinal.wasm kernel_2.wasm
 mv negativeFinal.wasm kernel_3.wasm
+cp *.wasm ../sys_test/
 
 
 ## Client
@@ -101,26 +102,15 @@ convert resultado.ppm resultado.jpg
 cd Distributed/orchestrator
 CC="" cargo run
 
-## sys
+## sys or sys_test (preferred)
 cd Distributed/sys
 CC="" cargo run
 
 
+## Tests env
 
 
 
-## Client
-Distributed/client
-CC="" cargo run
-convert resultado.ppm resultado.jpg
-
-## orchestrator
-Distributed/orchestrator
-CC="" cargo run
-
-## sys
-Distributed/sys
-CC="" cargo run
 
 
 ## to run manually:

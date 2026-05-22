@@ -14,7 +14,8 @@ struct ImageData {
     pixels: Vec<u8>,
     reply_to: String,
     kernels: Vec<u8>,
-    current_kernel: u32
+    current_kernel: u32,
+    request: u32
 }
 
 fn read_ppm(path: &str) -> std::io::Result<ImageData> {
@@ -63,13 +64,13 @@ fn main() -> std::io::Result<()> {
 
     
     let data = ImageData {
-        reply_to: "10.68.119.168:9000".to_string(),
-        kernels: vec![1],
+        reply_to: "10.68.119.168:9000".to_string(), #TODO CLIENT'S IP
+        kernels: vec![1], #TODO KERNELS TO BE PROCESSED
         current_kernel: 1,
         ..data_raw
     };
     
-    let mut stream = TcpStream::connect("10.68.119.168:8081")?;  
+    let mut stream = TcpStream::connect("10.68.119.168:8081")?;  #TODO FIRST KERNEL IP
 
     let serialized_msgpack = rmp_serde::to_vec(&data).expect("MSGPACK Serialization failed");
     let len = serialized_msgpack.len() as u32;
@@ -83,7 +84,7 @@ fn main() -> std::io::Result<()> {
 
     drop(stream);
     //===============
-    let listener = TcpListener::bind("10.68.119.168:9000")?;
+    let listener = TcpListener::bind("10.68.119.168:9000")?; #TODO CLIENT'S IP
     let (mut stream_resposta, addr) = listener.accept()?; 
     println!("Conexão de resposta vinda de: {}", addr);
 
