@@ -32,10 +32,10 @@ struct SystemMetrics {
     functions: Vec<FunctionInfo>,
 }
 
-//fn spawn_wasm_worker(func_id: u8, port: u16) -> Child {    
-fn spawn_wasm_worker(func_id: u8, port: u16, node_ip: &str) -> Child {    
+//fn spawn_wasm_worker(func_id: u8, port: u16) -> Child {
+fn spawn_wasm_worker(func_id: u8, port: u16, node_ip: &str) -> Child {
     let wasm_file = format!("kernel_{}.wasm", func_id);
-    
+
     Command::new("wasmtime")
         .arg("run")
         .args(["--wasi", "inherit-network", "--dir", "."])
@@ -55,7 +55,7 @@ fn collect_free_metrics(node_id: u8, sys: &mut System, networks: &mut sysinfo::N
     let cpu_usage: f32 = sys.cpus().iter()
         .map(|cpu: &Cpu| cpu.cpu_usage())
         .sum::<f32>() / sys.cpus().len() as f32;
-    
+
     let cpu_free = 100.0 - cpu_usage;
     //let mem_free = sys.available_memory() / 1024 / 1024;
     let total_mem = sys.total_memory() as f32;
@@ -64,8 +64,8 @@ fn collect_free_metrics(node_id: u8, sys: &mut System, networks: &mut sysinfo::N
 
     let health_score = cpu_free + mem_free;
 
-    let total_rx = networks.into_iter() 
-        .map(|(_, data)| data.received()) 
+    let total_rx = networks.into_iter()
+        .map(|(_, data)| data.received())
         .sum();
 
     println!("Node ID: {} | Memory Free: {:.2}% | CPU Free: {:.2}% | Functions: {} | Health: {}", node_id, mem_free, cpu_free, functions.len(), health_score);
@@ -82,14 +82,14 @@ fn collect_free_metrics(node_id: u8, sys: &mut System, networks: &mut sysinfo::N
 
 fn send_to_orchestrator(metrics: SystemMetrics) {
     let addr = "10.68.119.168:9998"; // #### TODO: Porta onde o Orchestrador estará ouvindo telemetria. Colocar o Ip do nó onde esta o orquestrador
-    
+
     match TcpStream::connect(addr) {
         Ok(mut stream) => {
             let payload = rmp_serde::to_vec(&metrics)
                 .expect("Falha ao serializar telemetria");
-            
+
             let len = (payload.len() as u32).to_be_bytes();
-            
+
             if stream.write_all(&len).is_ok() && stream.write_all(&payload).is_ok() {
                 let _ = stream.flush();
                 println!("[TELEMETRIA] Dados enviados com sucesso para {}", addr);
@@ -129,7 +129,7 @@ fn sync_workers(routing_data: &RoutingTable, active_workers: &mut HashMap<u8, Ch
                 let port = match func_id { 1 => 8081, 2 => 8082, 3 => 8083, _ => 8080 };
                 let start_exec = Instant::now();
                 let child = spawn_wasm_worker(func_id, port, node_ip);
-                
+
                 // Aguarda o worker subir
                 for _ in 0..100 {
                     if TcpStream::connect(format!("{}:{}", node_ip, port)).is_ok() { break; }
@@ -202,12 +202,11 @@ fn main() -> std::io::Result<()> {
         if last_telemetry.elapsed() >= std::time::Duration::from_secs(15) {
             println!("--- Coletando Telemetria ---");
             let metrics = collect_free_metrics(my_node_id, &mut sys, &mut networks, my_functions.clone());
-            
+
             send_to_orchestrator(metrics);
-            
+
             last_telemetry = std::time::Instant::now();
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
     Ok(())
-}
