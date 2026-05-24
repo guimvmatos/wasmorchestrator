@@ -38,6 +38,7 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
     let mut len_buf = [0u8; 4];
 
     loop {
+        let start_receive = Instant::now(); // TEMP
         if let Err(e) = stream.read_exact(&mut len_buf) {
             if e.kind() == std::io::ErrorKind::UnexpectedEof {
                 break; // Cliente desconectou normalmente
@@ -45,7 +46,7 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
             return Err(e); // Erro real de rede
         }
 
-        let start_receive = Instant::now(); // TEMP
+        
         // 2. Converter os bytes para o tamanho real da imagem
         let len = u32::from_be_bytes(len_buf) as usize;
         println!("Recebendo payload de {} bytes...", len);
@@ -113,6 +114,10 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         next_stream.flush()?;
 
         println!("Payload enviado para o Sobel com sucesso!");
+        
+        let mut wait = [0u8; 1];
+        let _ = next_stream.read(&mut wait);
+        
         let sendduration = start_send.elapsed().as_millis();
 
         let totalduration = start_total.elapsed().as_millis();
@@ -122,9 +127,25 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
             MY_ID, input_img.width, input_img.height, totalduration, current_score, receiveduration, execduration, sendduration
         );
 
-        let mut wait = [0u8; 1];
-        let _ = next_stream.read(&mut wait);
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("receiver_logs.jsonl") 
+        {
+            let log_linha = serde_json::json!({
+                "request": input_img.request,
+                "node_id": MY_ID,
+                "total_receiver_ms": totalduration,
+                "receive_ms": receiveduration,
+                "exec_ms": execduration,
+                "send_ms": sendduration
+            });
 
+            if let Ok(texto) = serde_json::to_string(&log_linha) {
+                let _ = writeln!(file, "{}", texto);
+            }
+        }
+        
         break;
     }
 
