@@ -88,6 +88,7 @@ fn main() -> std::io::Result<()> {
         ..data_raw
     };
     
+    let start_send = Instant::now(); //time to send begin
     let mut stream = TcpStream::connect("10.68.119.168:8081")?;  //TODO FIRST KERNEL IP
 
     let serialized_msgpack = rmp_serde::to_vec(&data).expect("MSGPACK Serialization failed");
@@ -96,9 +97,14 @@ fn main() -> std::io::Result<()> {
 
     stream.write_all(&serialized_msgpack)?;
     stream.flush()?;
-    let start_exec = Instant::now();
+
+    let sendduration_micros = start_send).as_micros(); 
+    let sendduration_millis = sendduration_micros as f64 / 1000.0;
+    
 
     println!("Enviado: {} bytes de payload.", len);
+
+    let start_exec = Instant::now(); //time after send until receives all data back
 
     drop(stream);
     //===============
@@ -121,7 +127,7 @@ fn main() -> std::io::Result<()> {
     let duration_micros = start_exec.elapsed().as_micros(); 
     let duration_millis = duration_micros as f64 / 1000.0;
     
-    println!("Sucesso! Recebida imagem de {}x{} Tempo: {}µs ({:.3}ms", result.width, result.height, duration_micros, duration_millis);
+    println!("Sucess! Recebida imagem de {}x{} time to process: {}µs ({:.3}ms - time to send: {}µs ({:.3}ms", result.width, result.height, duration_micros, duration_millis, sendduration_micros, sendduration_millis);
 
     save_ppm("resultado.ppm", &result).expect("Erro ao salvar o arquivo de saída");
     if let Ok(mut file) = std::fs::OpenOptions::new()
