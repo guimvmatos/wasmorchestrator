@@ -107,7 +107,22 @@ cd Distributed/sys
 CC="" cargo run
 
 
-## Tests env
+## Tests env Ok
+For distributed, use:
+Tests/orchestrator Ok
+Distributed/sys_test Ok
+Distributed/client Ok
+Distributed/kernel Ok
+Distributed/receivers Ok
+
+
+
+For monolithic, use:
+Tests/orchestrator confirmed?
+Tests/receiver confirmed?
+Tests/kernel confirmed?
+Distributed/client (with only 1 as request) Ok
+Distributed/sys_test Ok
 
 
 

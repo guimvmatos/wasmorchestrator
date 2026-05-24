@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use rmp_serde::{Deserializer, Serializer};
 use std::fs::File;
 use std::time::Instant;
+use std::env;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -42,7 +43,7 @@ fn read_ppm(path: &str) -> std::io::Result<ImageData> {
     let mut pixels = vec![0u8; (width * height * 3) as usize];
     reader.read_exact(&mut pixels)?;
 
-    Ok(ImageData { width, height, pixels, reply_to: String::new(), kernels: Vec::new(), current_kernel: 1})
+    Ok(ImageData { width, height, pixels, reply_to: String::new(), kernels: Vec::new(), current_kernel: 1, request: 0})
 }
 
 fn save_ppm(path: &str, img: &ImageData) -> std::io::Result<()> {
@@ -57,6 +58,22 @@ fn save_ppm(path: &str, img: &ImageData) -> std::io::Result<()> {
 }
 
 fn main() -> std::io::Result<()> {
+    // 1. CAPTURA DOS PARÂMETROS DE INICIALIZAÇÃO
+    let args: Vec<String> = env::args().collect();
+    
+    if args.len() < 2 {
+        eprintln!("Erro: ID do request não fornecido.");
+        eprintln!("Uso correto: {} <id_do_request>", args[0]);
+        std::process::exit(1);
+    }
+
+    // Faz o parse do argumento string para u32
+    let request_id: u32 = args[1].parse().unwrap_or_else(|_| {
+        eprintln!("Erro: O ID do request precisa ser um número inteiro válido (u32).");
+        std::process::exit(1);
+    });
+
+
     let path = "image.ppm";
     println!("Carregando {}...", path);
     //let data = read_ppm(path).expect("Erro ao ler o arquivo PPM");
@@ -64,13 +81,14 @@ fn main() -> std::io::Result<()> {
 
     
     let data = ImageData {
-        reply_to: "10.68.119.168:9000".to_string(), #TODO CLIENT'S IP
-        kernels: vec![1], #TODO KERNELS TO BE PROCESSED
+        reply_to: "10.68.119.168:9000".to_string(), //TODO CLIENT'S IP
+        kernels: vec![1], //TODO KERNELS TO PROCESS
         current_kernel: 1,
+        request: request_id,
         ..data_raw
     };
     
-    let mut stream = TcpStream::connect("10.68.119.168:8081")?;  #TODO FIRST KERNEL IP
+    let mut stream = TcpStream::connect("10.68.119.168:8081")?;  //TODO FIRST KERNEL IP
 
     let serialized_msgpack = rmp_serde::to_vec(&data).expect("MSGPACK Serialization failed");
     let len = serialized_msgpack.len() as u32;
@@ -84,7 +102,7 @@ fn main() -> std::io::Result<()> {
 
     drop(stream);
     //===============
-    let listener = TcpListener::bind("10.68.119.168:9000")?; #TODO CLIENT'S IP
+    let listener = TcpListener::bind("10.68.119.168:9000")?; //TODO CLIENT'S IP
     let (mut stream_resposta, addr) = listener.accept()?; 
     println!("Conexão de resposta vinda de: {}", addr);
 
@@ -106,6 +124,25 @@ fn main() -> std::io::Result<()> {
     println!("Sucesso! Recebida imagem de {}x{} Tempo: {}µs ({:.3}ms", result.width, result.height, duration_micros, duration_millis);
 
     save_ppm("resultado.ppm", &result).expect("Erro ao salvar o arquivo de saída");
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+    .create(true)
+    .append(true)
+    .open("client_logs.jsonl") 
+    {
+        let log_linha = serde_json::json!({
+            "request": result.request,
+            "img_width": result.width,
+            "img_height": result.height,
+            "total_time_ms": duration_millis,
+            "sla_ms": 15,
+            "pipeline_demanda": result.kernels 
+        });
+
+        if let Ok(texto) = serde_json::to_string(&log_linha) {
+            let _ = writeln!(file, "{}", texto);
+            println!("Log da execução {} salvo com sucesso em client_logs.jsonl!", result.request);
+        }
+    }
     
     Ok(())
 }

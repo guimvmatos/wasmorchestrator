@@ -4,6 +4,7 @@ use std::net::{TcpListener, TcpStream};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::env;
+use std::collections::HashMap;
 
 type WitImagedata = bindings::planner::grayscaleworld::plan::Imagedata;
 
@@ -30,6 +31,8 @@ struct RoutingTable {
 
 fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Result<()> {
 
+    let start_exec = Instant::now(); // TEMP
+
     let MY_ID: u8 = 1; //#### TODO colocar o numero da funcao aqui...
 
     let mut len_buf = [0u8; 4];
@@ -51,11 +54,11 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
         let input_img: WitImagedata = rmp_serde::from_slice(&buffer).expect("Failed to deserialize MessagePack response");
 
-        let start_exec = Instant::now();
+        //let start_exec = Instant::now();
 
         let mut status = bindings::planner::grayscaleworld::plan::grayscale(&input_img);
 
-        let duration = start_exec.elapsed().as_millis();
+        //let duration = start_exec.elapsed().as_millis();
 
         let file = std::fs::File::open("routing_table.json").expect("Erro ao abrir JSON");
         let routing: RoutingTable = serde_json::from_reader(file).expect("Erro no JSON");
@@ -63,10 +66,10 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         // Captura o score deste nó (estou assumindo que este nó físico é o ID 1)
         let current_score = routing.node_scores.get(&1).cloned().unwrap_or(0.0); //#### TODO colocar ip numero do NÓ aqui
 
-        println!(
-            "METRIC_DATA: id={}, w={}, h={}, time_ms={}, score={:.2}",
-            MY_ID, input_img.width, input_img.height, duration, current_score
-        );
+        //println!(
+        //    "METRIC_DATA: id={}, w={}, h={}, time_ms={}, score={:.2}",
+        //    MY_ID, input_img.width, input_img.height, duration, current_score
+        //);
 
         let itinerary = &status.kernels; 
         let my_pos = itinerary.iter().position(|&id| id == MY_ID);
@@ -111,6 +114,13 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         next_stream.flush()?;
 
         println!("Payload enviado para o Sobel com sucesso!");
+
+        let duration = start_exec.elapsed().as_millis();
+
+        println!(
+            "METRIC_DATA: id={}, w={}, h={}, time_ms={}, score={:.2}",
+            MY_ID, input_img.width, input_img.height, duration, current_score
+        );
 
         let mut wait = [0u8; 1];
         let _ = next_stream.read(&mut wait);

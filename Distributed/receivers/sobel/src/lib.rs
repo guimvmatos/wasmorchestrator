@@ -4,6 +4,8 @@ use std::net::{TcpListener, TcpStream};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::env;
+use std::collections::HashMap;
+
 
 type WitImagedata = bindings::planner::sobelworld::plan::Imagedata;
 
