@@ -98,7 +98,7 @@ fn main() -> std::io::Result<()> {
     stream.write_all(&serialized_msgpack)?;
     stream.flush()?;
 
-    let sendduration_micros = start_send).as_micros(); 
+    let sendduration_micros = start_send.elapsed().as_micros(); 
     let sendduration_millis = sendduration_micros as f64 / 1000.0;
     
 
@@ -127,7 +127,7 @@ fn main() -> std::io::Result<()> {
     let duration_micros = start_exec.elapsed().as_micros(); 
     let duration_millis = duration_micros as f64 / 1000.0;
     
-    println!("Sucess! Recebida imagem de {}x{} time to process: {}µs ({:.3}ms - time to send: {}µs ({:.3}ms", result.width, result.height, duration_micros, duration_millis, sendduration_micros, sendduration_millis);
+    println!("Sucess! Image received: {}x{} | Time to process: {}µs ({:.3}ms) | Time to send: {}µs ({:.3}ms)", result.width, result.height, duration_micros, duration_millis, sendduration_micros, sendduration_millis);
 
     save_ppm("resultado.ppm", &result).expect("Erro ao salvar o arquivo de saída");
     if let Ok(mut file) = std::fs::OpenOptions::new()
@@ -139,6 +139,7 @@ fn main() -> std::io::Result<()> {
             "request": result.request,
             "img_width": result.width,
             "img_height": result.height,
+            "send_time_ms": sendduration_millis,
             "total_time_ms": duration_millis,
             "sla_ms": 15,
             "pipeline_demanda": result.kernels 
