@@ -88,10 +88,10 @@ fn main() -> std::io::Result<()> {
         ..data_raw
     };
     
+    let serialized_msgpack = rmp_serde::to_vec(&data).expect("MSGPACK Serialization failed");
     let start_send = Instant::now(); //time to send begin
     let mut stream = TcpStream::connect("10.68.119.168:8081")?;  //TODO FIRST KERNEL IP
 
-    let serialized_msgpack = rmp_serde::to_vec(&data).expect("MSGPACK Serialization failed");
     let len = serialized_msgpack.len() as u32;
     stream.write_all(&len.to_be_bytes())?; 
 
@@ -150,32 +150,6 @@ fn main() -> std::io::Result<()> {
             println!("Log da execução {} salvo com sucesso em client_logs.jsonl!", result.request);
         }
     }
-
-    // ====================================================================
-    // NOVO: DISPARA O AGREGADOR PYTHON LOGO APÓS FECHAR O LOG DO CLIENTE
-    // ====================================================================
-    /*println!("Acionando o Data Aggregator assintoticamente...");
-    
-    let output = std::process::Command::new("python3")
-        .arg("../aggregator/aggregator.py") // Se o script estiver na mesma pasta do client
-        .arg(result.request.to_string()) // <--- ENVIANDO O REQUEST ATUAL COMO ARGUMENTO
-        .output();
-
-    match output {
-        Ok(out) => {
-            if out.status.success() {
-                // Transforma o que o Python printou no terminal em string pra mostrar no Rust
-                let stdout = String::from_utf8_lossy(&out.stdout);
-                println!("{}", stdout.trim());
-            } else {
-                let stderr = String::from_utf8_lossy(&out.stderr);
-                eprintln!("Erro na execução do Data Aggregator: {}", stderr.trim());
-            }
-        }
-        Err(e) => eprintln!("Falha ao iniciar o Data Aggregator (python3 não encontrado?): {:?}", e),
-    }
-    // ====================================================================
-    */
     
     Ok(())
 }
