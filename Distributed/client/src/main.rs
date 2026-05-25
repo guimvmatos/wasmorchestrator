@@ -154,11 +154,11 @@ fn main() -> std::io::Result<()> {
     // ====================================================================
     // NOVO: DISPARA O AGREGADOR PYTHON LOGO APÓS FECHAR O LOG DO CLIENTE
     // ====================================================================
-    println!("Acionando o Data Aggregator assintoticamente...");
+    /*println!("Acionando o Data Aggregator assintoticamente...");
     
     let output = std::process::Command::new("python3")
         .arg("../aggregator/aggregator.py") // Se o script estiver na mesma pasta do client
-        // .arg("../caminho/se/estiver/em/outro/lugar/data_aggregator.py") // Use assim se estiver fora
+        .arg(result.request.to_string()) // <--- ENVIANDO O REQUEST ATUAL COMO ARGUMENTO
         .output();
 
     match output {
@@ -175,6 +175,7 @@ fn main() -> std::io::Result<()> {
         Err(e) => eprintln!("Falha ao iniciar o Data Aggregator (python3 não encontrado?): {:?}", e),
     }
     // ====================================================================
+    */
     
     Ok(())
 }
