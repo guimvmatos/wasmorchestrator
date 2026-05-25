@@ -188,7 +188,7 @@ fn main() -> std::io::Result<()> {
                 }
             });
 
-            let current_demand = vec![1]; 
+            let current_demand = vec![1, 2, 3]; 
 
             let (new_table, scores, new_assignments) = decide_routing(&nodes_health, &current_demand);
 
