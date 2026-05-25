@@ -117,6 +117,7 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         
         //let mut wait = [0u8; 1];
         let _ = next_stream.shutdown(Shutdown::Write); //em teste
+        let _ = stream.shutdown(Shutdown::Both); //em teste
         //let _ = next_stream.read(&mut wait);
         
         let sendduration = start_send.elapsed().as_millis();
