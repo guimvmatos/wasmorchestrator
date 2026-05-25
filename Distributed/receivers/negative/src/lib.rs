@@ -60,21 +60,8 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         let receiveduration = start_receive.elapsed().as_millis();
 
         let start_exec = Instant::now();
-        println!(
-            "TEST1: request={}",
-            input_img.request
-        );
 
         let mut status = bindings::planner::negativeworld::plan::invert(&input_img);
-        println!(
-            "TEST2: request={}",
-            input_img.request
-        );
-
-        println!(
-            "TEST3: request={}",
-            status.request
-        );
 
         let execduration = start_exec.elapsed().as_millis();
 
