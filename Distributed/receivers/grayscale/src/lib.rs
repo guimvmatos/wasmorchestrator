@@ -134,7 +134,7 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         {
             let log_linha = serde_json::json!({
                 "request": input_img.request,
-                "node_id": MY_ID,
+                "kernel_id": MY_ID,
                 "total_receiver_ms": totalduration,
                 "receive_ms": receiveduration,
                 "exec_ms": execduration,

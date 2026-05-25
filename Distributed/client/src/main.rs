@@ -150,6 +150,31 @@ fn main() -> std::io::Result<()> {
             println!("Log da execução {} salvo com sucesso em client_logs.jsonl!", result.request);
         }
     }
+
+    // ====================================================================
+    // NOVO: DISPARA O AGREGADOR PYTHON LOGO APÓS FECHAR O LOG DO CLIENTE
+    // ====================================================================
+    println!("Acionando o Data Aggregator assintoticamente...");
+    
+    let output = std::process::Command::new("python3")
+        .arg("../aggregator/aggregator.py") // Se o script estiver na mesma pasta do client
+        // .arg("../caminho/se/estiver/em/outro/lugar/data_aggregator.py") // Use assim se estiver fora
+        .output();
+
+    match output {
+        Ok(out) => {
+            if out.status.success() {
+                // Transforma o que o Python printou no terminal em string pra mostrar no Rust
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                println!("{}", stdout.trim());
+            } else {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                eprintln!("Erro na execução do Data Aggregator: {}", stderr.trim());
+            }
+        }
+        Err(e) => eprintln!("Falha ao iniciar o Data Aggregator (python3 não encontrado?): {:?}", e),
+    }
+    // ====================================================================
     
     Ok(())
 }
