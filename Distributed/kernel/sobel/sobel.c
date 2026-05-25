@@ -50,4 +50,5 @@ void exports_planner_sobelworld_plan_sobel(exports_planner_sobelworld_plan_image
     ret->reply_to = img->reply_to;
     ret->kernels = img->kernels;
     ret->current_kernel = img->current_kernel;
+    ret->request = img->request;
 }
