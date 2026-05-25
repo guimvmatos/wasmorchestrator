@@ -66,6 +66,12 @@ def consolidar_dataset():
     logs_hardware = carregar_jsonl("../sys_test/sys_hardware_metrics.jsonl")
 
     # 5. MONTA A LINHA ÚNICA DA EXECUÇÃO ATUAL
+    lista_kernels = req_client["pipeline_demanda"]
+    if isinstance(lista_kernels, list):
+        demanda_formatada = "-".join(str(k) for k in lista_kernels)
+    else:
+        demanda_formatada = str(lista_kernels).replace("[", "").replace("]", "").replace(", ", "|")
+
     linha_dataset = {
         "request_id": target_request_id,
         "img_width": int(req_client["img_width"]),
@@ -73,7 +79,7 @@ def consolidar_dataset():
         "send_time_ms": float(req_client["send_time_ms"]),
         "total_client_time_ms": float(req_client["total_time_ms"]),
         "sla_ms": int(req_client["sla_ms"]),
-        "pipeline_demanda": str(req_client["pipeline_demanda"]),
+        "pipeline_demanda": demanda_formatada,
     }
 
     # Varre todos os kernels que processaram essa request (caso haja mais de um)

@@ -136,7 +136,7 @@ fn main() -> std::io::Result<()> {
     .open("client_logs.jsonl") 
     {
         let log_linha = serde_json::json!({
-            "request": result.request,
+            "request": request_id,
             "img_width": result.width,
             "img_height": result.height,
             "send_time_ms": sendduration_millis,
