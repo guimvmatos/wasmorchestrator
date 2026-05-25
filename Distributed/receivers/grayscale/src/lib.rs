@@ -123,8 +123,8 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         let totalduration = start_total.elapsed().as_millis();
 
         println!(
-            "METRIC_DATA: id={}, w={}, h={}, total_ms={}, score={:.2}, receive_ms{}, exec_ms{}, send_ms{}",
-            MY_ID, input_img.width, input_img.height, totalduration, current_score, receiveduration, execduration, sendduration
+            "METRIC_DATA: request={}, id={}, w={}, h={}, total_ms={}, score={:.2}, receive_ms{}, exec_ms{}, send_ms{}",
+            MY_ID, input_img.request, input_img.width, input_img.height, totalduration, current_score, receiveduration, execduration, sendduration
         );
 
         if let Ok(mut file) = std::fs::OpenOptions::new()

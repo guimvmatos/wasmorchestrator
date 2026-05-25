@@ -203,6 +203,28 @@ fn main() -> std::io::Result<()> {
             println!("--- Coletando Telemetria ---");
             let metrics = collect_free_metrics(my_node_id, &mut sys, &mut networks, my_functions.clone());
 
+            // ====================================================================
+            // NOVO: SALVA AS MÉTRICAS DE HARDWARE EM JSON LINES DINÂMICO
+            // ====================================================================
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("sys_hardware_metrics.jsonl") 
+            {
+                let log_linha = serde_json::json!({
+                    "node_id": my_node_id,
+                    "cpu_free": metrics.cpu_free,       // TODO: Confirme se o campo na sua struct chama 'cpu_free'
+                    "mem_free": metrics.mem_free,       // TODO: Confirme se o campo na sua struct chama 'mem_free'
+                    "health_score": metrics.health_score // TODO: Confirme se o campo na sua struct chama 'health_score'
+                });
+
+                if let Ok(texto) = serde_json::to_string(&log_linha) {
+                    use std::io::Write; // Garante o trait Write no escopo local
+                    let _ = writeln!(file, "{}", texto);
+                }
+            }
+            // ====================================================================
+
             send_to_orchestrator(metrics);
 
             last_telemetry = std::time::Instant::now();
