@@ -68,7 +68,7 @@ def consolidar_dataset():
     # 5. MONTA A LINHA ÚNICA DA EXECUÇÃO ATUAL
     lista_kernels = req_client["pipeline_demanda"]
     if isinstance(lista_kernels, list):
-        demanda_formatada = "-".join(str(k) for k in lista_kernels)
+        demanda_formatada = "|".join(str(k) for k in lista_kernels)
     else:
         demanda_formatada = str(lista_kernels).replace("[", "").replace("]", "").replace(", ", "|")
 
