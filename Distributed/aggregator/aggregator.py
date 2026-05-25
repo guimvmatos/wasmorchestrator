@@ -17,6 +17,7 @@ def carregar_jsonl(caminho_arquivo):
 
 
 def consolidar_dataset():
+    time.sleep(0.5)
     print("Iniciando a consolidação dos dados para a IA...")
 
     # 1. CARREGA OS LOGS DO CLIENTE (Caminho Atualizado)
