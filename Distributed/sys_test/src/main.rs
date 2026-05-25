@@ -213,12 +213,9 @@ fn main() -> std::io::Result<()> {
             {
                 let log_linha = serde_json::json!({
                     "node_id": my_node_id,
-                    //"cpu_free": metrics.cpu_free_pct,       // TODO: Confirme se o campo na sua struct chama 'cpu_free'
-                    //"mem_free": metrics.mem_free_pct,       // TODO: Confirme se o campo na sua struct chama 'mem_free'
-                    //"health_score": metrics.health_score // TODO: Confirme se o campo na sua struct chama 'health_score'
-                    "cpu_free": (metrics.cpu_free_pct * 100.0).round() / 100.0,       
-                    "mem_free": (metrics.mem_free_pct * 100.0).round() / 100.0,       
-                    "health_score": (metrics.health_score * 100.0).round() / 100.0,
+                    "cpu_free": format!("{:.2}", metrics.cpu_free_pct),       
+                    "mem_free": format!("{:.2}", metrics.mem_free_pct),       
+                    "health_score": format!("{:.2}", metrics.health_score),
                 });
 
                 if let Ok(texto) = serde_json::to_string(&log_linha) {
