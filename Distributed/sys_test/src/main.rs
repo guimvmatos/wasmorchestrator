@@ -213,8 +213,8 @@ fn main() -> std::io::Result<()> {
             {
                 let log_linha = serde_json::json!({
                     "node_id": my_node_id,
-                    "cpu_free": metrics.cpu_free,       // TODO: Confirme se o campo na sua struct chama 'cpu_free'
-                    "mem_free": metrics.mem_free,       // TODO: Confirme se o campo na sua struct chama 'mem_free'
+                    "cpu_free": metrics.cpu_free_pct,       // TODO: Confirme se o campo na sua struct chama 'cpu_free'
+                    "mem_free": metrics.mem_free_pct,       // TODO: Confirme se o campo na sua struct chama 'mem_free'
                     "health_score": metrics.health_score // TODO: Confirme se o campo na sua struct chama 'health_score'
                 });
 
