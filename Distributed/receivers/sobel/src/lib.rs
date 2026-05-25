@@ -60,7 +60,7 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         let receiveduration = start_receive.elapsed().as_millis();
 
         let start_exec = Instant::now();
-        
+
         let mut status = bindings::planner::sobelworld::plan::sobel(&input_img);
 
         let execduration = start_exec.elapsed().as_millis();
@@ -86,8 +86,8 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
                 status.current_kernel = next_kernel_id as u32;
 
                 // 4. CONSULTA KEY/VALUE NO JSON
-                let file = std::fs::File::open("routing_table.json").expect("Erro ao abrir JSON");
-                let routing: RoutingTable = serde_json::from_reader(file).expect("Erro no JSON");
+                //let file = std::fs::File::open("routing_table.json").expect("Erro ao abrir JSON");
+                //let routing: RoutingTable = serde_json::from_reader(file).expect("Erro no JSON");
 
                 // Buscamos pela CHAVE "7"
                 routing.table.get(&next_kernel_id)
