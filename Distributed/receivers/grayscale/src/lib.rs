@@ -53,6 +53,7 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
         let mut buffer = vec![0u8; len];
         stream.read_exact(&mut buffer)?;
+        let _ = stream.shutdown(Shutdown::Both); //em teste
 
         let input_img: WitImagedata = rmp_serde::from_slice(&buffer).expect("Failed to deserialize MessagePack response");
 
@@ -115,10 +116,10 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
         println!("Payload enviado para o Sobel com sucesso!");
         
-        //let mut wait = [0u8; 1];
-        let _ = next_stream.shutdown(Shutdown::Write); //em teste
-        let _ = stream.shutdown(Shutdown::Both); //em teste
-        //let _ = next_stream.read(&mut wait);
+        let mut wait = [0u8; 1];
+        //let _ = next_stream.shutdown(Shutdown::Write); //em teste
+        //let _ = stream.shutdown(Shutdown::Both); //em teste
+        let _ = next_stream.read(&mut wait);
         
         let sendduration = start_send.elapsed().as_millis();
 
