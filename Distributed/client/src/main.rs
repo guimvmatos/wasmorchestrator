@@ -74,12 +74,16 @@ fn main() -> std::io::Result<()> {
     });
 
 
+    //LOADING IMAGE
     let path = "image.ppm";
     println!("Carregando {}...", path);
     //let data = read_ppm(path).expect("Erro ao ler o arquivo PPM");
+    let start_read = Instant::now();
     let data_raw = read_ppm(path).expect("Erro ao ler PPM");
-
+    let readduration_micros = start_read.elapsed().as_micros(); 
+    let readduration_millis = readduration_micros as f64 / 1000.0;
     
+
     let data = ImageData {
         reply_to: "10.68.119.168:9000".to_string(), //TODO CLIENT'S IP
         kernels: vec![1], //TODO KERNELS TO PROCESS
@@ -88,7 +92,13 @@ fn main() -> std::io::Result<()> {
         ..data_raw
     };
     
+    //IMAGE SERIALIZATION
+    let start_serialize = Instant::now();
     let serialized_msgpack = rmp_serde::to_vec(&data).expect("MSGPACK Serialization failed");
+    let serializeduration_micros = start_serialize.elapsed().as_micros(); 
+    let serializeduration_millis = serializeduration_micros as f64 / 1000.0;
+
+    //IMAGE SEND
     let start_send = Instant::now(); //time to send begin
     let mut stream = TcpStream::connect("10.68.119.168:8081")?;  //TODO FIRST KERNEL IP
 
@@ -103,29 +113,33 @@ fn main() -> std::io::Result<()> {
     
 
     println!("Enviado: {} bytes de payload.", len);
-
+    
+    //PIPELINE... (TIME TO PROCESS KERNELS AND RECEIVE AN OUTPUT)
     let start_exec = Instant::now(); //time after send until receives all data back
-
     drop(stream);
-    //===============
     let listener = TcpListener::bind("10.68.119.168:9000")?; //TODO CLIENT'S IP
+
     let (mut stream_resposta, addr) = listener.accept()?; 
     println!("Conexão de resposta vinda de: {}", addr);
 
+    
     let mut len_buf = [0u8; 4];
     stream_resposta.read_exact(&mut len_buf).expect("Failed to read size header");
-
     let response_len = u32::from_be_bytes(len_buf) as usize;
 
     let mut response_payload = vec![0u8; response_len];
-    
-    //stream.read_exact(&mut response_payload).expect("Failed to read payload");
     stream_resposta.read_exact(&mut response_payload).expect("Failed to read payload");
-
-    let result: ImageData = rmp_serde::from_slice(&response_payload).expect("Failed to deserialize MessagePack response");
-    
+    drop(stream_resposta);
     let duration_micros = start_exec.elapsed().as_micros(); 
     let duration_millis = duration_micros as f64 / 1000.0;
+
+
+    //IMAGEM DESERIALIZATION
+    let start_deserialize = Instant::now(); //time after send until receives all data back
+    let result: ImageData = rmp_serde::from_slice(&response_payload).expect("Failed to deserialize MessagePack response");
+    let deserializeduration_micros = start_deserialize.elapsed().as_micros(); 
+    let deserializeduration_millis = duration_micros as f64 / 1000.0;
+    
     
     println!("Sucess! Image received: {}x{} | Time to process: {}µs ({:.3}ms) | Time to send: {}µs ({:.3}ms)", result.width, result.height, duration_micros, duration_millis, sendduration_micros, sendduration_millis);
 
@@ -137,11 +151,14 @@ fn main() -> std::io::Result<()> {
     {
         let log_linha = serde_json::json!({
             "request": request_id,
+            "sla_ms": 15,
             "img_width": result.width,
             "img_height": result.height,
+            "read_time_ms": readduration_millis,
+            "serialize_time_ms:" serializeduration_millis,
             "send_time_ms": sendduration_millis,
-            "total_time_ms": duration_millis,
-            "sla_ms": 15,
+            "exec_time_ms": duration_millis,
+            "deserialize_time_ms": deserializeduration_millis,
             "pipeline_demanda": result.kernels 
         });
 
