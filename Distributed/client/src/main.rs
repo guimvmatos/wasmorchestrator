@@ -138,7 +138,7 @@ fn main() -> std::io::Result<()> {
     let start_deserialize = Instant::now(); //time after send until receives all data back
     let result: ImageData = rmp_serde::from_slice(&response_payload).expect("Failed to deserialize MessagePack response");
     let deserializeduration_micros = start_deserialize.elapsed().as_micros(); 
-    let deserializeduration_millis = duration_micros as f64 / 1000.0;
+    let deserializeduration_millis = deserializeduration_micros as f64 / 1000.0;
     
     
     println!("Sucess! Image received: {}x{} | Time to process: {}µs ({:.3}ms) | Time to send: {}µs ({:.3}ms)", result.width, result.height, duration_micros, duration_millis, sendduration_micros, sendduration_millis);
@@ -155,7 +155,7 @@ fn main() -> std::io::Result<()> {
             "img_width": result.width,
             "img_height": result.height,
             "read_time_ms": readduration_millis,
-            "serialize_time_ms:" serializeduration_millis,
+            "serialize_time_ms": serializeduration_millis,
             "send_time_ms": sendduration_millis,
             "exec_time_ms": duration_millis,
             "deserialize_time_ms": deserializeduration_millis,
