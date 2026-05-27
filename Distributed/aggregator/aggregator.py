@@ -72,12 +72,16 @@ def consolidar_dataset():
     else:
         demanda_formatada = str(lista_kernels).replace("[", "").replace("]", "").replace(", ", "|")
 
+    # Montagem da estrutura base da linha do dataset
     linha_dataset = {
         "request_id": target_request_id,
         "img_width": int(req_client["img_width"]),
         "img_height": int(req_client["img_height"]),
+        "client_read_time_ms": float(req_client.get("read_time_ms", 0.0)),
+        "client_serialize_time_ms": float(req_client.get("serialize_time_ms", 0.0)),
         "send_time_ms": float(req_client["send_time_ms"]),
-        "total_client_time_ms": float(req_client["total_time_ms"]),
+        "total_client_time_ms": float(req_client["exec_time_ms"]),  # CORRIGIDO: De total_time_ms para exec_time_ms
+        "client_deserialize_time_ms": float(req_client.get("deserialize_time_ms", 0.0)),
         "sla_ms": int(req_client["sla_ms"]),
         "pipeline_demanda": demanda_formatada,
     }

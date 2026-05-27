@@ -2,7 +2,7 @@
 
 # CONFIGURAÇÕES DA SUA BATERIA DE TESTES
 ID_INICIAL=1       # Mude para o ID que você quer começar
-QUANTIDADE=10       # Quantos requests quer rodar em sequência?
+QUANTIDADE=1       # Quantos requests quer rodar em sequência?
 ID_FINAL=$((ID_INICIAL + QUANTIDADE - 1))
 
 echo "==============================================="

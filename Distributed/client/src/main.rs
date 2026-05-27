@@ -61,9 +61,9 @@ fn main() -> std::io::Result<()> {
     // 1. CAPTURA DOS PARÂMETROS DE INICIALIZAÇÃO
     let args: Vec<String> = env::args().collect();
     
-    if args.len() < 2 {
-        eprintln!("Erro: ID do request não fornecido.");
-        eprintln!("Uso correto: {} <id_do_request>", args[0]);
+    if args.len() < 3 {
+        eprintln!("Erro: Parâmetros insuficientes.");
+        eprintln!("Uso correto: {} <id_do_request> <caminho_da_imagem.ppm>", args[0]);
         std::process::exit(1);
     }
 
@@ -73,9 +73,11 @@ fn main() -> std::io::Result<()> {
         std::process::exit(1);
     });
 
+    let path = &args[2];
+
 
     //LOADING IMAGE
-    let path = "image.ppm";
+    //let path = "image.ppm";
     println!("Carregando {}...", path);
     //let data = read_ppm(path).expect("Erro ao ler o arquivo PPM");
     let start_read = Instant::now();
