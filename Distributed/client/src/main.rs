@@ -62,7 +62,7 @@ fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
     
     if args.len() < 4 {
-        eprintln!("Correct usage: {} <id_request> <image.ppm> <kernels_split_by_comma>", args[0])
+        eprintln!("Correct usage: {} <id_request> <image.ppm> <kernels_split_by_comma>", args[0]);
         std::process::exit(1);
     }
 
@@ -90,6 +90,7 @@ fn main() -> std::io::Result<()> {
     let readduration_micros = start_read.elapsed().as_micros(); 
     let readduration_millis = readduration_micros as f64 / 1000.0;
     
+    let primeiro_kernel = kernels_vec.first().cloned().unwrap_or(1);
 
     let data = ImageData {
         reply_to: "10.68.119.168:9000".to_string(), //TODO CLIENT'S IP
@@ -98,6 +99,16 @@ fn main() -> std::io::Result<()> {
         current_kernel: 1,
         request: request_id,
         ..data_raw
+    };
+
+    //let primeiro_kernel = kernels_vec.first().cloned().unwrap_or(1);
+
+    // 2. Define a porta dinamicamente com base no ID do primeiro kernel
+    let porta = match primeiro_kernel {
+        1 => 8081, // Grayscale
+        2 => 8082, // Sobel
+        3 => 8083, // Negative
+        _ => 8081, // Fallback de segurança
     };
     
     //IMAGE SERIALIZATION
@@ -108,7 +119,9 @@ fn main() -> std::io::Result<()> {
 
     //IMAGE SEND
     let start_send = Instant::now(); //time to send begin
-    let mut stream = TcpStream::connect("10.68.119.168:8081")?;  //TODO FIRST KERNEL IP
+    let target_address = format!("10.68.119.168:{}", porta);
+    //let mut stream = TcpStream::connect("10.68.119.168:8081")?;  //TODO FIRST KERNEL IP
+    let mut stream = TcpStream::connect(target_address)?;
 
     let len = serialized_msgpack.len() as u32;
     stream.write_all(&len.to_be_bytes())?; 
