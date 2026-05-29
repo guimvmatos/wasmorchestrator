@@ -73,10 +73,11 @@ def consolidar_dataset():
         "request_id": target_request_id,
         "img_width": int(req_client["img_width"]),
         "img_height": int(req_client["img_height"]),
+        "total_client_time_ms": float(req_client.get("total_client_time_ms", 0.0)), # Tempo mestre fim a fim real
         "client_read_time_ms": float(req_client.get("read_time_ms", 0.0)),
         "client_serialize_time_ms": float(req_client.get("serialize_time_ms", 0.0)),
         "send_time_ms": float(req_client["send_time_ms"]),
-        "total_client_time_ms": float(req_client["exec_time_ms"]),
+        "client_exec_time_ms": float(req_client["exec_time_ms"]), # Tempo da pipeline (rede + wasm)
         "client_deserialize_time_ms": float(req_client.get("deserialize_time_ms", 0.0)),
         "sla_ms": int(req_client["sla_ms"]),
         "pipeline_demanda": demanda_formatada,

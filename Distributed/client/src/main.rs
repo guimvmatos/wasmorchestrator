@@ -58,6 +58,7 @@ fn save_ppm(path: &str, img: &ImageData) -> std::io::Result<()> {
 }
 
 fn main() -> std::io::Result<()> {
+    let start_total = Instant::now(); // <--- INSERIR ESTA LINHA
     // 1. CAPTURA DOS PARÂMETROS DE INICIALIZAÇÃO
     let args: Vec<String> = env::args().collect();
     
@@ -165,6 +166,7 @@ fn main() -> std::io::Result<()> {
     println!("Sucess! Image received: {}x{} | Time to process: {}µs ({:.3}ms) | Time to send: {}µs ({:.3}ms)", result.width, result.height, duration_micros, duration_millis, sendduration_micros, sendduration_millis);
 
     save_ppm("resultado.ppm", &result).expect("Erro ao salvar o arquivo de saída");
+    let total_duration_millis = start_total.elapsed().as_secs_f64() * 1000.0; 
     if let Ok(mut file) = std::fs::OpenOptions::new()
     .create(true)
     .append(true)
@@ -180,6 +182,7 @@ fn main() -> std::io::Result<()> {
             "send_time_ms": sendduration_millis,
             "exec_time_ms": duration_millis,
             "deserialize_time_ms": deserializeduration_millis,
+            "total_client_time_ms": total_duration_millis, 
             "pipeline_demanda": result.kernels 
         });
 
