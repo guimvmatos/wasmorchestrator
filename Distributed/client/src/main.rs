@@ -61,9 +61,8 @@ fn main() -> std::io::Result<()> {
     // 1. CAPTURA DOS PARÂMETROS DE INICIALIZAÇÃO
     let args: Vec<String> = env::args().collect();
     
-    if args.len() < 3 {
-        eprintln!("Erro: Parâmetros insuficientes.");
-        eprintln!("Uso correto: {} <id_do_request> <caminho_da_imagem.ppm>", args[0]);
+    if args.len() < 4 {
+        eprintln!("Correct usage: {} <id_request> <image.ppm> <kernels_split_by_comma>", args[0])
         std::process::exit(1);
     }
 
@@ -74,6 +73,12 @@ fn main() -> std::io::Result<()> {
     });
 
     let path = &args[2];
+
+    let kernels_str = &args[3];
+    let kernels_vec: Vec<u8> = kernels_str
+    .split(',')
+    .map(|s| s.parse().unwrap_or(1))
+    .collect();
 
 
     //LOADING IMAGE
@@ -88,7 +93,8 @@ fn main() -> std::io::Result<()> {
 
     let data = ImageData {
         reply_to: "10.68.119.168:9000".to_string(), //TODO CLIENT'S IP
-        kernels: vec![1], //TODO KERNELS TO PROCESS
+        //kernels: vec![1], //TODO KERNELS TO PROCESS
+        kernels: kernels_vec,
         current_kernel: 1,
         request: request_id,
         ..data_raw
