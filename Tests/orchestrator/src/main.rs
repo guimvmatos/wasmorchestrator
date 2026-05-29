@@ -1,3 +1,4 @@
+// BUG FIX: Forçar roteamento se o score for < 180 mas o nó for o único disponível ou já tiver a função ativa.
 use std::collections::HashMap;
 use std::net::TcpStream;
 use std::io::{Write, Read};

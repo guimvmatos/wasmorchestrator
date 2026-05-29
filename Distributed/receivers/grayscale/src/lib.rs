@@ -69,7 +69,7 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         let routing: RoutingTable = serde_json::from_reader(file).expect("Erro no JSON");
 
         // Captura o score deste nó (estou assumindo que este nó físico é o ID 1)
-        let current_score = routing.node_scores.get(&1).cloned().unwrap_or(0.0); //#### TODO colocar ip numero do NÓ aqui
+        let current_score = routing.node_scores.get(&1).cloned().unwrap_or(0.0); //#### TODO colocar numero do NÓ aqui deopis do get(&x).cloned... X deve ser o onumero do nó
 
         let itinerary = &status.kernels; 
         let my_pos = itinerary.iter().position(|&id| id == MY_ID);
