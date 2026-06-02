@@ -1,54 +1,55 @@
 #!/bin/bash
 
-# Array com as suas imagens de teste
-IMAGENS=("image_4k.ppm" "image_cnn.ppm" "image_fhd.ppm" "image_hd.ppm")
+IMAGENS=("image_cnn.ppm" "image_hd.ppm" "image_fhd.ppm" "image_4k.ppm")
+DEMANDAS=("1" "2" "3" "1,2" "1,3" "2,3" "1,2,3")
 
-# ID inicial do request (você pode mudar se quiser continuar de onde parou)
 REQUEST_ID=1
-
-# Quantas vezes você quer rodar a bateria completa de testes?
 REPETICOES=1
 
-echo "========================================================="
-echo "   Iniciando Bateria de Testes Automatizados - IA Continuum"
-echo "========================================================="
+echo "=== INICIANDO BATERIA DE TESTES (CONTINUANDO A PARTIR DO ID 100) ==="
 
-for ((i=1; i<=REPETICOES; i++))
+for ((r=1; r<=REPETICOES; r++))
 do
-    echo "---------------------------------------------------------"
-    echo " RODADA DE TESTES NÚMERO: $i"
-    echo "---------------------------------------------------------"
+    echo "================================================"
+    echo "INICIANDO RODADA DE REPETIÇÃO NÚMERO: $r / $REPETICOES"
+    echo "================================================"
 
     for IMG in "${IMAGENS[@]}"
     do
-        # Valida se o arquivo de fato existe antes de quebrar o Rust
         if [ ! -f "$IMG" ]; then
-            echo "Aviso: Arquivo $IMG não encontrado na pasta. Pulando..."
+            echo "Aviso: $IMG não encontrada. Pulando..."
             continue
         fi
 
-        echo "[Request #$REQUEST_ID] Disparando pipeline para a imagem: $IMG"
+        for DEMANDA in "${DEMANDAS[@]}"
+        do
+            # SE O ID FOR MENOR QUE 100, APENAS PULA SEM EXECUTAR NADA
+            if [ $REQUEST_ID -lt 100 ]; then
+                # Incrementa o ID silenciosamente para avançar na combinação certa de imagem/pipeline
+                REQUEST_ID=$((REQUEST_ID + 1))
+                continue
+            fi
 
-        # 1. Executa o cliente Rust passando o ID e o caminho da imagem por parâmetro
-        # Nota: Usando --release para a CPU não chorar na serialização de 9 segundos!
-        cargo run --release -- $REQUEST_ID "$IMG"
+            # --- DAQUI PARA BAIXO SÓ EXECUTA DO REQUEST 100 EM DIANTE ---
 
-        # 2. Pequena folga de 1 segundo para garantir que os logs dos Kernels
-        # foram transmitidos e gravados no sys_test pelo receptor assíncrono
-        sleep 1
+            echo "------------------------------------------------"
+            echo "[Req #$REQUEST_ID] [Rodada $r] Imagem: $IMG | Pipeline: [$DEMANDA]"
+            
+            # Executa o cliente passando: ID, Caminho da Imagem e a String da Demanda
+            cargo run --release -- $REQUEST_ID "$IMG" "$DEMANDA"
+            
+            sleep 1
 
-        # 3. Executa o agregador Python para amarrar os logs e atualizar o CSV de treino
-        echo "[Request #$REQUEST_ID] Agregando telemetria e atualizando o dataset..."
-        python3 ../aggregator/aggregator.py $REQUEST_ID
-
-        # Incrementa o ID para o próximo request
-        REQUEST_ID=$((REQUEST_ID + 1))
-        
-        echo "Aguardando próximo disparo..."
-        sleep 2
+            # pegar arquivos em outro pc.
+            #sshpass -p "Kr4pn1kn1l" rsync -avzP --include="*.jsonl" --exclude="*" ssh guimvmatos@10.147.172.163:/home/guimvmatos/wasmorchestrator/Distributed/sys_test/. ../sys_test/
+            
+            # O seu agregador Python original faz o papel dele usando o ID
+            python3 ../aggregator/aggregator.py $REQUEST_ID
+            
+            REQUEST_ID=$((REQUEST_ID + 1))
+            sleep 2
+        done
     done
 done
 
-echo "========================================================="
-echo " Bateria concluída! Dataset atualizado com sucesso."
-echo "========================================================="
+echo "=== BATERIA DE TESTES CONCLUÍDA! ==="
