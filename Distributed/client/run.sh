@@ -32,7 +32,9 @@ do
             sleep 1
 
             # pegar arquivos em outro pc.
-            #sshpass -p "Kr4pn1kn1l" rsync -avzP --include="*.jsonl" --exclude="*" ssh guimvmatos@10.147.172.163:/home/guimvmatos/wasmorchestrator/Distributed/sys_test/. ../sys_test/
+            # sshpass -p "password" rsync -avzP -e ssh --include="*/" --include="*.jsonl" --exclude="*" eiumgat@10.68.119.165:/home/eiumgat/wasmorchestrator/Distributed/sys_test/. ../
+
+            scp blade18:/home/eiumgat/wasmorchestrator/Distributed/sys_test/*.jsonl ../sys_test/
             
             # O seu agregador Python original faz o papel dele usando o ID
             python3 ../aggregator/aggregator.py $REQUEST_ID
