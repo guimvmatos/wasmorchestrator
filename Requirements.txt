@@ -1,0 +1,22 @@
+curl https://sh.rustup.rs -sSf | sh
+#apt install cargo
+#apt install rustup
+rustup target add wasm32-wasip1
+rustup target add wasm32-wasip2
+cargo install wit-bindgen-cli
+cargo install wkg
+cargo install wac-cli
+export PATH="/root/.cargo/bin:$PATH"
+
+wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
+tar -xvf wasi-sdk-25.0-x86_64-linux.tar.gz
+sudo mv wasi-sdk-25.0-x86_64-linux /opt/wasi-sdk
+export WASI_SDK="/opt/wasi-sdk"
+rm -rf wasi-sdk-25.0-x86_64-linux*
+
+curl -L -O https://github.com/bytecodealliance/wasmtime/releases/download/v29.0.0/wasmtime-v29.0.0-x86_64-linux.tar.xz
+tar -xf wasmtime-v29.0.0-x86_64-linux.tar.xz
+mv wasmtime-v29.0.0-x86_64-linux/wasmtime /usr/local/bin/
+rm -rf wasmtime-v29.0.0-x86_64-linux*
+
+bind 'set enable-bracketed-paste off'

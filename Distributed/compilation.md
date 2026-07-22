@@ -3,8 +3,8 @@
 ### Initial dependencies:
 ``` bash
 curl https://sh.rustup.rs -sSf | sh
-apt install cargo rustup
-apt install rustup
+#apt install cargo rustup
+#apt install rustup
 rustup target add wasm32-wasip1
 rustup target add wasm32-wasip2
 cargo install wit-bindgen-cli wkg wac-cli

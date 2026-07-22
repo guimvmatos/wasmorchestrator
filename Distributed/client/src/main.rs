@@ -94,7 +94,7 @@ fn main() -> std::io::Result<()> {
     let primeiro_kernel = kernels_vec.first().cloned().unwrap_or(1);
 
     let data = ImageData {
-        reply_to: "10.68.119.168:9000".to_string(), //TODO CLIENT'S IP
+        reply_to: "200.18.102.25:9000".to_string(), //TODO CLIENT'S IP
         //kernels: vec![1], //TODO KERNELS TO PROCESS
         kernels: kernels_vec,
         current_kernel: 1,
@@ -120,8 +120,8 @@ fn main() -> std::io::Result<()> {
 
     //IMAGE SEND
     let start_send = Instant::now(); //time to send begin
-    let target_address = format!("10.68.119.168:{}", porta);
-    //let mut stream = TcpStream::connect("10.68.119.168:8081")?;  //TODO FIRST KERNEL IP
+    let target_address = format!("200.18.102.27:{}", porta);
+    //let mut stream = TcpStream::connect("200.18.102.27:8081")?;  //TODO FIRST KERNEL IP
     let mut stream = TcpStream::connect(target_address)?;
 
     let len = serialized_msgpack.len() as u32;
@@ -139,7 +139,7 @@ fn main() -> std::io::Result<()> {
     //PIPELINE... (TIME TO PROCESS KERNELS AND RECEIVE AN OUTPUT)
     let start_exec = Instant::now(); //time after send until receives all data back
     drop(stream);
-    let listener = TcpListener::bind("10.68.119.168:9000")?; //TODO CLIENT'S IP
+    let listener = TcpListener::bind("200.18.102.25:9000")?; //TODO CLIENT'S IP
 
     let (mut stream_resposta, addr) = listener.accept()?; 
     println!("Conexão de resposta vinda de: {}", addr);
