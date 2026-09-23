@@ -20,3 +20,5 @@ mv wasmtime-v29.0.0-x86_64-linux/wasmtime /usr/local/bin/
 rm -rf wasmtime-v29.0.0-x86_64-linux*
 
 bind 'set enable-bracketed-paste off'
+
+git reset origin/resnet
