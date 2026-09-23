@@ -1,5 +1,5 @@
 # Runtime
-cd /home/guimvmatos/Documents/wasi-gfx-runtime
+cd /home/guimvmatos/Documents/wasmorchestrator/wasi-gfx-runtime
 cargo build -p runtime --release
 
 # Kernels/Receivers
