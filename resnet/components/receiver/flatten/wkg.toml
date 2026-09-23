@@ -1,0 +1,2 @@
+[overrides]
+"planner:flattenworld" = { path = "../../kernel/flatten/" }

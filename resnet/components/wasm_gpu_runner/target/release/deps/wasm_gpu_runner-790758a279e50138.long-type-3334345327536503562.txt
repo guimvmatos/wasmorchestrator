@@ -1,0 +1,2 @@
+(&CudaSlice<f32>, &CudaSlice<f32>, &mut CudaSlice<f32>, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32)
+CudaFunction: LaunchAsync<(&CudaSlice<f32>, &CudaSlice<f32>, &mut CudaSlice<f32>, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32)>

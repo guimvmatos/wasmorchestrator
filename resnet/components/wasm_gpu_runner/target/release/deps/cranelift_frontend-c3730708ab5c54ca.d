@@ -1,0 +1,14 @@
+/home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/deps/cranelift_frontend-c3730708ab5c54ca.d: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/frontend.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/frontend/safepoints.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/ssa.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/switch.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/variable.rs
+
+/home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/deps/libcranelift_frontend-c3730708ab5c54ca.rlib: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/frontend.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/frontend/safepoints.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/ssa.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/switch.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/variable.rs
+
+/home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/deps/libcranelift_frontend-c3730708ab5c54ca.rmeta: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/frontend.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/frontend/safepoints.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/ssa.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/switch.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/variable.rs
+
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/lib.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/frontend.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/frontend/safepoints.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/ssa.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/switch.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.116.1/src/variable.rs:
+
+# env-dep:CARGO_PKG_VERSION=0.116.1

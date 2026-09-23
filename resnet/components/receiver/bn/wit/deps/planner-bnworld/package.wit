@@ -1,0 +1,18 @@
+package planner:bnworld;
+
+interface plan {
+  record data {
+    input: list<f32>,
+    output: list<f32>,
+    reply-to: string,
+    kernels: list<u8>,
+    current-kernel: u32,
+    request: u32,
+  }
+
+  bn: func(channels: u32, h-in: u32, w-in: u32, epsilon: f32, scale: list<f32>, beta: list<f32>, mean: list<f32>, var: list<f32>, img: data) -> data;
+}
+
+world bnworld {
+  export plan;
+}

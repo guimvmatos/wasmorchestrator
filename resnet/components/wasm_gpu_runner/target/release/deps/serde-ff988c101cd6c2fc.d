@@ -1,0 +1,14 @@
+/home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/deps/serde-ff988c101cd6c2fc.d: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/serde-e760acdaa3b4f70b/out/private.rs
+
+/home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/deps/libserde-ff988c101cd6c2fc.rlib: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/serde-e760acdaa3b4f70b/out/private.rs
+
+/home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/deps/libserde-ff988c101cd6c2fc.rmeta: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/serde-e760acdaa3b4f70b/out/private.rs
+
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/serde-e760acdaa3b4f70b/out/private.rs:
+
+# env-dep:OUT_DIR=/home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/serde-e760acdaa3b4f70b/out

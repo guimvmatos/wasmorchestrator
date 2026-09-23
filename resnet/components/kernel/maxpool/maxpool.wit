@@ -1,0 +1,31 @@
+package planner:maxpoolworld;
+
+interface plan {
+
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32
+    }
+  
+    maxpool: func(
+        channels: u32,
+        h-in: u32,
+        w-in: u32,
+        kh: u32,
+        kw: u32,
+        stride: u32,
+        padding: u32,
+        img: data
+    ) -> data;
+    
+}
+
+world maxpoolworld {
+
+    export plan;
+
+}

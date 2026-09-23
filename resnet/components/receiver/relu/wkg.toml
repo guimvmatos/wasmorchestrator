@@ -1,0 +1,2 @@
+[overrides]
+"planner:reluworld" = { path = "../../kernel/relu/" }

@@ -1,0 +1,18 @@
+Writing generated file: /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/settings.rs
+Writing generated file: /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/types.rs
+Writing generated file: /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/opcodes.rs
+Writing generated file: /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/inst_builder.rs
+Writing generated file: /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/settings-x86.rs
+Writing generated file: /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/clif_opt.isle
+Writing generated file: /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/clif_lower.isle
+Rebuilding /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_opt.rs
+Writing ISLE-generated Rust code to /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_opt.rs
+Rebuilding /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_x64.rs
+Writing ISLE-generated Rust code to /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_x64.rs
+Rebuilding /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_aarch64.rs
+Writing ISLE-generated Rust code to /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_aarch64.rs
+Rebuilding /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_s390x.rs
+Writing ISLE-generated Rust code to /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_s390x.rs
+Rebuilding /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_riscv64.rs
+Writing ISLE-generated Rust code to /home/guimvmatos/Documents/wasmorchestrator/resnet/components/wasm_gpu_runner/target/release/build/cranelift-codegen-d2ac3089b3af322c/out/isle_riscv64.rs
+fatal: not a git repository (or any of the parent directories): .git

@@ -1,0 +1,10 @@
+[overrides]
+"planner:convworld" = { path = "../../../kernel/conv/" }
+"planner:bnworld"  = { path = "../../../kernel/bn/" }
+"planner:reluworld"  = { path = "../../../kernel/relu/" }
+"planner:maxpoolworld"  = { path = "../../../kernel/maxpool/" }
+"planner:addworld"  = { path = "../../../kernel/add/" }
+"planner:gapworld"  = { path = "../../../kernel/gap/" }
+"planner:flattenworld"  = { path = "../../../kernel/flatten/" }
+"planner:gemmworld"  = { path = "../../../kernel/gemm/" }
+"planner:dropoutworld" = { path = "../../../kernel/dropout/" }

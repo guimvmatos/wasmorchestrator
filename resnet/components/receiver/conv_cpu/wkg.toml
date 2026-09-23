@@ -1,0 +1,2 @@
+[overrides]
+"planner:convworld" = { path = "../../kernel/conv/" }

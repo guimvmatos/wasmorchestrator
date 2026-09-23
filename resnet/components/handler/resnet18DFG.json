@@ -1,0 +1,131 @@
+{
+  "model": "ResNet-18",
+  "steps": [
+    {
+      "step": 1,
+      "kernel_type": 1,
+      "name": "resnetv15_conv0",
+      "params": {
+        "weight_path": "../bin_weights/resnetv15_conv0_weight.bin",
+        "stride": 2,
+        "padding": 3,
+        "cin": 3,
+        "cout": 64,
+        "h_in": 224,
+        "w_in": 224,
+        "kh": 7,
+        "kw": 7
+      },
+      "next_steps": [2]
+    },
+    {
+      "step": 2,
+      "kernel_type": 2,
+      "name": "resnetv15_batchnorm0",
+      "params": {
+        "channels": 64,
+        "h_in": 112,
+        "w_in": 112,
+        "epsilon": 0.00001,
+        "scale_path": "../bin_weights/resnetv15_batchnorm0_gamma.bin",
+        "beta_path": "../bin_weights/resnetv15_batchnorm0_beta.bin",
+        "mean_path": "../bin_weights/resnetv15_batchnorm0_running_mean.bin",
+        "var_path": "../bin_weights/resnetv15_batchnorm0_running_var.bin"
+      },
+      "next_steps": [3]
+    },
+    {
+      "step": 3,
+      "kernel_type": 3,
+      "name": "stage0_relu",
+      "params": {},
+      "next_steps": [4]
+    },
+    {
+      "step": 4,
+      "kernel_type": 4,
+      "name": "stage0_maxpool",
+      "params": {
+        "channels": 64,
+        "h_in": 112,
+        "w_in": 112,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
+      "next_steps": [5, 9]
+    },
+    {
+      "step": 5,
+      "kernel_type": 1,
+      "name": "stage1_block0_conv1",
+      "params": {
+        "weight_path": "../bin_weights/resnetv15_stage1_conv0_weight.bin",
+        "stride": 1,
+        "padding": 1,
+        "cin": 64,
+        "cout": 64,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3
+      },
+      "next_steps": [6]
+    },
+    {
+      "step": 6,
+      "kernel_type": 2,
+      "name": "stage1_block0_batchnorm1",
+      "params": {
+        "channels": 64,
+        "h_in": 56,
+        "w_in": 56,
+        "epsilon": 0.00001,
+        "scale_path": "../bin_weights/resnetv15_stage1_batchnorm0_gamma.bin",
+        "beta_path": "../bin_weights/resnetv15_stage1_batchnorm0_beta.bin",
+        "mean_path": "../bin_weights/resnetv15_stage1_batchnorm0_running_mean.bin",
+        "var_path": "../bin_weights/resnetv15_stage1_batchnorm0_running_var.bin"
+      },
+      "next_steps": [7]
+    },
+    {
+      "step": 7,
+      "kernel_type": 3,
+      "name": "stage1_block0_relu1",
+      "params": {},
+      "next_steps": [8]
+    },
+    {
+      "step": 8,
+      "kernel_type": 1,
+      "name": "stage1_block0_conv2",
+      "params": {
+        "weight_path": "../bin_weights/resnetv15_stage1_conv1_weight.bin",
+        "stride": 1,
+        "padding": 1,
+        "cin": 64,
+        "cout": 64,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3
+      },
+      "next_steps": [9]
+    },
+    {
+      "step": 9,
+      "kernel_type": 5,
+      "name": "stage1_block0_add",
+      "params": {},
+      "next_steps": [10]
+    },
+    {
+      "step": 10,
+      "kernel_type": 3,
+      "name": "stage1_block0_relu_out",
+      "params": {},
+      "next_steps": []
+    }
+  ]
+}

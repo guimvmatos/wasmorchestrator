@@ -1,0 +1,6 @@
+package example:server;
+
+world runner {
+    import planner:gapworld/plan;
+    export wasi:cli/run@0.2.7;
+}

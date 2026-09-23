@@ -1,2 +1,0 @@
-[overrides]
-"planner:kernelworld" = { path = "../kernel/" }

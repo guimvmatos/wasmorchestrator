@@ -1,0 +1,2 @@
+[overrides]
+"planner:maxpoolworld" = { path = "../../kernel/maxpool/" }

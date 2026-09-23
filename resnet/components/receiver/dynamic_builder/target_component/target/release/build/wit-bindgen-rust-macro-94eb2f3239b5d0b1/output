@@ -1,0 +1,2 @@
+cargo:rerun-if-changed=build.rs
+cargo:rustc-env=DEBUG_OUTPUT_DIR=/home/guimvmatos/Documents/wasmorchestrator/resnet/components/receiver/dynamic_builder/target_component/target/release/build/wit-bindgen-rust-macro-94eb2f3239b5d0b1/out

@@ -1,0 +1,6 @@
+package example:server;
+
+world runner {
+    import planner:dropoutworld/plan;
+    export wasi:cli/run@0.2.7;
+}

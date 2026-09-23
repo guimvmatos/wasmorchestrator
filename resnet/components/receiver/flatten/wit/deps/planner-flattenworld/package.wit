@@ -1,0 +1,18 @@
+package planner:flattenworld;
+
+interface plan {
+  record data {
+    input: list<f32>,
+    output: list<f32>,
+    reply-to: string,
+    kernels: list<u8>,
+    current-kernel: u32,
+    request: u32,
+  }
+
+  flatten: func(a: list<f32>, result-container: data) -> data;
+}
+
+world flattenworld {
+  export plan;
+}

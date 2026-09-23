@@ -1,0 +1,16 @@
+gcc -O3 -I.. conv2d3d_copy.c -o test_conv
+./test_conv resnetv15_conv0_weight 64 3 224 224 7 7 2 3
+nome do peso, c_out, c_in, h_in, w_in, kh, kw, stride, padding
+Weight shape (64,3,7,7), kernel shape (7x7), stride 2, pads 3
+
+gcc -O3 -I.. batchnorm.c -o test_bn -lm
+./test_bn resnetv15_batchnorm0 64 112 112
+Weight shape 64, previous output h_in and w_in 112 112
+
+
+gcc -O3 -I.. conv2d3d_copy.c -o test_conv
+gcc -O3 -I.. batchnorm.c -o test_bn -lm
+gcc -O3 relu.c -o test_relu
+./test_conv resnetv15_conv0_weight 64 3 224 224 7 7 2 3
+./test_bn resnetv15_batchnorm0 64 112 112
+./test_relu 802816

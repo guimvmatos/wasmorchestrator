@@ -1,0 +1,16 @@
+[package]
+name = "bn_gpu"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.51.0"
+bytemuck = { version = "1.16", features = ["derive"] }
+pollster = "0.3"
+
+[profile.release]
+opt-level = "s"
+lto = true

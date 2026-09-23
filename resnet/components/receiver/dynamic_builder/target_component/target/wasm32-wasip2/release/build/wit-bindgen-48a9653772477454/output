@@ -1,0 +1,2 @@
+cargo:rustc-link-lib=static=wit_bindgen_cabi0_51_0
+cargo:rustc-link-search=native=/home/guimvmatos/Documents/wasmorchestrator/resnet/components/receiver/dynamic_builder/target_component/target/wasm32-wasip2/release/build/wit-bindgen-48a9653772477454/out
