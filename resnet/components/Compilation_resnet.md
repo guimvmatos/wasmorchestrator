@@ -164,7 +164,7 @@ wac plug dropout/target/wasm32-wasip2/release/dropoutserver.wasm --plug ../kerne
 
 #### all (kernel_0)  
 ##### Receiver
-cd ../../receiver/all
+cd "$WOR/resnet/components/receiver/all/"
 wkg wit fetch
 CC="" cargo build --target=wasm32-wasip2 --release
 cd ..
@@ -195,15 +195,13 @@ mv dropoutFinal.wasm kernel_9.wasm
 mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 
-Go to components/receiver/dynamic_builder folder
+cd "$WOR/resnet/components/receiver/dynamic_builder"
 python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9 --component-dir ./target_component --output ./node_all.wasm
 Change the name of the .wasm and put it on the sys_test folder
 
 #### Onnx to Json
-Go to resnet/text_onnx folder
-python3 onnx_to_dfg.py --onnx resnet18.onnx --output resnet18DFG.json --weights-dir ./bin_weights
-Put the .json file on sys_test\ folder and bin_weights on resnet\
-
+cd "$WOR/resnet/test_onnx/"
+python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output ../sys_test/resnet18DFG.json --weights-dir ../bin_weights
 
 
 ### Running
