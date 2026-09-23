@@ -1,0 +1,23 @@
+// Not bound by bindgen! directly; the includes are o manifest that tells `wkg wit fetch` (wit-fetch.sh) what to vendor into wit/deps.
+package wasi-gfx-runtime:wasi-webgpu;
+
+// Função síncrona customizada: faz map + poll bloqueante (thread nativa do
+// host) + leitura + unmap numa única chamada. Existe porque `map-async` da
+// wasi:webgpu oficial é `async func`, e uma task sync-lifted (como o export
+// wasi:cli/run@0.2 do convserver) não pode suspender esperando um import
+// async — trap "cannot block a synchronous task before returning".
+interface sync-io {
+    use wasi:webgpu/webgpu@0.3.0-rc.2.{gpu-buffer, gpu-map-mode, gpu-size64};
+
+    map-and-read-sync: func(
+        buffer: borrow<gpu-buffer>,
+        mode: gpu-map-mode,
+        offset: option<gpu-size64>,
+        size: option<gpu-size64>,
+    ) -> result<list<u8>, string>;
+}
+
+world bindings {
+    include wasi:webgpu/imports@0.3.0-rc.2;
+    import sync-io;
+}
