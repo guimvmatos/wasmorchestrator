@@ -1,3 +1,4 @@
+git clone wasmorchestrator.... 
 export WOR="$(pwd)"
 
 # Runtime
@@ -49,7 +50,6 @@ cd "$WOR/resnet/sys_test"
 
 
 
-  #onnx to dfg.py
-  cd "$WOR/resnet/test_onnx"
-  python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output resnet18DFG.json --weights-dir ../bin_weights
-  cp resnet50-v1-7.onnx ../sys_test/resnet18DFG.json
+#onnx to dfg.py
+cd "$WOR/resnet/test_onnx"
+python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output ../sys_test/resnet18DFG.json --weights-dir ../bin_weights
