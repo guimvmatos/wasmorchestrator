@@ -1,6 +1,6 @@
 #### Conv (kernel_1)
 ##### Kernel
-cd components/
+cd "$WOR/resnet/components"
 
 cd kernel/conv/
 wit-bindgen c --world convworld conv.wit
