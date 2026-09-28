@@ -1,0 +1,3 @@
+[overrides]
+"planner:gemmworld" = { path = "../../kernel/gemm_gpu/wit" }
+"wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }

@@ -48,6 +48,26 @@ cd "$WOR/resnet/sys_test"
   --port 8082 \
   --ip 127.0.0.1
 
+## GEMM
+cd "$WOR/resnet/components/kernel/gemm_gpu"
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
+
+cd "$WOR/resnet/components/receiver/gemm_gpu"
+wkg wit fetch
+cargo build --target=wasm32-wasip2 --release
+
+cd ..
+wac plug gemm_gpu/target/wasm32-wasip2/release/gemmserver.wasm \
+  --plug ../kernel/gemm_gpu/target/wasm32-wasip2/release/gemm_gpu.wasm \
+  -o ../../sys_test/kernel_8.wasm
+
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_8.wasm \
+  --port 8088 \
+  --ip 127.0.0.1
+
 
 
 #onnx to dfg.py

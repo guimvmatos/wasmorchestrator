@@ -216,6 +216,14 @@ async fn main() -> anyhow::Result<()> {
     let workload_state = host_state.add_workload(&kernel_args)?;
     let mut store = Store::new(&engine, workload_state);
 
+    // CVE-2026-27204: Wasmtime limita por padrão quantos bytes um guest pode
+    // copiar pro host numa única hostcall (128MiB default), para prevenir
+    // exhaustão de recursos por guest malicioso. Nossos próprios tensores de
+    // pesos (ex: camada FC densa do Gemm) legitimamente excedem isso, então
+    // ampliamos o teto — este runtime só executa componentes nossos, não
+    // recebe wasm de terceiros não confiável.
+    store.set_hostcall_fuel(1024 * 1024 * 1024); // 1 GiB
+
     println!("[HOST] Carregando componente WASM de: {}", args.wasm);
     let component = Component::from_file(&engine, &args.wasm)
         .context(format!("Componente não encontrado em: {}", args.wasm))?;

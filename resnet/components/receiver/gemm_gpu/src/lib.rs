@@ -6,7 +6,7 @@ use std::time::Instant;
 use std::env;
 use std::collections::HashMap;
 
-type WitData = bindings::planner::convworld::plan::Data;
+type WitData = bindings::planner::gemmworld::plan::Data;
 
 mod bindings {
     use super::Component;
@@ -30,25 +30,15 @@ struct RoutingTable {
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
-struct ConvParams {
+struct GemmParams {
     #[serde(default)]
     weight_path: String,
     #[serde(default)]
-    cin: u32,
+    bias_path: String,
     #[serde(default)]
-    cout: u32,
+    in_features: u32,
     #[serde(default)]
-    h_in: u32,
-    #[serde(default)]
-    w_in: u32,
-    #[serde(default)]
-    kh: u32,
-    #[serde(default)]
-    kw: u32,
-    #[serde(default)]
-    stride: u32,
-    #[serde(default)]
-    padding: u32,
+    out_features: u32,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -58,7 +48,7 @@ struct StepNode {
     name: String,
     kernel_type: u8,
     #[serde(default)]
-    params: ConvParams,
+    params: GemmParams,
     #[serde(default)]
     next_steps: Vec<u32>,
 }
@@ -69,11 +59,18 @@ struct ModelGraph {
     steps: Vec<StepNode>,
 }
 
+fn load_bin(path: &str) -> Vec<f32> {
+    let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("Erro ao carregar {}: {:?}", path, e));
+    unsafe {
+        std::slice::from_raw_parts(bytes.as_ptr() as *const f32, bytes.len() / 4).to_vec()
+    }
+}
+
 fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Result<()> {
 
     let start_total = Instant::now(); // TEMP
 
-    let MY_ID: u8 = 1; //#### TODO colocar o numero da funcao aqui...
+    let MY_ID: u8 = 8; //#### TODO colocar o numero da funcao aqui...
 
     let mut len_buf = [0u8; 4];
 
@@ -103,46 +100,38 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
         // 1. CARREGA O GRAFO E OBTÉM OS PARÂMETROS DO STEP ATUAL
         let graph_file = std::fs::File::open("resnet18DFG.json").expect("Erro ao abrir resnet18DFG.json");
-let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no parser do resnet18DFG.json");
+        let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no parser do resnet18DFG.json");
 
         let current_step = input_img.current_kernel;
         let current_node = graph.steps.iter().find(|s| s.step == current_step)
-            .unwrap_or_else(|| panic!("Step {} não encontrado no model_graph.json", current_step));
+            .unwrap_or_else(|| panic!("Step {} não encontrado no resnet18DFG.json", current_step));
 
         let p = &current_node.params;
 
-        // 2. Calcula dimensões de saída e ALOCA o vetor de output
-        let out_h = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;
-        let out_w = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;
-        let output_size = (p.cout * out_h * out_w) as usize;
-        input_img.output = vec![0.0f32; output_size];
+        // 2. Aloca o buffer de saída (1000 logits)
+        input_img.output = vec![0.0f32; p.out_features as usize];
 
-        // 3. Lê os pesos do arquivo indicado no grafo (defensivo contra path vazio)
-        let weights: Vec<f32> = if !p.weight_path.is_empty() {
-            let weights_bytes = std::fs::read(&p.weight_path)
-                .unwrap_or_else(|e| panic!("Erro ao carregar pesos de {}: {:?}", p.weight_path, e));
-            unsafe {
-                std::slice::from_raw_parts(
-                    weights_bytes.as_ptr() as *const f32,
-                    weights_bytes.len() / 4,
-                )
-                .to_vec()
-            }
+        // 3. Carrega os pesos e o bias usando a função load_bin
+        //let weights = load_bin(&p.weight_path);
+        //let bias    = load_bin(&p.bias_path);
+        let weights = if !p.weight_path.is_empty() {
+            load_bin(&p.weight_path)
         } else {
             Vec::new()
         };
 
-        // 4. Executa o kernel C
-        let mut status = bindings::planner::convworld::plan::conv(
-            p.cout,
-            p.cin,
-            p.h_in,
-            p.w_in,
-            p.kh,
-            p.kw,
-            p.stride,
-            p.padding,
+        let bias = if !p.bias_path.is_empty() {
+            load_bin(&p.bias_path)
+        } else {
+            Vec::new()
+        };
+
+        // 4. Executa o GEMM
+        let mut status = bindings::planner::gemmworld::plan::gemm(
+            p.in_features,
+            p.out_features,
             &weights,
+            &bias,
             &input_img,
         );
 
@@ -240,7 +229,7 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
     fn run() -> Result<(), ()> {
 
         let args: Vec<String> = env::args().collect();
-        let port = args.get(1).map(|s| s.as_str()).unwrap_or("8081"); //fallback.. se nao passar por argumento ele vai coloar essa
+        let port = args.get(1).map(|s| s.as_str()).unwrap_or("8088"); //fallback.. se nao passar por argumento ele vai coloar essa
         let ip = args.get(2).map(|s| s.as_str()).unwrap_or("0.0.0.0");
         let bind_addr = format!("{}:{}", ip, port);
         let listener = TcpListener::bind(&bind_addr).expect(&format!("Não conseguiu abrir a porta {}", port));
