@@ -6,7 +6,7 @@ use std::time::Instant;
 use std::env;
 use std::collections::HashMap;
 
-type WitData = bindings::planner::convworld::plan::Data;
+type WitData = bindings::planner::maxpoolworld::plan::Data;
 
 mod bindings {
     use super::Component;
@@ -30,13 +30,9 @@ struct RoutingTable {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-struct ConvParams {
+struct MaxPoolParams {
     #[serde(default)]
-    weight_path: String,
-    #[serde(default)]
-    cin: u32,
-    #[serde(default)]
-    cout: u32,
+    channels: u32,
     #[serde(default)]
     h_in: u32,
     #[serde(default)]
@@ -58,7 +54,7 @@ struct StepNode {
     name: String,
     kernel_type: u8,
     #[serde(default)]
-    params: ConvParams,
+    params: MaxPoolParams,
     #[serde(default)]
     next_steps: Vec<u32>,
 }
@@ -78,7 +74,7 @@ fn handle_client(
 
     let start_total = Instant::now(); // TEMP
 
-    let MY_ID: u8 = 1; //#### TODO colocar o numero da funcao aqui...
+    let MY_ID: u8 = 4; //#### TODO colocar o numero da funcao aqui...
 
     let mut len_buf = [0u8; 4];
 
@@ -108,7 +104,7 @@ fn handle_client(
         let receiveduration = start_receive.elapsed().as_millis();
 
         let start_exec = Instant::now();
-        *initialized += 1; // [T] contador de chamadas do processo (1 = primeira = contexto GPU frio)
+        *initialized += 1; // [T] contador de chamadas do processo (1 = primeira = cold start)
         let call_idx = *initialized; // [T]
         let ts_unix_ms = std::time::SystemTime::now() // [T]
             .duration_since(std::time::UNIX_EPOCH)
@@ -118,51 +114,29 @@ fn handle_client(
         // 1. OBTÉM OS PARÂMETROS DO STEP ATUAL (grafo já carregado uma vez em run())
         let current_step = input_img.current_kernel;
         let current_node = graph.steps.iter().find(|s| s.step == current_step)
-            .unwrap_or_else(|| panic!("Step {} não encontrado no model_graph.json", current_step));
+            .unwrap_or_else(|| panic!("Step {} não encontrado no resnet18DFG.json", current_step));
 
         let p = &current_node.params;
         let graph_load_us: u64 = 0; // [T] carregado uma vez em run(), não por request
 
-        // 2. Calcula dimensões de saída e ALOCA o vetor de output
+        // 2. Calcula dimensões dinamicamente e aloca a saída
         let t_alloc = Instant::now(); // [T]
-        let out_h = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;
-        let out_w = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;
-        let output_size = (p.cout * out_h * out_w) as usize;
-        input_img.output = vec![0.0f32; output_size];
+        let h_out = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;
+        let w_out = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;
+        let total_size = (p.channels * h_out * w_out) as usize;
+        input_img.output = vec![0.0f32; total_size];
         let alloc_output_us = t_alloc.elapsed().as_micros() as u64; // [T]
 
-        // 3. Lê os pesos do arquivo indicado no grafo (defensivo contra path vazio)
-        let t_w = Instant::now(); // [T]
-        let weights: Vec<f32> = if !p.weight_path.is_empty() {
-            let weights_bytes = std::fs::read(&p.weight_path)
-                .unwrap_or_else(|e| panic!("Erro ao carregar pesos de {}: {:?}", p.weight_path, e));
-            unsafe {
-                std::slice::from_raw_parts(
-                    weights_bytes.as_ptr() as *const f32,
-                    weights_bytes.len() / 4,
-                )
-                .to_vec()
-            }
-        } else {
-            Vec::new()
-        };
-        let weights_load_us = t_w.elapsed().as_micros() as u64; // [T]
-
-        let req_id = input_img.request;
-        let in_len = input_img.input.len();
-
-        // 4. Executa o kernel síncrono
+        // 3. Execução do kernel (CPU em C ou GPU, dependendo do .wasm plugado)
         let t_call = Instant::now(); // [T]
-        let mut status = bindings::planner::convworld::plan::conv(
-            p.cout,
-            p.cin,
+        let mut status = bindings::planner::maxpoolworld::plan::maxpool(
+            p.channels,
             p.h_in,
             p.w_in,
             p.kh,
             p.kw,
             p.stride,
             p.padding,
-            &weights,
             &input_img,
         );
         let kernel_call_us = t_call.elapsed().as_micros() as u64; // [T]
@@ -176,8 +150,9 @@ fn handle_client(
         let start_send = Instant::now();
 
         let t_clone_out = Instant::now(); // [T]
+        // Salva a saída computada no buffer de entrada para os próximos nós
         let computed_output = status.output.clone();
-        let out_len = computed_output.len(); // <--- Salva o tamanho aqui
+        let out_len = computed_output.len();
         status.output = vec![];
         let clone_output_us = t_clone_out.elapsed().as_micros() as u64; // [T]
 
@@ -189,9 +164,10 @@ fn handle_client(
         let mut sent_bytes: usize = 0; // [T]
 
         if current_node.next_steps.is_empty() {
-            println!("Último step da rede. Retornando para o cliente em {}...", status.reply_to);
+            // Último step da rede (devolve para o client)
+            println!("Sou o último da lista. Retornando para o cliente em {}...", status.reply_to);
             let t = Instant::now(); // [T]
-            status.input = computed_output.clone(); // <--- Adiciona .clone()
+            status.input = computed_output.clone();
             clone_in_send_us += t.elapsed().as_micros() as u64; // [T]
 
             let t = Instant::now(); // [T]
@@ -210,6 +186,7 @@ fn handle_client(
             next_stream.flush()?;
             write_us += t.elapsed().as_micros() as u64; // [T]
         } else {
+            // Itera sobre todos os destinos (faz o fork caso haja mais de 1 destino)
             for &next_step in &current_node.next_steps {
                 let next_node = graph.steps.iter().find(|s| s.step == next_step)
                     .unwrap_or_else(|| panic!("Próximo Step {} não encontrado no grafo", next_step));
@@ -257,7 +234,7 @@ fn handle_client(
 
         println!(
             "METRIC_DATA: req={} step={} layer='{}' next={:?} in_len={} out_len={} exec_ms={} total_ms={}",
-            req_id, current_step, current_node.name, current_node.next_steps, in_len, out_len, execduration, totalduration
+            input_img.request, current_step, current_node.name, current_node.next_steps, input_img.input.len(), out_len, execduration, totalduration
         );
 
         if let Ok(mut file) = std::fs::OpenOptions::new()
@@ -266,12 +243,12 @@ fn handle_client(
             .open("receiver_logs.jsonl") 
         {
             let log_linha = serde_json::json!({
-                "request": req_id,
+                "request": input_img.request,
                 "kernel_id": MY_ID,
                 "step": current_step,
                 "layer_name": current_node.name,
                 "next_steps": current_node.next_steps,
-                "input_len": in_len,
+                "input_len": input_img.input.len(),
                 "output_len": out_len,
                 "total_receiver_ms": totalduration,
                 "receive_ms": receiveduration,
@@ -284,13 +261,11 @@ fn handle_client(
                 "params": serde_json::to_value(p).unwrap_or(serde_json::Value::Null),
                 "payload_in_bytes": len,
                 "payload_out_bytes": sent_bytes,
-                "weights_bytes": weights.len() * 4,
                 "timing_us": {
                     "net_in": net_in_us,
                     "deserialize": deserialize_us,
                     "graph_load": graph_load_us,
                     "alloc_output": alloc_output_us,
-                    "weights_load": weights_load_us,
                     "kernel_call": kernel_call_us,
                     "routing_load": routing_load_us,
                     "clone_output": clone_output_us,
@@ -320,13 +295,12 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
     fn run() -> Result<(), ()> {
 
         let args: Vec<String> = env::args().collect();
-        let port = args.get(1).map(|s| s.as_str()).unwrap_or("8081");
+        let port = args.get(1).map(|s| s.as_str()).unwrap_or("8084"); //fallback.. se nao passar por argumento ele vai coloar essa
         let ip = args.get(2).map(|s| s.as_str()).unwrap_or("0.0.0.0");
         let bind_addr = format!("{}:{}", ip, port);
         let listener = TcpListener::bind(&bind_addr).expect(&format!("Não conseguiu abrir a porta {}", port));
 
         // Carrega grafo e routing table uma vez, no boot do processo.
-        // Antes: reabertos e reparseados a cada request.
         let t_boot = Instant::now();
         let graph_file = std::fs::File::open("resnet18DFG.json")
             .expect("Erro ao abrir resnet18DFG.json");
@@ -349,6 +323,7 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
+                    //call function to handle client
                     println!("entrei!!");
 
                     if let Err(e) = handle_client(stream, &mut init, &graph, &routing) {

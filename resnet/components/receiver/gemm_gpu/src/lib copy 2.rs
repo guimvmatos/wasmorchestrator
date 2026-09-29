@@ -6,7 +6,7 @@ use std::time::Instant;
 use std::env;
 use std::collections::HashMap;
 
-type WitData = bindings::planner::convworld::plan::Data;
+type WitData = bindings::planner::gemmworld::plan::Data;
 
 mod bindings {
     use super::Component;
@@ -30,25 +30,15 @@ struct RoutingTable {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-struct ConvParams {
+struct GemmParams {
     #[serde(default)]
     weight_path: String,
     #[serde(default)]
-    cin: u32,
+    bias_path: String,
     #[serde(default)]
-    cout: u32,
+    in_features: u32,
     #[serde(default)]
-    h_in: u32,
-    #[serde(default)]
-    w_in: u32,
-    #[serde(default)]
-    kh: u32,
-    #[serde(default)]
-    kw: u32,
-    #[serde(default)]
-    stride: u32,
-    #[serde(default)]
-    padding: u32,
+    out_features: u32,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -58,7 +48,7 @@ struct StepNode {
     name: String,
     kernel_type: u8,
     #[serde(default)]
-    params: ConvParams,
+    params: GemmParams,
     #[serde(default)]
     next_steps: Vec<u32>,
 }
@@ -69,16 +59,18 @@ struct ModelGraph {
     steps: Vec<StepNode>,
 }
 
-fn handle_client(
-    mut stream: TcpStream,
-    initialized: &mut i32,
-    graph: &ModelGraph,
-    routing: &RoutingTable,
-) -> std::io::Result<()> {
+fn load_bin(path: &str) -> Vec<f32> {
+    let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("Erro ao carregar {}: {:?}", path, e));
+    unsafe {
+        std::slice::from_raw_parts(bytes.as_ptr() as *const f32, bytes.len() / 4).to_vec()
+    }
+}
+
+fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Result<()> {
 
     let start_total = Instant::now(); // TEMP
 
-    let MY_ID: u8 = 1; //#### TODO colocar o numero da funcao aqui...
+    let MY_ID: u8 = 8; //#### TODO colocar o numero da funcao aqui...
 
     let mut len_buf = [0u8; 4];
 
@@ -98,7 +90,7 @@ fn handle_client(
 
         let mut buffer = vec![0u8; len];
         stream.read_exact(&mut buffer)?;
-        let _ = stream.shutdown(Shutdown::Both); //em teste
+                let _ = stream.shutdown(Shutdown::Both); //em teste
         let net_in_us = start_receive.elapsed().as_micros() as u64; // [T]
 
         let t_de = Instant::now(); // [T]
@@ -115,60 +107,57 @@ fn handle_client(
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
 
-        // 1. OBTÉM OS PARÂMETROS DO STEP ATUAL (grafo já carregado uma vez em run())
+        // 1. CARREGA O GRAFO E OBTÉM OS PARÂMETROS DO STEP ATUAL
+        let t_graph = Instant::now(); // [T]
+        let graph_file = std::fs::File::open("resnet18DFG.json").expect("Erro ao abrir resnet18DFG.json");
+        let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no parser do resnet18DFG.json");
+
         let current_step = input_img.current_kernel;
         let current_node = graph.steps.iter().find(|s| s.step == current_step)
-            .unwrap_or_else(|| panic!("Step {} não encontrado no model_graph.json", current_step));
+            .unwrap_or_else(|| panic!("Step {} não encontrado no resnet18DFG.json", current_step));
 
         let p = &current_node.params;
-        let graph_load_us: u64 = 0; // [T] carregado uma vez em run(), não por request
+        let graph_load_us = t_graph.elapsed().as_micros() as u64; // [T]
 
-        // 2. Calcula dimensões de saída e ALOCA o vetor de output
-        let t_alloc = Instant::now(); // [T]
-        let out_h = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;
-        let out_w = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;
-        let output_size = (p.cout * out_h * out_w) as usize;
-        input_img.output = vec![0.0f32; output_size];
-        let alloc_output_us = t_alloc.elapsed().as_micros() as u64; // [T]
+        // 2. Aloca o buffer de saída (1000 logits)
+        input_img.output = vec![0.0f32; p.out_features as usize];
 
-        // 3. Lê os pesos do arquivo indicado no grafo (defensivo contra path vazio)
-        let t_w = Instant::now(); // [T]
-        let weights: Vec<f32> = if !p.weight_path.is_empty() {
-            let weights_bytes = std::fs::read(&p.weight_path)
-                .unwrap_or_else(|e| panic!("Erro ao carregar pesos de {}: {:?}", p.weight_path, e));
-            unsafe {
-                std::slice::from_raw_parts(
-                    weights_bytes.as_ptr() as *const f32,
-                    weights_bytes.len() / 4,
-                )
-                .to_vec()
-            }
+        // 3. Carrega os pesos e o bias usando a função load_bin
+        //let weights = load_bin(&p.weight_path);
+        //let bias    = load_bin(&p.bias_path);
+                let t_w = Instant::now(); // [T]
+        let weights = if !p.weight_path.is_empty() {
+            load_bin(&p.weight_path)
         } else {
             Vec::new()
         };
         let weights_load_us = t_w.elapsed().as_micros() as u64; // [T]
 
-        let req_id = input_img.request;
-        let in_len = input_img.input.len();
+        let t_b = Instant::now(); // [T]
+        let bias = if !p.bias_path.is_empty() {
+            load_bin(&p.bias_path)
+        } else {
+            Vec::new()
+        };
+        let bias_load_us = t_b.elapsed().as_micros() as u64; // [T]
 
-        // 4. Executa o kernel síncrono
+        // 4. Executa o GEMM
         let t_call = Instant::now(); // [T]
-        let mut status = bindings::planner::convworld::plan::conv(
-            p.cout,
-            p.cin,
-            p.h_in,
-            p.w_in,
-            p.kh,
-            p.kw,
-            p.stride,
-            p.padding,
+        let mut status = bindings::planner::gemmworld::plan::gemm(
+            p.in_features,
+            p.out_features,
             &weights,
+            &bias,
             &input_img,
         );
         let kernel_call_us = t_call.elapsed().as_micros() as u64; // [T]
 
         let execduration = start_exec.elapsed().as_millis();
-        let routing_load_us: u64 = 0; // [T] carregado uma vez em run(), não por request
+
+        let t_route = Instant::now(); // [T]
+        let file = std::fs::File::open("routing_table.json").expect("Erro ao abrir JSON");
+        let routing: RoutingTable = serde_json::from_reader(file).expect("Erro no JSON");
+        let routing_load_us = t_route.elapsed().as_micros() as u64; // [T]
 
         // Captura o score deste nó (estou assumindo que este nó físico é o ID 1)
         let current_score = routing.node_scores.get(&1).cloned().unwrap_or(0.0); //#### TODO colocar numero do NÓ aqui deopis do get(&x).cloned... X deve ser o onumero do nó
@@ -248,7 +237,7 @@ fn handle_client(
                 ack_us += t.elapsed().as_micros() as u64; // [T]
             }
         }
-
+        
         let sendduration = start_send.elapsed().as_millis();
         let send_total_us = start_send.elapsed().as_micros() as u64; // [T]
 
@@ -257,7 +246,7 @@ fn handle_client(
 
         println!(
             "METRIC_DATA: req={} step={} layer='{}' next={:?} in_len={} out_len={} exec_ms={} total_ms={}",
-            req_id, current_step, current_node.name, current_node.next_steps, in_len, out_len, execduration, totalduration
+            input_img.request, current_step, current_node.name, current_node.next_steps, input_img.input.len(), out_len, execduration, totalduration
         );
 
         if let Ok(mut file) = std::fs::OpenOptions::new()
@@ -266,12 +255,12 @@ fn handle_client(
             .open("receiver_logs.jsonl") 
         {
             let log_linha = serde_json::json!({
-                "request": req_id,
+                "request": input_img.request,
                 "kernel_id": MY_ID,
                 "step": current_step,
                 "layer_name": current_node.name,
                 "next_steps": current_node.next_steps,
-                "input_len": in_len,
+                "input_len": input_img.input.len(),
                 "output_len": out_len,
                 "total_receiver_ms": totalduration,
                 "receive_ms": receiveduration,
@@ -285,12 +274,13 @@ fn handle_client(
                 "payload_in_bytes": len,
                 "payload_out_bytes": sent_bytes,
                 "weights_bytes": weights.len() * 4,
+                "bias_bytes": bias.len() * 4,
                 "timing_us": {
                     "net_in": net_in_us,
                     "deserialize": deserialize_us,
                     "graph_load": graph_load_us,
-                    "alloc_output": alloc_output_us,
                     "weights_load": weights_load_us,
+                    "bias_load": bias_load_us,
                     "kernel_call": kernel_call_us,
                     "routing_load": routing_load_us,
                     "clone_output": clone_output_us,
@@ -320,28 +310,10 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
     fn run() -> Result<(), ()> {
 
         let args: Vec<String> = env::args().collect();
-        let port = args.get(1).map(|s| s.as_str()).unwrap_or("8081");
+        let port = args.get(1).map(|s| s.as_str()).unwrap_or("8088"); //fallback.. se nao passar por argumento ele vai coloar essa
         let ip = args.get(2).map(|s| s.as_str()).unwrap_or("0.0.0.0");
         let bind_addr = format!("{}:{}", ip, port);
         let listener = TcpListener::bind(&bind_addr).expect(&format!("Não conseguiu abrir a porta {}", port));
-
-        // Carrega grafo e routing table uma vez, no boot do processo.
-        // Antes: reabertos e reparseados a cada request.
-        let t_boot = Instant::now();
-        let graph_file = std::fs::File::open("resnet18DFG.json")
-            .expect("Erro ao abrir resnet18DFG.json");
-        let graph: ModelGraph = serde_json::from_reader(graph_file)
-            .expect("Erro no parser do resnet18DFG.json");
-
-        let routing_file = std::fs::File::open("routing_table.json")
-            .expect("Erro ao abrir routing_table.json");
-        let routing: RoutingTable = serde_json::from_reader(routing_file)
-            .expect("Erro no parser do routing_table.json");
-        println!(
-            "Grafo e routing table carregados em {}ms ({} steps)",
-            t_boot.elapsed().as_millis(),
-            graph.steps.len()
-        );
 
         println!("Listening on {}", bind_addr);
 
@@ -349,9 +321,10 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
+                    //call function to handle client
                     println!("entrei!!");
 
-                    if let Err(e) = handle_client(stream, &mut init, &graph, &routing) {
+                    if let Err(e) = handle_client(stream, &mut init) {
                         eprintln!("Error handling client: {:?}", e);
                     }
                 }

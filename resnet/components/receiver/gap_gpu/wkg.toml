@@ -1,0 +1,3 @@
+[overrides]
+"planner:gapworld" = { path = "../../kernel/gap_gpu/wit" }
+"wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }
