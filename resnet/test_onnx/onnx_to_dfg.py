@@ -14,10 +14,23 @@ OP_TO_KERNEL = {
     "Add": 5,
     "GlobalAveragePool": 6,
     "Flatten": 7,
-    "Gemm": 8,
-    "MatMul": 8,
+    "Gemm": 8,                 # peso fixo (W, B) — camada densa clássica
     "Dropout": 9,
+    "Sigmoid": 10,
+    "Mul": 11,
+    "Split": 13,
+    "Concat": 14,
+    "Reshape": 15,
+    "Transpose": 16,
+    "MatMul": 17,               # tensor x tensor dinâmico — NÃO é Gemm
+    "Resize": 18,
+    "Slice": 19,
+    "Sub": 20,
+    "Div": 21,
+    "Softmax": 22,
 }
+
+SILU_KERNEL_TYPE = 12  # produzido pela fusão Sigmoid+Mul, não é op_type direto
 
 def save_weight_bin(tensor_proto, output_dir):
     if tensor_proto is None:
@@ -35,6 +48,54 @@ def save_weight_bin(tensor_proto, output_dir):
     # Adiciona o ../ para a visibilidade do WASM
     dir_name = os.path.basename(os.path.normpath(output_dir))
     return f"../{dir_name}/{filename}"
+
+def try_fuse_silu(valid_nodes):
+    """
+    Detecta o padrão SiLU (x * sigmoid(x)) e funde o par Sigmoid+Mul em um
+    único nó sintético. Critério: o Sigmoid tem exatamente um consumidor,
+    esse consumidor é um Mul, e um dos dois inputs do Mul é exatamente o
+    mesmo tensor que entrou no Sigmoid (não o output dele). Quando o padrão
+    não bate (ex: Sigmoid isolado, ou Mul que não usa o input original),
+    cada nó continua sendo emitido separadamente — a fusão é só uma
+    otimização quando reconhecida, nunca um requisito.
+    """
+    output_to_consumers = {}
+    for idx, node in enumerate(valid_nodes):
+        for inp in node.input:
+            output_to_consumers.setdefault(inp, []).append(idx)
+
+    silu_pairs = {}       # sigmoid_idx -> mul_idx
+    fused_mul_indices = set()
+
+    for idx, node in enumerate(valid_nodes):
+        if node.op_type != "Sigmoid":
+            continue
+        sig_input = node.input[0]
+        sig_output = node.output[0]
+        consumers = output_to_consumers.get(sig_output, [])
+        if len(consumers) != 1:
+            continue
+        mul_idx = consumers[0]
+        mul_node = valid_nodes[mul_idx]
+        if mul_node.op_type != "Mul":
+            continue
+        if sig_input not in mul_node.input:
+            continue
+        silu_pairs[idx] = mul_idx
+        fused_mul_indices.add(mul_idx)
+
+    fused_indices = set(silu_pairs.keys()) | fused_mul_indices
+    result = []
+    for idx, node in enumerate(valid_nodes):
+        if idx in silu_pairs:
+            mul_idx = silu_pairs[idx]
+            result.append(("silu", node, valid_nodes[mul_idx]))
+        elif idx in fused_indices:
+            continue
+        else:
+            result.append(("raw", node))
+    return result
+
 
 def get_node_attribute(node, attr_name, default=None):
     for attr in node.attribute:
@@ -90,20 +151,47 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
         else:
             print(f"[AVISO] Ignorando nó '{node.name}' com op_type '{op_type}' (não mapeado)")
 
-    # Mapear saídas para os passos
-    for step_id, node in enumerate(valid_nodes, start=1):
-        for out_name in node.output:
-            tensor_producer[out_name] = step_id
+    # Funde pares Sigmoid+Mul que formam SiLU antes de numerar os steps —
+    # a partir daqui, "fused_nodes" é a lista real usada para gerar o DFG.
+    # Cada entrada é ("raw", node) ou ("silu", sigmoid_node, mul_node).
+    fused_nodes = try_fuse_silu(valid_nodes)
+
+    # Mapear saídas para os passos. Para um par fundido, só o output do
+    # Mul (a saída real do SiLU) conta — o output do Sigmoid interno nunca
+    # é consumido por fora do par, então não precisa de entrada própria.
+    for step_id, entry in enumerate(fused_nodes, start=1):
+        if entry[0] == "silu":
+            _, _, mul_node = entry
+            for out_name in mul_node.output:
+                tensor_producer[out_name] = step_id
+        else:
+            _, node = entry
+            for out_name in node.output:
+                tensor_producer[out_name] = step_id
 
     # 5. Segundo passe: construir os StepNodes e extrair os pesos
     steps = []
-    for step_id, node in enumerate(valid_nodes, start=1):
-        kernel_type = OP_TO_KERNEL[node.op_type]
-        layer_name = node.name if node.name else f"{node.op_type}_{step_id}"
-        params = {}
+    for step_id, entry in enumerate(fused_nodes, start=1):
+        if entry[0] == "silu":
+            _, sigmoid_node, mul_node = entry
+            kernel_type = SILU_KERNEL_TYPE
+            layer_name = mul_node.name if mul_node.name else f"SiLU_{step_id}"
+            node = mul_node  # usado abaixo só para next_steps (output real do par)
+            # O input real do SiLU é o input do Sigmoid, não um input do Mul
+            # (que tem dois: o original e a saída do Sigmoid).
+            main_input_name = sigmoid_node.input[0]
+        else:
+            _, node = entry
+            kernel_type = OP_TO_KERNEL[node.op_type]
+            layer_name = node.name if node.name else f"{node.op_type}_{step_id}"
+            main_input_name = node.input[0]
+            # Mul com constante: o input[0] pode ser a própria constante
+            # (ex: "0.1767..." antes do tensor principal) — nesse caso o
+            # shape de referência tem que vir do outro input, não dele.
+            if node.op_type == "Mul" and main_input_name in initializers:
+                main_input_name = node.input[1]
 
-        # Determinar dimensões de entrada a partir do tensor de entrada principal
-        main_input_name = node.input[0]
+        params = {}
         in_shape = value_info_shapes.get(main_input_name, [1, 3, 224, 224])
         
         c_in = in_shape[1] if len(in_shape) > 1 and in_shape[1] is not None else 3
@@ -115,19 +203,35 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
             strides = get_node_attribute(node, "strides", [1, 1])
             pads = get_node_attribute(node, "pads", [0, 0, 0, 0])
             kernel_shape = get_node_attribute(node, "kernel_shape", [3, 3])
+            groups = get_node_attribute(node, "group", 1)  # atributo ONNX chama "group", singular
 
             w_tensor = initializers.get(node.input[1]) if len(node.input) > 1 else None
             w_path = save_weight_bin(w_tensor, weights_dir) if w_tensor else ""
 
+            # Terceiro input opcional do Conv: bias (separado de BatchNorm,
+            # usado quando a camada não é seguida de BN — ex: as 3 convs
+            # finais de cada detection head do YOLO, que vão direto pra
+            # Reshape sem normalização).
+            b_tensor = initializers.get(node.input[2]) if len(node.input) > 2 else None
+            b_path = save_weight_bin(b_tensor, weights_dir) if b_tensor else ""
+
             cout = w_tensor.dims[0] if w_tensor else c_in
-            cin = w_tensor.dims[1] if w_tensor else c_in
             kh = kernel_shape[0] if len(kernel_shape) > 0 else 3
             kw = kernel_shape[1] if len(kernel_shape) > 1 else 3
 
+            # cin REAL do tensor de entrada, não w_tensor.dims[1] — para
+            # Conv agrupada/depthwise (groups > 1), o peso ONNX vem no
+            # formato [cout, cin/groups, kh, kw], então w_tensor.dims[1] é
+            # cin/groups, não cin. Usar sempre o shape do tensor de entrada
+            # (já lido acima como c_in) evita essa armadilha silenciosa.
+            cin = c_in
+
             params = {
                 "weight_path": w_path,
+                "bias_path": b_path,
                 "cout": int(cout),
                 "cin": int(cin),
+                "groups": int(groups),
                 "h_in": int(h_in),
                 "w_in": int(w_in),
                 "kh": int(kh),
@@ -182,14 +286,61 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
                 "out_features": int(out_features)
             }
 
+        elif kernel_type == 6:  # GlobalAveragePool
+            # EXCEÇÃO: GlobalAveragePool não tem atributos no ONNX (confirmado
+            # via Netron) — a operação em si não precisa de configuração.
+            # Mas o kernel que a executa recebe o tensor como buffer linear
+            # achatado (list<f32>), sem informação de forma embutida, e
+            # precisa saber onde termina um canal e começa o outro
+            # (offset = c * spatial_size) para calcular a média por canal
+            # corretamente. channels/h_in/w_in não são inventados: é o
+            # mesmo shape do tensor de entrada já usado por Conv/BatchNorm/
+            # MaxPool acima (c_in/h_in/w_in), apenas também registrado aqui
+            # porque GAP não tem outro lugar no schema para carregar esse
+            # dado. Sem isso, o kernel teria que assumir um valor fixo de
+            # canais (ex: 512), o que quebra silenciosamente em arquiteturas
+            # com canal final diferente (ex: ResNet-50 usa 2048).
+            params = {
+                "channels": int(c_in),
+                "h_in": int(h_in),
+                "w_in": int(w_in)
+            }
+
         elif kernel_type == 9:  # Dropout (Identity em inferência)
             params = {}
 
-        # Encontrar next_steps observando quem consome a saída deste nó
+        elif kernel_type == SILU_KERNEL_TYPE:  # SiLU fundido (x * sigmoid(x))
+            params = {}
+
+        elif kernel_type == 10:  # Sigmoid isolado (fallback quando não funde com Mul)
+            params = {}
+
+        elif kernel_type == 11:  # Mul
+            in0, in1 = node.input[0], node.input[1]
+            const_tensor = None
+            if in0 in initializers:
+                const_tensor = initializers[in0]
+            elif in1 in initializers:
+                const_tensor = initializers[in1]
+
+            if const_tensor is not None:
+                params = {
+                    "const_path": save_weight_bin(const_tensor, weights_dir),
+                    "const_shape": [int(d) for d in const_tensor.dims],
+                }
+            else:
+                params = {}
+
+        # Encontrar next_steps observando quem consome a saída deste nó.
+        # Para um SiLU fundido, "node" já foi redirecionado para o mul_node
+        # acima, então node.output continua correto (é a saída real do par).
         next_steps = []
         for out_name in node.output:
-            for consumer_step, other_node in enumerate(valid_nodes, start=1):
-                if consumer_step != step_id and out_name in other_node.input:
+            for consumer_step, consumer_entry in enumerate(fused_nodes, start=1):
+                if consumer_step == step_id:
+                    continue
+                consumer_node = consumer_entry[-1]  # mul_node para "silu", node para "raw"
+                if out_name in consumer_node.input:
                     if consumer_step not in next_steps:
                         next_steps.append(consumer_step)
 

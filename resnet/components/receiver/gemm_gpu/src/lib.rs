@@ -5,8 +5,26 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::env;
 use std::collections::HashMap;
+use std::cell::RefCell;
+use std::sync::Arc;
 
 type WitData = bindings::planner::gemmworld::plan::Data;
+
+thread_local! {
+    // Cache de pesos/bias já lidos do disco, chaveado pelo path do arquivo.
+    // Sem isso, toda chamada relia o .bin inteiro do zero (até ~900ms pro
+    // arquivo de 411MB da dense0), mesmo que já tivesse sido lido antes
+    // nesse mesmo processo. O mesmo processo atende várias camadas
+    // (dense0/dense1/dense2), cada uma com seu próprio arquivo de peso.
+    static WEIGHTS_CACHE: RefCell<HashMap<String, Arc<Vec<f32>>>> = RefCell::new(HashMap::new());
+
+    // Controla quais weight_id (= weight_path) já foram enviados ao
+    // kernel GPU via gemm_load_weights. Depois da primeira vez, chamadas
+    // seguintes pulam o marshalling do Vec<f32> inteiro pela fronteira
+    // WIT — confirmado ~81ms pra 411MB, proporcional ao tamanho (ver
+    // GEMM_TIMING vs kernel_call registrado anteriormente).
+    static GPU_LOADED: RefCell<std::collections::HashSet<String>> = RefCell::new(std::collections::HashSet::new());
+}
 
 mod bindings {
     use super::Component;
@@ -66,6 +84,19 @@ fn load_bin(path: &str) -> Vec<f32> {
     }
 }
 
+// Lê do cache se o path já foi carregado antes neste processo; senão lê do
+// disco com load_bin e guarda no cache para as próximas chamadas.
+fn load_bin_cached(path: &str) -> Arc<Vec<f32>> {
+    WEIGHTS_CACHE.with(|cache| {
+        if let Some(existing) = cache.borrow().get(path) {
+            return existing.clone();
+        }
+        let data = Arc::new(load_bin(path));
+        cache.borrow_mut().insert(path.to_string(), data.clone());
+        data
+    })
+}
+
 fn handle_client(
     mut stream: TcpStream,
     initialized: &mut i32,
@@ -123,32 +154,50 @@ fn handle_client(
         // 2. Aloca o buffer de saída (1000 logits)
         input_img.output = vec![0.0f32; p.out_features as usize];
 
-        // 3. Carrega os pesos e o bias usando a função load_bin
-        //let weights = load_bin(&p.weight_path);
-        //let bias    = load_bin(&p.bias_path);
-                let t_w = Instant::now(); // [T]
+        // 3. Carrega os pesos e o bias do disco (cache local, path -> dados)
+        let t_w = Instant::now(); // [T]
         let weights = if !p.weight_path.is_empty() {
-            load_bin(&p.weight_path)
+            load_bin_cached(&p.weight_path)
         } else {
-            Vec::new()
+            Arc::new(Vec::new())
         };
-        let weights_load_us = t_w.elapsed().as_micros() as u64; // [T]
+        let weights_load_us = t_w.elapsed().as_micros() as u64; // [T] perto de 0 após a 1ª chamada p/ este path
 
         let t_b = Instant::now(); // [T]
         let bias = if !p.bias_path.is_empty() {
-            load_bin(&p.bias_path)
+            load_bin_cached(&p.bias_path)
         } else {
-            Vec::new()
+            Arc::new(Vec::new())
         };
-        let bias_load_us = t_b.elapsed().as_micros() as u64; // [T]
+        let bias_load_us = t_b.elapsed().as_micros() as u64; // [T] idem
 
-        // 4. Executa o GEMM
+        // 3b. weight_id = weight_path (único por camada). Na primeira vez
+        // que o kernel GPU vê este weight_id, manda os floats e ele cacheia
+        // os buffers GPU; nas chamadas seguintes, só manda o identificador —
+        // sem reenviar o Vec<f32> pela fronteira WIT.
+        let weight_id = p.weight_path.clone();
+        let t_gpu_load = Instant::now(); // [T]
+        let gpu_load_triggered = GPU_LOADED.with(|loaded| { // [T]
+            if loaded.borrow().contains(&weight_id) {
+                false
+            } else {
+                bindings::planner::gemmworld::plan::gemm_load_weights(
+                    &weight_id,
+                    weights.as_slice(),
+                    bias.as_slice(),
+                );
+                loaded.borrow_mut().insert(weight_id.clone());
+                true
+            }
+        });
+        let gpu_load_us = t_gpu_load.elapsed().as_micros() as u64; // [T] só não-zero na 1ª chamada p/ este weight_id
+
+        // 4. Executa o GEMM (sem reenviar pesos — já cacheados no kernel)
         let t_call = Instant::now(); // [T]
         let mut status = bindings::planner::gemmworld::plan::gemm(
+            &weight_id,
             p.in_features,
             p.out_features,
-            &weights,
-            &bias,
             &input_img,
         );
         let kernel_call_us = t_call.elapsed().as_micros() as u64; // [T]
@@ -273,12 +322,14 @@ fn handle_client(
                 "payload_out_bytes": sent_bytes,
                 "weights_bytes": weights.len() * 4,
                 "bias_bytes": bias.len() * 4,
+                "gpu_load_triggered": gpu_load_triggered,
                 "timing_us": {
                     "net_in": net_in_us,
                     "deserialize": deserialize_us,
                     "graph_load": graph_load_us,
                     "weights_load": weights_load_us,
                     "bias_load": bias_load_us,
+                    "gpu_load": gpu_load_us,
                     "kernel_call": kernel_call_us,
                     "routing_load": routing_load_us,
                     "clone_output": clone_output_us,

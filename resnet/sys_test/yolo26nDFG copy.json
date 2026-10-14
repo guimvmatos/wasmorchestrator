@@ -1,0 +1,93 @@
+{
+  "model": "yolo26n",
+  "steps": [
+    {
+      "step": 1,
+      "name": "/model.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.0.conv.bias.bin",
+        "cout": 16,
+        "cin": 3,
+        "groups": 1,
+        "h_in": 640,
+        "w_in": 640,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
+      "next_steps": [
+        2
+      ]
+    },
+    {
+      "step": 2,
+      "name": "/model.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        3
+      ]
+    },
+    {
+      "step": 3,
+      "name": "/model.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.1.conv.bias.bin",
+        "cout": 32,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 320,
+        "w_in": 320,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
+      "next_steps": [
+        4
+      ]
+    },
+    {
+      "step": 4,
+      "name": "/model.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        5
+      ]
+    },
+    {
+      "step": 5,
+      "name": "/model.2/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.2.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.2.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 160,
+        "w_in": 160,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        6
+      ]
+    },
+    {
+      "step": 6,
+      "name": "/model.2/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": []
+    }
+  ]
+}

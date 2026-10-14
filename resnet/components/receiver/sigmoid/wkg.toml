@@ -1,0 +1,2 @@
+[overrides]
+"planner:sigmoidworld" = { path = "../../kernel/sigmoid/" }

@@ -1,0 +1,2 @@
+[overrides]
+"wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }

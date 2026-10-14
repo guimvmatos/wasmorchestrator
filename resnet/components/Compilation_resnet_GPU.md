@@ -18,14 +18,7 @@ cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug conv_gpu/target/wasm32-wasip2/release/convserver.wasm \
   --plug ../kernel/conv_gpu/target/wasm32-wasip2/release/conv_gpu.wasm \
-  -o ../../sys_test/kernel_1.wasm
-
-
-cd "$WOR/resnet/sys_test"
-"$WOR/wasi-gfx-runtime/target/release/runtime" \
-  --wasm ./kernel_1.wasm \
-  --port 8081 \
-  --ip 127.0.0.1
+  -o ../../sys_test/kernel_1_gpu.wasm
 
 ## BatchNorm
 cd "$WOR/resnet/components/kernel/bn_gpu"
@@ -39,16 +32,9 @@ cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug bn_gpu/target/wasm32-wasip2/release/bnserver.wasm \
   --plug ../kernel/bn_gpu/target/wasm32-wasip2/release/bn_gpu.wasm \
-  -o ../../sys_test/kernel_2.wasm
+  -o ../../sys_test/kernel_2_gpu.wasm
 
-
-cd "$WOR/resnet/sys_test"
-"$WOR/wasi-gfx-runtime/target/release/runtime" \
-  --wasm ./kernel_2.wasm \
-  --port 8082 \
-  --ip 127.0.0.1
-
-## BatchNorm
+## MaxPool
 cd "$WOR/resnet/components/kernel/maxpool_gpu"
 wkg wit fetch
 CC="" cargo build --target=wasm32-wasip2 --release
@@ -60,14 +46,21 @@ cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug maxpool_gpu/target/wasm32-wasip2/release/maxpoolserver.wasm \
   --plug ../kernel/maxpool_gpu/target/wasm32-wasip2/release/maxpool_gpu.wasm \
-  -o ../../sys_test/kernel_4.wasm
+  -o ../../sys_test/kernel_4_gpu.wasm
 
+## GAP
+cd "$WOR/resnet/components/kernel/gap_gpu"
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
 
-cd "$WOR/resnet/sys_test"
-"$WOR/wasi-gfx-runtime/target/release/runtime" \
-  --wasm ./kernel_4.wasm \
-  --port 8084 \
-  --ip 127.0.0.1
+cd "$WOR/resnet/components/receiver/gap_gpu"
+wkg wit fetch
+cargo build --target=wasm32-wasip2 --release
+
+cd ..
+wac plug gap_gpu/target/wasm32-wasip2/release/gapserver.wasm \
+  --plug ../kernel/gap_gpu/target/wasm32-wasip2/release/gap_gpu.wasm \
+  -o ../../sys_test/kernel_6_gpu.wasm
 
 ## GEMM
 cd "$WOR/resnet/components/kernel/gemm_gpu"
@@ -81,16 +74,95 @@ cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug gemm_gpu/target/wasm32-wasip2/release/gemmserver.wasm \
   --plug ../kernel/gemm_gpu/target/wasm32-wasip2/release/gemm_gpu.wasm \
-  -o ../../sys_test/kernel_8.wasm
+  -o ../../sys_test/kernel_8_gpu.wasm
+
+## Sigmoid
+cd "$WOR/resnet/components/kernel/sigmoid_gpu"
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
+
+cd "$WOR/resnet/components/receiver/sigmoid_gpu"
+wkg wit fetch
+cargo build --target=wasm32-wasip2 --release
+
+cd ..
+wac plug sigmoid_gpu/target/wasm32-wasip2/release/sigmoidserver.wasm \
+  --plug ../kernel/sigmoid_gpu/target/wasm32-wasip2/release/sigmoid_gpu.wasm \
+  -o ../../sys_test/kernel_10_gpu.wasm
+
+## SILU
+cd "$WOR/resnet/components/kernel/silu_gpu"
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
+
+cd "$WOR/resnet/components/receiver/silu_gpu"
+wkg wit fetch
+cargo build --target=wasm32-wasip2 --release
+
+cd ..
+wac plug silu_gpu/target/wasm32-wasip2/release/siluserver.wasm \
+  --plug ../kernel/silu_gpu/target/wasm32-wasip2/release/silu_gpu.wasm \
+  -o ../../sys_test/kernel_12_gpu.wasm
+
+# to run
 
 cd "$WOR/resnet/sys_test"
 "$WOR/wasi-gfx-runtime/target/release/runtime" \
-  --wasm ./kernel_8.wasm \
+  --wasm ./kernel_1_gpu.wasm \
+  --port 8081 \
+  --ip 127.0.0.1
+
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_2_gpu.wasm \
+  --port 8082 \
+  --ip 127.0.1
+
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_4_gpu.wasm \
+  --port 8084 \
+  --ip 127.0.0.1
+
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_6_gpu.wasm \
+  --port 8086 \
+  --ip 127.0.0.1
+
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_8_gpu.wasm \
   --port 8088 \
   --ip 127.0.0.1
 
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_10_gpu.wasm \
+  --port 8090 \
+  --ip 127.0.0.1
 
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_12_gpu.wasm \
+  --port 8092 \
+  --ip 127.0.0.1
 
-#onnx to dfg.py
+# onnx to dfg.py
 cd "$WOR/resnet/test_onnx"
 python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output ../sys_test/resnet18DFG.json --weights-dir ../bin_weights
+
+
+# AutoGenerate
+cd "$WOR/resnet/components/receiver/dynamic_builder_gpu"
+python3 build_custom.py \
+  --kernels 1,2,3,4,5,6,7,8,9 \
+  --gpu 1,2,4,6,8 \
+  --component-dir ./target_component \
+  --output ../../../sys_test/kernel_0_gpu.wasm
+
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_0_gpu.wasm \
+  --port 8080 \
+  --ip 127.0.0.1

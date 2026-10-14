@@ -34,9 +34,13 @@ struct ConvParams {
     #[serde(default)]
     weight_path: String,
     #[serde(default)]
+    bias_path: String,
+    #[serde(default)]
     cin: u32,
     #[serde(default)]
     cout: u32,
+    #[serde(default)]
+    groups: u32,
     #[serde(default)]
     h_in: u32,
     #[serde(default)]
@@ -148,11 +152,30 @@ fn handle_client(
         };
         let weights_load_us = t_w.elapsed().as_micros() as u64; // [T]
 
+        // 3b. Lê o bias (opcional — path vazio → lista vazia, GPU trata
+        // has_bias=0 e ignora o buffer dummy).
+        let t_b = Instant::now(); // [T]
+        let bias: Vec<f32> = if !p.bias_path.is_empty() {
+            let bias_bytes = std::fs::read(&p.bias_path)
+                .unwrap_or_else(|e| panic!("Erro ao carregar bias de {}: {:?}", p.bias_path, e));
+            unsafe {
+                std::slice::from_raw_parts(
+                    bias_bytes.as_ptr() as *const f32,
+                    bias_bytes.len() / 4,
+                )
+                .to_vec()
+            }
+        } else {
+            Vec::new()
+        };
+        let bias_load_us = t_b.elapsed().as_micros() as u64; // [T]
+
         let req_id = input_img.request;
         let in_len = input_img.input.len();
 
         // 4. Executa o kernel síncrono
         let t_call = Instant::now(); // [T]
+        let groups = if p.groups == 0 { 1 } else { p.groups };
         let mut status = bindings::planner::convworld::plan::conv(
             p.cout,
             p.cin,
@@ -162,7 +185,9 @@ fn handle_client(
             p.kw,
             p.stride,
             p.padding,
+            groups,
             &weights,
+            &bias,
             &input_img,
         );
         let kernel_call_us = t_call.elapsed().as_micros() as u64; // [T]
@@ -285,12 +310,14 @@ fn handle_client(
                 "payload_in_bytes": len,
                 "payload_out_bytes": sent_bytes,
                 "weights_bytes": weights.len() * 4,
+                "bias_bytes": bias.len() * 4,
                 "timing_us": {
                     "net_in": net_in_us,
                     "deserialize": deserialize_us,
                     "graph_load": graph_load_us,
                     "alloc_output": alloc_output_us,
                     "weights_load": weights_load_us,
+                    "bias_load": bias_load_us,
                     "kernel_call": kernel_call_us,
                     "routing_load": routing_load_us,
                     "clone_output": clone_output_us,

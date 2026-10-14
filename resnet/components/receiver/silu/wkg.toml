@@ -1,0 +1,2 @@
+[overrides]
+"planner:siluworld" = { path = "../../kernel/silu/" }

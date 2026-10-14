@@ -34,9 +34,13 @@ struct ConvParams {
     #[serde(default)]
     weight_path: String,
     #[serde(default)]
+    bias_path: String,
+    #[serde(default)]
     cin: u32,
     #[serde(default)]
     cout: u32,
+    #[serde(default)]
+    groups: u32,
     #[serde(default)]
     h_in: u32,
     #[serde(default)]
@@ -132,7 +136,24 @@ let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no pars
             Vec::new()
         };
 
+        // 3b. Lê o bias (opcional — convs seguidas de BN costumam não ter;
+        // path vazio → lista vazia, que o kernel trata como "sem bias").
+        let bias: Vec<f32> = if !p.bias_path.is_empty() {
+            let bias_bytes = std::fs::read(&p.bias_path)
+                .unwrap_or_else(|e| panic!("Erro ao carregar bias de {}: {:?}", p.bias_path, e));
+            unsafe {
+                std::slice::from_raw_parts(
+                    bias_bytes.as_ptr() as *const f32,
+                    bias_bytes.len() / 4,
+                )
+                .to_vec()
+            }
+        } else {
+            Vec::new()
+        };
+
         // 4. Executa o kernel C
+        let groups = if p.groups == 0 { 1 } else { p.groups };
         let mut status = bindings::planner::convworld::plan::conv(
             p.cout,
             p.cin,
@@ -142,7 +163,9 @@ let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no pars
             p.kw,
             p.stride,
             p.padding,
+            groups,
             &weights,
+            &bias,
             &input_img,
         );
 

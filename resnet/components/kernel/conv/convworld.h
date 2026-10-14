@@ -34,7 +34,7 @@ typedef struct exports_planner_convworld_plan_data_t {
 } exports_planner_convworld_plan_data_t;
 
 // Exported Functions from `planner:convworld/plan`
-void exports_planner_convworld_plan_conv(uint32_t c_out, uint32_t c_in, uint32_t h_in, uint32_t w_in, uint32_t kh, uint32_t kw, uint32_t stride, uint32_t padding, convworld_list_f32_t *weights, exports_planner_convworld_plan_data_t *img, exports_planner_convworld_plan_data_t *ret);
+void exports_planner_convworld_plan_conv(uint32_t c_out, uint32_t c_in, uint32_t h_in, uint32_t w_in, uint32_t kh, uint32_t kw, uint32_t stride, uint32_t padding, uint32_t groups, convworld_list_f32_t *weights, convworld_list_f32_t *bias, exports_planner_convworld_plan_data_t *img, exports_planner_convworld_plan_data_t *ret);
 
 // Helper Functions
 

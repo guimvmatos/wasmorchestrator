@@ -111,17 +111,18 @@ void convworld_string_free(convworld_string_t *ret) {
 
 __attribute__((__export_name__("planner:convworld/plan#conv")))
 uint8_t * __wasm_export_exports_planner_convworld_plan_conv(uint8_t * arg) {
-  convworld_list_f32_t arg0 = (convworld_list_f32_t) { (float*)(*((uint8_t **) (arg + 32))), (*((size_t*) (arg + (32+1*sizeof(void*))))) };
-  exports_planner_convworld_plan_data_t arg1 = (exports_planner_convworld_plan_data_t) {
-    (convworld_list_f32_t) (convworld_list_f32_t) { (float*)(*((uint8_t **) (arg + (32+2*sizeof(void*))))), (*((size_t*) (arg + (32+3*sizeof(void*))))) },
-    (convworld_list_f32_t) (convworld_list_f32_t) { (float*)(*((uint8_t **) (arg + (32+4*sizeof(void*))))), (*((size_t*) (arg + (32+5*sizeof(void*))))) },
-    (convworld_string_t) (convworld_string_t) { (uint8_t*)(*((uint8_t **) (arg + (32+6*sizeof(void*))))), (*((size_t*) (arg + (32+7*sizeof(void*))))) },
-    (convworld_list_u8_t) (convworld_list_u8_t) { (uint8_t*)(*((uint8_t **) (arg + (32+8*sizeof(void*))))), (*((size_t*) (arg + (32+9*sizeof(void*))))) },
-    (uint32_t) (uint32_t) (*((int32_t*) (arg + (32+10*sizeof(void*))))),
-    (uint32_t) (uint32_t) (*((int32_t*) (arg + (36+10*sizeof(void*))))),
+  convworld_list_f32_t arg0 = (convworld_list_f32_t) { (float*)(*((uint8_t **) (arg + (32+1*sizeof(void*))))), (*((size_t*) (arg + (32+2*sizeof(void*))))) };
+  convworld_list_f32_t arg1 = (convworld_list_f32_t) { (float*)(*((uint8_t **) (arg + (32+3*sizeof(void*))))), (*((size_t*) (arg + (32+4*sizeof(void*))))) };
+  exports_planner_convworld_plan_data_t arg2 = (exports_planner_convworld_plan_data_t) {
+    (convworld_list_f32_t) (convworld_list_f32_t) { (float*)(*((uint8_t **) (arg + (32+5*sizeof(void*))))), (*((size_t*) (arg + (32+6*sizeof(void*))))) },
+    (convworld_list_f32_t) (convworld_list_f32_t) { (float*)(*((uint8_t **) (arg + (32+7*sizeof(void*))))), (*((size_t*) (arg + (32+8*sizeof(void*))))) },
+    (convworld_string_t) (convworld_string_t) { (uint8_t*)(*((uint8_t **) (arg + (32+9*sizeof(void*))))), (*((size_t*) (arg + (32+10*sizeof(void*))))) },
+    (convworld_list_u8_t) (convworld_list_u8_t) { (uint8_t*)(*((uint8_t **) (arg + (32+11*sizeof(void*))))), (*((size_t*) (arg + (32+12*sizeof(void*))))) },
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (32+13*sizeof(void*))))),
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (36+13*sizeof(void*))))),
   };
   exports_planner_convworld_plan_data_t ret;
-  exports_planner_convworld_plan_conv((uint32_t) (*((int32_t*) (arg + 0))), (uint32_t) (*((int32_t*) (arg + 4))), (uint32_t) (*((int32_t*) (arg + 8))), (uint32_t) (*((int32_t*) (arg + 12))), (uint32_t) (*((int32_t*) (arg + 16))), (uint32_t) (*((int32_t*) (arg + 20))), (uint32_t) (*((int32_t*) (arg + 24))), (uint32_t) (*((int32_t*) (arg + 28))), &arg0, &arg1, &ret);
+  exports_planner_convworld_plan_conv((uint32_t) (*((int32_t*) (arg + 0))), (uint32_t) (*((int32_t*) (arg + 4))), (uint32_t) (*((int32_t*) (arg + 8))), (uint32_t) (*((int32_t*) (arg + 12))), (uint32_t) (*((int32_t*) (arg + 16))), (uint32_t) (*((int32_t*) (arg + 20))), (uint32_t) (*((int32_t*) (arg + 24))), (uint32_t) (*((int32_t*) (arg + 28))), (uint32_t) (*((int32_t*) (arg + 32))), &arg0, &arg1, &arg2, &ret);
   free(arg);
   uint8_t *ptr = (uint8_t *) &RET_AREA;
   *((size_t*)(ptr + sizeof(void*))) = ((ret).input).len;

@@ -182,6 +182,26 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
                 "out_features": int(out_features)
             }
 
+        elif kernel_type == 6:  # GlobalAveragePool
+            # EXCEÇÃO: GlobalAveragePool não tem atributos no ONNX (confirmado
+            # via Netron) — a operação em si não precisa de configuração.
+            # Mas o kernel que a executa recebe o tensor como buffer linear
+            # achatado (list<f32>), sem informação de forma embutida, e
+            # precisa saber onde termina um canal e começa o outro
+            # (offset = c * spatial_size) para calcular a média por canal
+            # corretamente. channels/h_in/w_in não são inventados: é o
+            # mesmo shape do tensor de entrada já usado por Conv/BatchNorm/
+            # MaxPool acima (c_in/h_in/w_in), apenas também registrado aqui
+            # porque GAP não tem outro lugar no schema para carregar esse
+            # dado. Sem isso, o kernel teria que assumir um valor fixo de
+            # canais (ex: 512), o que quebra silenciosamente em arquiteturas
+            # com canal final diferente (ex: ResNet-50 usa 2048).
+            params = {
+                "channels": int(c_in),
+                "h_in": int(h_in),
+                "w_in": int(w_in)
+            }
+
         elif kernel_type == 9:  # Dropout (Identity em inferência)
             params = {}
 

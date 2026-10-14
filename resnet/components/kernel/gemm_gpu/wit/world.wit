@@ -10,15 +10,17 @@ interface plan {
         current-kernel: u32,
         request: u32
     }
-  
-    gemm: func(
-        in-features: u32, 
-        out-features: u32, 
-        weights: list<f32>, 
-        bias: list<f32>, 
-        result-container: data
-    ) -> data;
-    
+
+    // Carrega e cacheia pesos+bias uma vez por weight-id, no lado GPU.
+    // Chamado apenas na primeira vez que este processo vê este weight-id;
+    // chamadas seguintes pulam o marshalling de weights/bias pela fronteira
+    // WIT inteira (confirmado ~81ms pra 411MB, proporcional ao tamanho).
+    gemm-load-weights: func(weight-id: string, weights: list<f32>, bias: list<f32>);
+
+    // Computa usando o buffer já cacheado para weight-id. Panica se
+    // gemm-load-weights não foi chamado antes para esse weight-id.
+    gemm: func(weight-id: string, in-features: u32, out-features: u32, img: data) -> data;
+
 }
 
 world gemmworld-gpu {

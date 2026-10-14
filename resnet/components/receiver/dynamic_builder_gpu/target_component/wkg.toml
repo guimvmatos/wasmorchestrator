@@ -1,0 +1,11 @@
+[overrides]
+"planner:convworld" = { path = "../../../kernel/conv_gpu/wit" }
+"planner:bnworld" = { path = "../../../kernel/bn_gpu/wit" }
+"planner:reluworld" = { path = "../../../kernel/relu/" }
+"planner:maxpoolworld" = { path = "../../../kernel/maxpool_gpu/wit" }
+"planner:addworld" = { path = "../../../kernel/add/" }
+"planner:gapworld" = { path = "../../../kernel/gap_gpu/wit" }
+"planner:flattenworld" = { path = "../../../kernel/flatten/" }
+"planner:gemmworld" = { path = "../../../kernel/gemm_gpu/wit" }
+"planner:dropoutworld" = { path = "../../../kernel/dropout/" }
+"wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }

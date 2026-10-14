@@ -1,0 +1,3 @@
+[overrides]
+"planner:siluworld" = { path = "../../kernel/silu_gpu/wit" }
+"wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }

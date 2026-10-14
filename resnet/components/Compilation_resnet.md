@@ -8,6 +8,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   conv.c convworld.c convworld_component_type.o \
   -o convworld_component.wasm -mexec-model=reactor
   
@@ -26,6 +27,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   bn.c bnworld.c bnworld_component_type.o \
   -o bnworld_component.wasm -mexec-model=reactor
   
@@ -44,6 +46,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   relu.c reluworld.c reluworld_component_type.o \
   -o reluworld_component.wasm -mexec-model=reactor
   
@@ -62,6 +65,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   maxpool.c maxpoolworld.c maxpoolworld_component_type.o \
   -o maxpoolworld_component.wasm -mexec-model=reactor
   
@@ -80,6 +84,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   add.c addworld.c addworld_component_type.o \
   -o addworld_component.wasm -mexec-model=reactor
   
@@ -98,6 +103,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   gap.c gapworld.c gapworld_component_type.o \
   -o gapworld_component.wasm -mexec-model=reactor
   
@@ -116,6 +122,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   flatten.c flattenworld.c flattenworld_component_type.o \
   -o flattenworld_component.wasm -mexec-model=reactor
   
@@ -134,6 +141,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   gemm.c gemmworld.c gemmworld_component_type.o \
   -o gemmworld_component.wasm -mexec-model=reactor
   
@@ -152,6 +160,7 @@ export WASI_SDK=/opt/wasi-sdk
 $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
   dropout.c dropoutworld.c dropoutworld_component_type.o \
   -o dropoutworld_component.wasm -mexec-model=reactor
   
@@ -161,6 +170,44 @@ wkg wit fetch
 CC="" cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug dropout/target/wasm32-wasip2/release/dropoutserver.wasm --plug ../kernel/dropout/dropoutworld_component.wasm -o dropoutFinal.wasm
+
+#### sigmoid (kernel_10)
+##### Kernel
+cd ../kernel/sigmoid/
+wit-bindgen c --world sigmoidworld sigmoid.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  sigmoid.c sigmoidworld.c sigmoidworld_component_type.o \
+  -o sigmoidworld_component.wasm -mexec-model=reactor
+  
+##### Receiver
+cd ../../receiver/sigmoid
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
+cd ..
+wac plug sigmoid/target/wasm32-wasip2/release/sigmoidserver.wasm --plug ../kernel/sigmoid/sigmoidworld_component.wasm -o sigmoidFinal.wasm
+
+#### silu (kernel_12)
+##### Kernel
+cd ../kernel/silu/
+wit-bindgen c --world siluworld silu.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  silu.c siluworld.c siluworld_component_type.o \
+  -o siluworld_component.wasm -mexec-model=reactor
+  
+##### Receiver
+cd ../../receiver/silu
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
+cd ..
+wac plug silu/target/wasm32-wasip2/release/siluserver.wasm --plug ../kernel/silu/siluworld_component.wasm -o siluFinal.wasm
 
 #### all (kernel_0)  
 ##### Receiver
@@ -178,6 +225,8 @@ wac plug all/target/wasm32-wasip2/release/allserver.wasm \
 --plug ../kernel/gemm/gemmworld_component.wasm \
 --plug ../kernel/maxpool/maxpoolworld_component.wasm \
 --plug ../kernel/relu/reluworld_component.wasm \
+--plug ../kernel/sigmoid/sigmoidworld_component.wasm \ # é necessário arrumar o codigo pra aceitar isso primeiro...
+--plug ../kernel/silu/siluworld_component.wasm \ # é necessário arrumar o codigo pra aceitar isso primeiro...
 -o allFinal.wasm
 
 
@@ -192,6 +241,8 @@ mv gapFinal.wasm kernel_6.wasm
 mv flattenFinal.wasm kernel_7.wasm
 mv gemmFinal.wasm kernel_8.wasm
 mv dropoutFinal.wasm kernel_9.wasm
+mv sigmoidFinal.wasm kernel_10.wasm
+mv siluFinal.wasm kernel_12.wasm
 mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 

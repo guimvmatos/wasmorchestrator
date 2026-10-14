@@ -19,7 +19,9 @@ interface plan {
         kw: u32, 
         stride: u32, 
         padding: u32, 
+        groups: u32,
         weights: list<f32>, 
+        bias: list<f32>,
         img: data
     ) -> data;
 }

@@ -10,7 +10,7 @@ interface plan {
     request: u32,
   }
 
-  conv: func(c-out: u32, c-in: u32, h-in: u32, w-in: u32, kh: u32, kw: u32, stride: u32, padding: u32, weights: list<f32>, img: data) -> data;
+  conv: func(c-out: u32, c-in: u32, h-in: u32, w-in: u32, kh: u32, kw: u32, stride: u32, padding: u32, groups: u32, weights: list<f32>, bias: list<f32>, img: data) -> data;
 }
 
 world convworld-gpu {

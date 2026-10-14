@@ -11,7 +11,7 @@ interface plan {
         request: u32
     }
   
-    gap: func(a: list<f32>, result-container: data) -> data;
+    gap: func(channels: u32, img: data) -> data;
     
 }
 

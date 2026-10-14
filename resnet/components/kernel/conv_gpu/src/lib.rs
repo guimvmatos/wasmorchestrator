@@ -75,7 +75,9 @@ impl Guest for Component {
         kw: u32,
         stride: u32,
         padding: u32,
+        groups: u32,
         weights: Vec<f32>,
+        bias: Vec<f32>,
         mut img: Data,
     ) -> Data {
         let out_h = ((h_in + 2 * padding - kh) / stride) + 1;
@@ -87,9 +89,10 @@ impl Guest for Component {
         }
 
         let result = execute_conv_gpu(
-            c_out, c_in, h_in, w_in, kh, kw, stride, padding, out_h, out_w,
+            c_out, c_in, h_in, w_in, kh, kw, stride, padding, groups, out_h, out_w,
             &img.input,
             &weights,
+            &bias,
             output_len,
         );
 
@@ -107,12 +110,16 @@ fn execute_conv_gpu(
     kw: u32,
     stride: u32,
     padding: u32,
+    groups: u32,
     out_h: u32,
     out_w: u32,
     input: &[f32],
     weights: &[f32],
+    bias: &[f32],
     output_len: usize,
 ) -> Vec<f32> {
+    let t_fn_start = std::time::Instant::now(); // [T]
+
     GPU_CTX.with(|cell| {
         if cell.borrow().is_none() {
             *cell.borrow_mut() = Some(build_gpu_context());
@@ -122,9 +129,12 @@ fn execute_conv_gpu(
         let device = &ctx.device;
         let compute_pipeline = &ctx.pipeline;
 
-        // 3. Buffer de Parâmetros (Uniform)
-        let params: [u32; 10] = [
-            c_out, c_in, h_in, w_in, kh, kw, stride, padding, out_h, out_w,
+        // 3. Buffer de Parâmetros (Uniform). has_bias é flag explícita —
+        // WGSL não tem Option; bias vazio (groups sem bias real) usa um
+        // buffer de 1 float dummy, nunca lido pelo shader quando flag=0.
+        let has_bias: u32 = if bias.is_empty() { 0 } else { 1 };
+        let params: [u32; 12] = [
+            c_out, c_in, h_in, w_in, kh, kw, stride, padding, out_h, out_w, groups, has_bias,
         ];
         let params_bytes = bytemuck::cast_slice(&params);
         let params_buffer = device.create_buffer(&webgpu::GpuBufferDescriptor {
@@ -139,6 +149,7 @@ fn execute_conv_gpu(
         params_buffer.unmap().unwrap();
 
         // 4. Buffer de Input (Storage)
+        let t_input_buf = std::time::Instant::now(); // [T]
         let input_bytes = bytemuck::cast_slice(input);
         let input_buffer = device.create_buffer(&webgpu::GpuBufferDescriptor {
             label: Some("Input Buffer".to_string()),
@@ -150,8 +161,10 @@ fn execute_conv_gpu(
             .get_mapped_range_set_with_copy(input_bytes, None, None)
             .unwrap();
         input_buffer.unmap().unwrap();
+        let input_buf_us = t_input_buf.elapsed().as_micros() as u64; // [T]
 
         // 5. Buffer de Weights (Storage)
+        let t_weights_buf = std::time::Instant::now(); // [T]
         let weights_bytes = bytemuck::cast_slice(weights);
         let weights_buffer = device.create_buffer(&webgpu::GpuBufferDescriptor {
             label: Some("Weights Buffer".to_string()),
@@ -163,6 +176,23 @@ fn execute_conv_gpu(
             .get_mapped_range_set_with_copy(weights_bytes, None, None)
             .unwrap();
         weights_buffer.unmap().unwrap();
+        let weights_buf_us = t_weights_buf.elapsed().as_micros() as u64; // [T]
+
+        // 5b. Buffer de Bias (Storage) — sempre criado, mesmo vazio, porque
+        // o bind group layout fixo do shader espera o binding presente;
+        // has_bias nos params decide se o shader de fato o lê.
+        let bias_source: &[f32] = if bias.is_empty() { &[0.0f32] } else { bias };
+        let bias_bytes = bytemuck::cast_slice(bias_source);
+        let bias_buffer = device.create_buffer(&webgpu::GpuBufferDescriptor {
+            label: Some("Bias Buffer".to_string()),
+            size: bias_bytes.len() as webgpu::GpuSize64,
+            usage: webgpu::GpuBufferUsage::STORAGE | webgpu::GpuBufferUsage::COPY_DST,
+            mapped_at_creation: Some(true),
+        });
+        bias_buffer
+            .get_mapped_range_set_with_copy(bias_bytes, None, None)
+            .unwrap();
+        bias_buffer.unmap().unwrap();
 
         // 6. Buffer de Output na GPU e Staging Buffer para leitura na CPU
         let output_byte_size = (output_len * std::mem::size_of::<f32>()) as webgpu::GpuSize64;
@@ -182,7 +212,7 @@ fn execute_conv_gpu(
             mapped_at_creation: None,
         });
 
-        // 8. Bind Group (conecta os 4 buffers aos bindings 0, 1, 2, 3 do WGSL)
+        // 8. Bind Group (conecta os 5 buffers aos bindings 0-4 do WGSL)
         let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
         let bind_group = device.create_bind_group(&webgpu::GpuBindGroupDescriptor {
             label: Some("Conv Bind Group".to_string()),
@@ -215,6 +245,14 @@ fn execute_conv_gpu(
                 webgpu::GpuBindGroupEntry {
                     binding: 3,
                     resource: webgpu::GpuBindingResource::GpuBufferBinding(webgpu::GpuBufferBinding {
+                        buffer: &bias_buffer,
+                        offset: Some(0),
+                        size: None,
+                    }),
+                },
+                webgpu::GpuBindGroupEntry {
+                    binding: 4,
+                    resource: webgpu::GpuBindingResource::GpuBufferBinding(webgpu::GpuBufferBinding {
                         buffer: &output_buffer,
                         offset: Some(0),
                         size: None,
@@ -224,6 +262,7 @@ fn execute_conv_gpu(
         });
 
         // 9. Command Encoder & Dispatch
+        let t_dispatch = std::time::Instant::now(); // [T]
         let encoder = device.create_command_encoder(Some(&webgpu::GpuCommandEncoderDescriptor { label: None }));
         {
             let cpass = encoder.begin_compute_pass(None);
@@ -243,8 +282,10 @@ fn execute_conv_gpu(
         // Copia do output_buffer (VRAM) para staging_buffer
         encoder.copy_buffer_to_buffer(&output_buffer, None, &staging_buffer, None, None);
         device.queue().submit(&[&encoder.finish(None)]);
+        let dispatch_submit_us = t_dispatch.elapsed().as_micros() as u64; // [T]
 
         // 10. Leitura síncrona
+        let t_readback = std::time::Instant::now(); // [T]
         let data = sync_io::map_and_read_sync(
             &staging_buffer,
             webgpu::GpuMapMode::READ,
@@ -252,6 +293,14 @@ fn execute_conv_gpu(
             None,
         )
         .expect("map_and_read_sync falhou no host");
+        let readback_us = t_readback.elapsed().as_micros() as u64; // [T]
+
+        let fn_total_us = t_fn_start.elapsed().as_micros() as u64; // [T]
+        eprintln!( // [T]
+            "[CONV_TIMING] c_out={} c_in={} kh={} kw={} h_in={} w_in={} weights_len={} | input_buf_us={} weights_buf_us={} dispatch_submit_us={} readback_us={} fn_total_us={}",
+            c_out, c_in, kh, kw, h_in, w_in, weights.len(),
+            input_buf_us, weights_buf_us, dispatch_submit_us, readback_us, fn_total_us
+        );
 
         if !data.is_empty() {
             bytemuck::cast_slice(&data).to_vec()
