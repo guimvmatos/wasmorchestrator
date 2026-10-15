@@ -713,6 +713,35 @@ KERNELS = {
             },
         },
     },
+    22: {
+        "name": "softmax",
+        "wit_import": "    import planner:softmaxworld/plan;",
+        # Softmax numericamente estável ao longo de UM eixo — ponto-a-ponto
+        # com normalização por eixo, sem FLOPs significativos (sem ganho em
+        # GPU, sem variante GPU, igual Reshape/Transpose/Resize). Reusa
+        # input_shape (já existe em LayerParams, compartilhado com Split/
+        # Transpose) + axis (já existe, compartilhado com Split).
+        "rust_match": """                22 => {
+                    let shape: Vec<u32> = p.input_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                    let data = bindings::planner::softmaxworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::softmaxworld::plan::softmax(&current_input, &shape, p.axis, &data);
+                    computed_output = res.output;
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:softmaxworld" = { path = "../../../kernel/softmax/" }',
+                "wasm_path": "../../../kernel/softmax/softmaxworld_component.wasm",
+            },
+        },
+    },
 }
 
 WASI_GFX_OVERRIDE = (
@@ -1258,7 +1287,7 @@ def main():
 
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 18.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 18, 22.")
             sys.exit(1)
 
     for k in gpu_ids:

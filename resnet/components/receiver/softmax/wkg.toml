@@ -1,0 +1,2 @@
+[overrides]
+"planner:softmaxworld" = { path = "../../kernel/softmax/" }

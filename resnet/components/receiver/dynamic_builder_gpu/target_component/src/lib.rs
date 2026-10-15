@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::Deserialize;
 
-const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22];
 thread_local! {
     // Controla quais weight_id (= weight_path) já foram enviados
     // ao kernel GPU via gemm_load_weights neste processo. Evita
@@ -680,6 +680,20 @@ fn handle_client(
                     let res = bindings::planner::resizeworld::plan::resize(
                         &current_input, p.channels, p.h_in, p.w_in, p.scale_h, p.scale_w, &data,
                     );
+                    computed_output = res.output;
+                },
+                22 => {
+                    let shape: Vec<u32> = p.input_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                    let data = bindings::planner::softmaxworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::softmaxworld::plan::softmax(&current_input, &shape, p.axis, &data);
                     computed_output = res.output;
                 },
                 _ => {

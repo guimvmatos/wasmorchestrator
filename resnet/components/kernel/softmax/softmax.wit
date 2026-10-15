@@ -1,0 +1,32 @@
+package planner:softmaxworld;
+
+interface plan {
+
+    // Mesmo record "data" usado em todo o pipeline (ver concat/split/transpose/matmul).
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // Softmax numericamente estavel (subtrai o maximo antes do exp) ao longo
+    // de UM eixo de um tensor N-D flattened. shape eh o shape completo de
+    // entrada (resolvido estaticamente pelo onnx_to_dfg.py, igual ao
+    // input_shape do Split/Transpose); axis ja vem normalizado (negativo
+    // resolvido pelo exporter).
+    softmax: func(
+        input: list<f32>,
+        shape: list<u32>,
+        axis: u32,
+        result-container: data
+    ) -> data;
+
+}
+
+world softmaxworld {
+    export plan;
+}
