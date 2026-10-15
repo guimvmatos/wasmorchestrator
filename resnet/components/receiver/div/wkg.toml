@@ -1,0 +1,2 @@
+[overrides]
+"planner:divworld" = { path = "../../kernel/div/" }

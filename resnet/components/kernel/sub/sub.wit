@@ -1,0 +1,27 @@
+package planner:subworld;
+
+interface plan {
+
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // ONNX Sub (a - b), mesmo padrão de broadcast por módulo do Mul (kernel
+    // 11): cobre elementwise (len_b == len_a) e escalar/broadcast simples
+    // (len_b == 1 ou len_b divide len_a), não broadcast multi-dimensional
+    // completo. Sub NÃO é comutativo — o receiver garante que `a`/`b` já
+    // chegam na ordem certa (quando um lado é constante, o host usa
+    // const_is_first pra decidir qual vira `a` e qual vira `b`).
+    sub: func(a: list<f32>, b: list<f32>, result-container: data) -> data;
+
+}
+
+world subworld {
+    export plan;
+}

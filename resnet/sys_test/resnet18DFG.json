@@ -1,22 +1,22 @@
 {
-  "model": "resnet50-v1-7",
+  "model": "yolo26n",
   "steps": [
     {
       "step": 1,
-      "name": "resnetv17_conv0_fwd",
+      "name": "/model.0/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_conv0_weight.bin",
-        "bias_path": "",
-        "cout": 64,
+        "weight_path": "../bin_weights/model.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.0.conv.bias.bin",
+        "cout": 16,
         "cin": 3,
         "groups": 1,
-        "h_in": 224,
-        "w_in": 224,
-        "kh": 7,
-        "kw": 7,
+        "h_in": 640,
+        "w_in": 640,
+        "kh": 3,
+        "kw": 3,
         "stride": 2,
-        "padding": 3
+        "padding": 1
       },
       "next_steps": [
         2
@@ -24,61 +24,55 @@
     },
     {
       "step": 2,
-      "name": "resnetv17_batchnorm0_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_batchnorm0_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_batchnorm0_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_batchnorm0_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_batchnorm0_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 64,
-        "h_in": 112,
-        "w_in": 112
-      },
+      "name": "/model.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         3
       ]
     },
     {
       "step": 3,
-      "name": "resnetv17_relu0_fwd",
-      "kernel_type": 3,
-      "params": {},
-      "next_steps": [
-        4
-      ]
-    },
-    {
-      "step": 4,
-      "name": "resnetv17_pool0_fwd",
-      "kernel_type": 4,
+      "name": "/model.1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "channels": 64,
-        "h_in": 112,
-        "w_in": 112,
+        "weight_path": "../bin_weights/model.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.1.conv.bias.bin",
+        "cout": 32,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 320,
+        "w_in": 320,
         "kh": 3,
         "kw": 3,
         "stride": 2,
         "padding": 1
       },
       "next_steps": [
-        5,
-        13
+        4
+      ]
+    },
+    {
+      "step": 4,
+      "name": "/model.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        5
       ]
     },
     {
       "step": 5,
-      "name": "resnetv17_stage1_conv0_fwd",
+      "name": "/model.2/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv0_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage1_conv0_bias.bin",
-        "cout": 64,
-        "cin": 64,
+        "weight_path": "../bin_weights/model.2.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.2.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
         "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
+        "h_in": 160,
+        "w_in": 160,
         "kh": 1,
         "kw": 1,
         "stride": 1,
@@ -90,43 +84,67 @@
     },
     {
       "step": 6,
-      "name": "resnetv17_stage1_batchnorm0_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm0_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm0_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm0_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm0_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 64,
-        "h_in": 56,
-        "w_in": 56
-      },
+      "name": "/model.2/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         7
       ]
     },
     {
       "step": 7,
-      "name": "resnetv17_stage1_relu0_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.2/Split",
+      "kernel_type": 13,
+      "params": {
+        "axis": 1,
+        "input_shape": [
+          1,
+          32,
+          160,
+          160
+        ],
+        "split": [
+          16,
+          16
+        ],
+        "num_outputs": 2
+      },
       "next_steps": [
-        8
+        13,
+        8,
+        12
+      ],
+      "output_routes": [
+        {
+          "to_step": 13,
+          "output_index": 0
+        },
+        {
+          "to_step": 8,
+          "output_index": 1
+        },
+        {
+          "to_step": 12,
+          "output_index": 1
+        },
+        {
+          "to_step": 13,
+          "output_index": 1
+        }
       ]
     },
     {
       "step": 8,
-      "name": "resnetv17_stage1_conv1_fwd",
+      "name": "/model.2/m.0/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv1_weight.bin",
-        "bias_path": "",
-        "cout": 64,
-        "cin": 64,
+        "weight_path": "../bin_weights/model.2.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.2.m.0.cv1.conv.bias.bin",
+        "cout": 8,
+        "cin": 16,
         "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
+        "h_in": 160,
+        "w_in": 160,
         "kh": 3,
         "kw": 3,
         "stride": 1,
@@ -138,86 +156,90 @@
     },
     {
       "step": 9,
-      "name": "resnetv17_stage1_batchnorm1_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm1_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm1_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm1_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm1_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 64,
-        "h_in": 56,
-        "w_in": 56
-      },
+      "name": "/model.2/m.0/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         10
       ]
     },
     {
       "step": 10,
-      "name": "resnetv17_stage1_relu1_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.2/m.0/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.2.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.2.m.0.cv2.conv.bias.bin",
+        "cout": 16,
+        "cin": 8,
+        "groups": 1,
+        "h_in": 160,
+        "w_in": 160,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
       "next_steps": [
         11
       ]
     },
     {
       "step": 11,
-      "name": "resnetv17_stage1_conv2_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv2_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage1_conv2_bias.bin",
-        "cout": 256,
-        "cin": 64,
-        "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
+      "name": "/model.2/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         12
       ]
     },
     {
       "step": 12,
-      "name": "resnetv17_stage1_batchnorm2_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm2_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm2_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm2_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm2_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 56,
-        "w_in": 56
-      },
+      "name": "/model.2/m.0/Add",
+      "kernel_type": 5,
+      "params": {},
       "next_steps": [
-        15
+        13
       ]
     },
     {
       "step": 13,
-      "name": "resnetv17_stage1_conv3_fwd",
-      "kernel_type": 1,
+      "name": "/model.2/Concat",
+      "kernel_type": 14,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv3_weight.bin",
-        "bias_path": "",
-        "cout": 256,
-        "cin": 64,
-        "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 7,
+            "shape": [
+              1,
+              16,
+              160,
+              160
+            ]
+          },
+          {
+            "const": false,
+            "step": 7,
+            "shape": [
+              1,
+              16,
+              160,
+              160
+            ]
+          },
+          {
+            "const": false,
+            "step": 12,
+            "shape": [
+              1,
+              16,
+              160,
+              160
+            ]
+          }
+        ]
       },
       "next_steps": [
         14
@@ -225,17 +247,20 @@
     },
     {
       "step": 14,
-      "name": "resnetv17_stage1_batchnorm3_fwd",
-      "kernel_type": 2,
+      "name": "/model.2/cv2/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm3_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm3_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm3_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm3_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 56,
-        "w_in": 56
+        "weight_path": "../bin_weights/model.2.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.2.cv2.conv.bias.bin",
+        "cout": 64,
+        "cin": 48,
+        "groups": 1,
+        "h_in": 160,
+        "w_in": 160,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         15
@@ -243,8 +268,8 @@
     },
     {
       "step": 15,
-      "name": "resnetv17_stage1__plus0",
-      "kernel_type": 5,
+      "name": "/model.2/cv2/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         16
@@ -252,48 +277,50 @@
     },
     {
       "step": 16,
-      "name": "resnetv17_stage1_activation0",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.3/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.3.conv.weight.bin",
+        "bias_path": "../bin_weights/model.3.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 160,
+        "w_in": 160,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
       "next_steps": [
-        17,
-        25
+        17
       ]
     },
     {
       "step": 17,
-      "name": "resnetv17_stage1_conv4_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv4_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage1_conv4_bias.bin",
-        "cout": 64,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
+      "name": "/model.3/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         18
       ]
     },
     {
       "step": 18,
-      "name": "resnetv17_stage1_batchnorm4_fwd",
-      "kernel_type": 2,
+      "name": "/model.4/cv1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm4_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm4_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm4_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm4_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 64,
-        "h_in": 56,
-        "w_in": 56
+        "weight_path": "../bin_weights/model.4.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.4.cv1.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         19
@@ -301,8 +328,8 @@
     },
     {
       "step": 19,
-      "name": "resnetv17_stage1_relu2_fwd",
-      "kernel_type": 3,
+      "name": "/model.4/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         20
@@ -310,38 +337,62 @@
     },
     {
       "step": 20,
-      "name": "resnetv17_stage1_conv5_fwd",
-      "kernel_type": 1,
+      "name": "/model.4/Split",
+      "kernel_type": 13,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv5_weight.bin",
-        "bias_path": "",
-        "cout": 64,
-        "cin": 64,
-        "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
+        "axis": 1,
+        "input_shape": [
+          1,
+          64,
+          80,
+          80
+        ],
+        "split": [
+          32,
+          32
+        ],
+        "num_outputs": 2
       },
       "next_steps": [
-        21
+        26,
+        21,
+        25
+      ],
+      "output_routes": [
+        {
+          "to_step": 26,
+          "output_index": 0
+        },
+        {
+          "to_step": 21,
+          "output_index": 1
+        },
+        {
+          "to_step": 25,
+          "output_index": 1
+        },
+        {
+          "to_step": 26,
+          "output_index": 1
+        }
       ]
     },
     {
       "step": 21,
-      "name": "resnetv17_stage1_batchnorm5_fwd",
-      "kernel_type": 2,
+      "name": "/model.4/m.0/cv1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm5_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm5_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm5_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm5_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 64,
-        "h_in": 56,
-        "w_in": 56
+        "weight_path": "../bin_weights/model.4.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.4.m.0.cv1.conv.bias.bin",
+        "cout": 16,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
       },
       "next_steps": [
         22
@@ -349,8 +400,8 @@
     },
     {
       "step": 22,
-      "name": "resnetv17_stage1_relu3_fwd",
-      "kernel_type": 3,
+      "name": "/model.4/m.0/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         23
@@ -358,20 +409,20 @@
     },
     {
       "step": 23,
-      "name": "resnetv17_stage1_conv6_fwd",
+      "name": "/model.4/m.0/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv6_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage1_conv6_bias.bin",
-        "cout": 256,
-        "cin": 64,
+        "weight_path": "../bin_weights/model.4.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.4.m.0.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 16,
         "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
-        "kh": 1,
-        "kw": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
         "stride": 1,
-        "padding": 0
+        "padding": 1
       },
       "next_steps": [
         24
@@ -379,25 +430,16 @@
     },
     {
       "step": 24,
-      "name": "resnetv17_stage1_batchnorm6_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm6_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm6_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm6_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm6_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 56,
-        "w_in": 56
-      },
+      "name": "/model.4/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         25
       ]
     },
     {
       "step": 25,
-      "name": "resnetv17_stage1__plus1",
+      "name": "/model.4/m.0/Add",
       "kernel_type": 5,
       "params": {},
       "next_steps": [
@@ -406,26 +448,59 @@
     },
     {
       "step": 26,
-      "name": "resnetv17_stage1_activation1",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.4/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 20,
+            "shape": [
+              1,
+              32,
+              80,
+              80
+            ]
+          },
+          {
+            "const": false,
+            "step": 20,
+            "shape": [
+              1,
+              32,
+              80,
+              80
+            ]
+          },
+          {
+            "const": false,
+            "step": 25,
+            "shape": [
+              1,
+              32,
+              80,
+              80
+            ]
+          }
+        ]
+      },
       "next_steps": [
-        27,
-        35
+        27
       ]
     },
     {
       "step": 27,
-      "name": "resnetv17_stage1_conv7_fwd",
+      "name": "/model.4/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv7_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage1_conv7_bias.bin",
-        "cout": 64,
-        "cin": 256,
+        "weight_path": "../bin_weights/model.4.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.4.cv2.conv.bias.bin",
+        "cout": 128,
+        "cin": 96,
         "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
+        "h_in": 80,
+        "w_in": 80,
         "kh": 1,
         "kw": 1,
         "stride": 1,
@@ -437,65 +512,60 @@
     },
     {
       "step": 28,
-      "name": "resnetv17_stage1_batchnorm7_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm7_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm7_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm7_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm7_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 64,
-        "h_in": 56,
-        "w_in": 56
-      },
+      "name": "/model.4/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
-        29
+        29,
+        138
       ]
     },
     {
       "step": 29,
-      "name": "resnetv17_stage1_relu4_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.5/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.5.conv.weight.bin",
+        "bias_path": "../bin_weights/model.5.conv.bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
       "next_steps": [
         30
       ]
     },
     {
       "step": 30,
-      "name": "resnetv17_stage1_conv8_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv8_weight.bin",
-        "bias_path": "",
-        "cout": 64,
-        "cin": 64,
-        "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
-      },
+      "name": "/model.5/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         31
       ]
     },
     {
       "step": 31,
-      "name": "resnetv17_stage1_batchnorm8_fwd",
-      "kernel_type": 2,
+      "name": "/model.6/cv1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm8_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm8_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm8_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm8_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 64,
-        "h_in": 56,
-        "w_in": 56
+        "weight_path": "../bin_weights/model.6.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.cv1.conv.bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         32
@@ -503,8 +573,8 @@
     },
     {
       "step": 32,
-      "name": "resnetv17_stage1_relu5_fwd",
-      "kernel_type": 3,
+      "name": "/model.6/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         33
@@ -512,96 +582,123 @@
     },
     {
       "step": 33,
-      "name": "resnetv17_stage1_conv9_fwd",
+      "name": "/model.6/Split",
+      "kernel_type": 13,
+      "params": {
+        "axis": 1,
+        "input_shape": [
+          1,
+          128,
+          40,
+          40
+        ],
+        "split": [
+          64,
+          64
+        ],
+        "num_outputs": 2
+      },
+      "next_steps": [
+        51,
+        34,
+        35
+      ],
+      "output_routes": [
+        {
+          "to_step": 51,
+          "output_index": 0
+        },
+        {
+          "to_step": 34,
+          "output_index": 1
+        },
+        {
+          "to_step": 35,
+          "output_index": 1
+        },
+        {
+          "to_step": 51,
+          "output_index": 1
+        }
+      ]
+    },
+    {
+      "step": 34,
+      "name": "/model.6/m.0/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage1_conv9_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage1_conv9_bias.bin",
-        "cout": 256,
+        "weight_path": "../bin_weights/model.6.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.m.0.cv1.conv.bias.bin",
+        "cout": 32,
         "cin": 64,
         "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
+        "h_in": 40,
+        "w_in": 40,
         "kh": 1,
         "kw": 1,
         "stride": 1,
         "padding": 0
       },
       "next_steps": [
-        34
-      ]
-    },
-    {
-      "step": 34,
-      "name": "resnetv17_stage1_batchnorm9_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage1_batchnorm9_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage1_batchnorm9_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage1_batchnorm9_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage1_batchnorm9_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 56,
-        "w_in": 56
-      },
-      "next_steps": [
-        35
-      ]
-    },
-    {
-      "step": 35,
-      "name": "resnetv17_stage1__plus2",
-      "kernel_type": 5,
-      "params": {},
-      "next_steps": [
         36
       ]
     },
     {
+      "step": 35,
+      "name": "/model.6/m.0/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.6.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.m.0.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        37
+      ]
+    },
+    {
       "step": 36,
-      "name": "resnetv17_stage1_activation2",
-      "kernel_type": 3,
+      "name": "/model.6/m.0/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
-        37,
-        45
+        38,
+        42
       ]
     },
     {
       "step": 37,
-      "name": "resnetv17_stage2_conv0_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv0_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage2_conv0_bias.bin",
-        "cout": 128,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
-        "kh": 1,
-        "kw": 1,
-        "stride": 2,
-        "padding": 0
-      },
+      "name": "/model.6/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
-        38
+        48
       ]
     },
     {
       "step": 38,
-      "name": "resnetv17_stage2_batchnorm0_fwd",
-      "kernel_type": 2,
+      "name": "/model.6/m.0/m/m.0/cv1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm0_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm0_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm0_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm0_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 128,
-        "h_in": 28,
-        "w_in": 28
+        "weight_path": "../bin_weights/model.6.m.0.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.m.0.m.0.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
       },
       "next_steps": [
         39
@@ -609,8 +706,8 @@
     },
     {
       "step": 39,
-      "name": "resnetv17_stage2_relu0_fwd",
-      "kernel_type": 3,
+      "name": "/model.6/m.0/m/m.0/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         40
@@ -618,16 +715,16 @@
     },
     {
       "step": 40,
-      "name": "resnetv17_stage2_conv1_fwd",
+      "name": "/model.6/m.0/m/m.0/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv1_weight.bin",
-        "bias_path": "",
-        "cout": 128,
-        "cin": 128,
+        "weight_path": "../bin_weights/model.6.m.0.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.m.0.m.0.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
+        "h_in": 40,
+        "w_in": 40,
         "kh": 3,
         "kw": 3,
         "stride": 1,
@@ -639,47 +736,39 @@
     },
     {
       "step": 41,
-      "name": "resnetv17_stage2_batchnorm1_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm1_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm1_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm1_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm1_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 128,
-        "h_in": 28,
-        "w_in": 28
-      },
+      "name": "/model.6/m.0/m/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         42
       ]
     },
     {
       "step": 42,
-      "name": "resnetv17_stage2_relu1_fwd",
-      "kernel_type": 3,
+      "name": "/model.6/m.0/m/m.0/Add",
+      "kernel_type": 5,
       "params": {},
       "next_steps": [
-        43
+        43,
+        47
       ]
     },
     {
       "step": 43,
-      "name": "resnetv17_stage2_conv2_fwd",
+      "name": "/model.6/m.0/m/m.1/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv2_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage2_conv2_bias.bin",
-        "cout": 512,
-        "cin": 128,
+        "weight_path": "../bin_weights/model.6.m.0.m.1.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.m.0.m.1.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
-        "kh": 1,
-        "kw": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
         "stride": 1,
-        "padding": 0
+        "padding": 1
       },
       "next_steps": [
         44
@@ -687,38 +776,29 @@
     },
     {
       "step": 44,
-      "name": "resnetv17_stage2_batchnorm2_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm2_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm2_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm2_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm2_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 28,
-        "w_in": 28
-      },
+      "name": "/model.6/m.0/m/m.1/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
-        47
+        45
       ]
     },
     {
       "step": 45,
-      "name": "resnetv17_stage2_conv3_fwd",
+      "name": "/model.6/m.0/m/m.1/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv3_weight.bin",
-        "bias_path": "",
-        "cout": 512,
-        "cin": 256,
+        "weight_path": "../bin_weights/model.6.m.0.m.1.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.m.0.m.1.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
         "groups": 1,
-        "h_in": 56,
-        "w_in": 56,
-        "kh": 1,
-        "kw": 1,
-        "stride": 2,
-        "padding": 0
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
       },
       "next_steps": [
         46
@@ -726,25 +806,16 @@
     },
     {
       "step": 46,
-      "name": "resnetv17_stage2_batchnorm3_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm3_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm3_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm3_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm3_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 28,
-        "w_in": 28
-      },
+      "name": "/model.6/m.0/m/m.1/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         47
       ]
     },
     {
       "step": 47,
-      "name": "resnetv17_stage2__plus0",
+      "name": "/model.6/m.0/m/m.1/Add",
       "kernel_type": 5,
       "params": {},
       "next_steps": [
@@ -753,26 +824,49 @@
     },
     {
       "step": 48,
-      "name": "resnetv17_stage2_activation0",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.6/m.0/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 47,
+            "shape": [
+              1,
+              32,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 37,
+            "shape": [
+              1,
+              32,
+              40,
+              40
+            ]
+          }
+        ]
+      },
       "next_steps": [
-        49,
-        57
+        49
       ]
     },
     {
       "step": 49,
-      "name": "resnetv17_stage2_conv4_fwd",
+      "name": "/model.6/m.0/cv3/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv4_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage2_conv4_bias.bin",
-        "cout": 128,
-        "cin": 512,
+        "weight_path": "../bin_weights/model.6.m.0.cv3.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.m.0.cv3.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
+        "h_in": 40,
+        "w_in": 40,
         "kh": 1,
         "kw": 1,
         "stride": 1,
@@ -784,47 +878,72 @@
     },
     {
       "step": 50,
-      "name": "resnetv17_stage2_batchnorm4_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm4_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm4_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm4_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm4_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 128,
-        "h_in": 28,
-        "w_in": 28
-      },
+      "name": "/model.6/m.0/cv3/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         51
       ]
     },
     {
       "step": 51,
-      "name": "resnetv17_stage2_relu2_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.6/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 33,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 33,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 50,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          }
+        ]
+      },
       "next_steps": [
         52
       ]
     },
     {
       "step": 52,
-      "name": "resnetv17_stage2_conv5_fwd",
+      "name": "/model.6/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv5_weight.bin",
-        "bias_path": "",
+        "weight_path": "../bin_weights/model.6.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.6.cv2.conv.bias.bin",
         "cout": 128,
-        "cin": 128,
+        "cin": 192,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
-        "kh": 3,
-        "kw": 3,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
         "stride": 1,
-        "padding": 1
+        "padding": 0
       },
       "next_steps": [
         53
@@ -832,65 +951,60 @@
     },
     {
       "step": 53,
-      "name": "resnetv17_stage2_batchnorm5_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm5_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm5_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm5_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm5_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 128,
-        "h_in": 28,
-        "w_in": 28
-      },
+      "name": "/model.6/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
-        54
+        54,
+        113
       ]
     },
     {
       "step": 54,
-      "name": "resnetv17_stage2_relu3_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.7/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.7.conv.weight.bin",
+        "bias_path": "../bin_weights/model.7.conv.bias.bin",
+        "cout": 256,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
       "next_steps": [
         55
       ]
     },
     {
       "step": 55,
-      "name": "resnetv17_stage2_conv6_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv6_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage2_conv6_bias.bin",
-        "cout": 512,
-        "cin": 128,
-        "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
+      "name": "/model.7/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         56
       ]
     },
     {
       "step": 56,
-      "name": "resnetv17_stage2_batchnorm6_fwd",
-      "kernel_type": 2,
+      "name": "/model.8/cv1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm6_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm6_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm6_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm6_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 28,
-        "w_in": 28
+        "weight_path": "../bin_weights/model.8.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.cv1.conv.bias.bin",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         57
@@ -898,8 +1012,8 @@
     },
     {
       "step": 57,
-      "name": "resnetv17_stage2__plus1",
-      "kernel_type": 5,
+      "name": "/model.8/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         58
@@ -907,96 +1021,123 @@
     },
     {
       "step": 58,
-      "name": "resnetv17_stage2_activation1",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.8/Split",
+      "kernel_type": 13,
+      "params": {
+        "axis": 1,
+        "input_shape": [
+          1,
+          256,
+          20,
+          20
+        ],
+        "split": [
+          128,
+          128
+        ],
+        "num_outputs": 2
+      },
       "next_steps": [
+        76,
         59,
-        67
+        60
+      ],
+      "output_routes": [
+        {
+          "to_step": 76,
+          "output_index": 0
+        },
+        {
+          "to_step": 59,
+          "output_index": 1
+        },
+        {
+          "to_step": 60,
+          "output_index": 1
+        },
+        {
+          "to_step": 76,
+          "output_index": 1
+        }
       ]
     },
     {
       "step": 59,
-      "name": "resnetv17_stage2_conv7_fwd",
+      "name": "/model.8/m.0/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv7_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage2_conv7_bias.bin",
-        "cout": 128,
-        "cin": 512,
+        "weight_path": "../bin_weights/model.8.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.m.0.cv1.conv.bias.bin",
+        "cout": 64,
+        "cin": 128,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
         "stride": 1,
         "padding": 0
       },
       "next_steps": [
-        60
-      ]
-    },
-    {
-      "step": 60,
-      "name": "resnetv17_stage2_batchnorm7_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm7_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm7_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm7_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm7_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 128,
-        "h_in": 28,
-        "w_in": 28
-      },
-      "next_steps": [
         61
       ]
     },
     {
-      "step": 61,
-      "name": "resnetv17_stage2_relu4_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "step": 60,
+      "name": "/model.8/m.0/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.8.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.m.0.cv2.conv.bias.bin",
+        "cout": 64,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
       "next_steps": [
         62
       ]
     },
     {
-      "step": 62,
-      "name": "resnetv17_stage2_conv8_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv8_weight.bin",
-        "bias_path": "",
-        "cout": 128,
-        "cin": 128,
-        "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
-      },
+      "step": 61,
+      "name": "/model.8/m.0/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
-        63
+        63,
+        67
+      ]
+    },
+    {
+      "step": 62,
+      "name": "/model.8/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        73
       ]
     },
     {
       "step": 63,
-      "name": "resnetv17_stage2_batchnorm8_fwd",
-      "kernel_type": 2,
+      "name": "/model.8/m.0/m/m.0/cv1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm8_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm8_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm8_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm8_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 128,
-        "h_in": 28,
-        "w_in": 28
+        "weight_path": "../bin_weights/model.8.m.0.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.m.0.m.0.cv1.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
       },
       "next_steps": [
         64
@@ -1004,8 +1145,8 @@
     },
     {
       "step": 64,
-      "name": "resnetv17_stage2_relu5_fwd",
-      "kernel_type": 3,
+      "name": "/model.8/m.0/m/m.0/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         65
@@ -1013,20 +1154,20 @@
     },
     {
       "step": 65,
-      "name": "resnetv17_stage2_conv9_fwd",
+      "name": "/model.8/m.0/m/m.0/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv9_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage2_conv9_bias.bin",
-        "cout": 512,
-        "cin": 128,
+        "weight_path": "../bin_weights/model.8.m.0.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.m.0.m.0.cv2.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
-        "kh": 1,
-        "kw": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
         "stride": 1,
-        "padding": 0
+        "padding": 1
       },
       "next_steps": [
         66
@@ -1034,75 +1175,69 @@
     },
     {
       "step": 66,
-      "name": "resnetv17_stage2_batchnorm9_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm9_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm9_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm9_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm9_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 28,
-        "w_in": 28
-      },
+      "name": "/model.8/m.0/m/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         67
       ]
     },
     {
       "step": 67,
-      "name": "resnetv17_stage2__plus2",
+      "name": "/model.8/m.0/m/m.0/Add",
       "kernel_type": 5,
       "params": {},
       "next_steps": [
-        68
+        68,
+        72
       ]
     },
     {
       "step": 68,
-      "name": "resnetv17_stage2_activation2",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.8/m.0/m/m.1/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.8.m.0.m.1.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.m.0.m.1.cv1.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
       "next_steps": [
-        69,
-        77
+        69
       ]
     },
     {
       "step": 69,
-      "name": "resnetv17_stage2_conv10_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv10_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage2_conv10_bias.bin",
-        "cout": 128,
-        "cin": 512,
-        "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
+      "name": "/model.8/m.0/m/m.1/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         70
       ]
     },
     {
       "step": 70,
-      "name": "resnetv17_stage2_batchnorm10_fwd",
-      "kernel_type": 2,
+      "name": "/model.8/m.0/m/m.1/cv2/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm10_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm10_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm10_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm10_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 128,
-        "h_in": 28,
-        "w_in": 28
+        "weight_path": "../bin_weights/model.8.m.0.m.1.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.m.0.m.1.cv2.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
       },
       "next_steps": [
         71
@@ -1110,8 +1245,8 @@
     },
     {
       "step": 71,
-      "name": "resnetv17_stage2_relu6_fwd",
-      "kernel_type": 3,
+      "name": "/model.8/m.0/m/m.1/cv2/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         72
@@ -1119,38 +1254,41 @@
     },
     {
       "step": 72,
-      "name": "resnetv17_stage2_conv11_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv11_weight.bin",
-        "bias_path": "",
-        "cout": 128,
-        "cin": 128,
-        "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
-      },
+      "name": "/model.8/m.0/m/m.1/Add",
+      "kernel_type": 5,
+      "params": {},
       "next_steps": [
         73
       ]
     },
     {
       "step": 73,
-      "name": "resnetv17_stage2_batchnorm11_fwd",
-      "kernel_type": 2,
+      "name": "/model.8/m.0/Concat",
+      "kernel_type": 14,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm11_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm11_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm11_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm11_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 128,
-        "h_in": 28,
-        "w_in": 28
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 72,
+            "shape": [
+              1,
+              64,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 62,
+            "shape": [
+              1,
+              64,
+              20,
+              20
+            ]
+          }
+        ]
       },
       "next_steps": [
         74
@@ -1158,47 +1296,72 @@
     },
     {
       "step": 74,
-      "name": "resnetv17_stage2_relu7_fwd",
-      "kernel_type": 3,
-      "params": {},
-      "next_steps": [
-        75
-      ]
-    },
-    {
-      "step": 75,
-      "name": "resnetv17_stage2_conv12_fwd",
+      "name": "/model.8/m.0/cv3/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage2_conv12_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage2_conv12_bias.bin",
-        "cout": 512,
+        "weight_path": "../bin_weights/model.8.m.0.cv3.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.m.0.cv3.conv.bias.bin",
+        "cout": 128,
         "cin": 128,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
         "stride": 1,
         "padding": 0
       },
       "next_steps": [
+        75
+      ]
+    },
+    {
+      "step": 75,
+      "name": "/model.8/m.0/cv3/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
         76
       ]
     },
     {
       "step": 76,
-      "name": "resnetv17_stage2_batchnorm12_fwd",
-      "kernel_type": 2,
+      "name": "/model.8/Concat",
+      "kernel_type": 14,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage2_batchnorm12_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage2_batchnorm12_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage2_batchnorm12_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage2_batchnorm12_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 28,
-        "w_in": 28
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 58,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 58,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 75,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          }
+        ]
       },
       "next_steps": [
         77
@@ -1206,87 +1369,105 @@
     },
     {
       "step": 77,
-      "name": "resnetv17_stage2__plus3",
-      "kernel_type": 5,
-      "params": {},
+      "name": "/model.8/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.8.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.8.cv2.conv.bias.bin",
+        "cout": 256,
+        "cin": 384,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
       "next_steps": [
         78
       ]
     },
     {
       "step": 78,
-      "name": "resnetv17_stage2_activation3",
-      "kernel_type": 3,
+      "name": "/model.8/cv2/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         79,
-        87
+        86
       ]
     },
     {
       "step": 79,
-      "name": "resnetv17_stage3_conv0_fwd",
+      "name": "/model.9/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv0_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv0_bias.bin",
-        "cout": 256,
-        "cin": 512,
+        "weight_path": "../bin_weights/model.9.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.9.cv1.conv.bias.bin",
+        "cout": 128,
+        "cin": 256,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
-        "stride": 2,
+        "stride": 1,
         "padding": 0
       },
       "next_steps": [
-        80
+        80,
+        83
       ]
     },
     {
       "step": 80,
-      "name": "resnetv17_stage3_batchnorm0_fwd",
-      "kernel_type": 2,
+      "name": "/model.9/m/MaxPool",
+      "kernel_type": 4,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm0_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm0_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm0_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm0_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
+        "channels": 128,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 5,
+        "kw": 5,
+        "stride": 1,
+        "padding": 2
       },
       "next_steps": [
-        81
+        81,
+        83
       ]
     },
     {
       "step": 81,
-      "name": "resnetv17_stage3_relu0_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.9/m_1/MaxPool",
+      "kernel_type": 4,
+      "params": {
+        "channels": 128,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 5,
+        "kw": 5,
+        "stride": 1,
+        "padding": 2
+      },
       "next_steps": [
-        82
+        82,
+        83
       ]
     },
     {
       "step": 82,
-      "name": "resnetv17_stage3_conv1_fwd",
-      "kernel_type": 1,
+      "name": "/model.9/m_2/MaxPool",
+      "kernel_type": 4,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv1_weight.bin",
-        "bias_path": "",
-        "cout": 256,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 3,
-        "kw": 3,
+        "channels": 128,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 5,
+        "kw": 5,
         "stride": 1,
-        "padding": 1
+        "padding": 2
       },
       "next_steps": [
         83
@@ -1294,17 +1475,52 @@
     },
     {
       "step": 83,
-      "name": "resnetv17_stage3_batchnorm1_fwd",
-      "kernel_type": 2,
+      "name": "/model.9/Concat",
+      "kernel_type": 14,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm1_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm1_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm1_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm1_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 79,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 80,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 81,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 82,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          }
+        ]
       },
       "next_steps": [
         84
@@ -1312,67 +1528,58 @@
     },
     {
       "step": 84,
-      "name": "resnetv17_stage3_relu1_fwd",
-      "kernel_type": 3,
-      "params": {},
-      "next_steps": [
-        85
-      ]
-    },
-    {
-      "step": 85,
-      "name": "resnetv17_stage3_conv2_fwd",
+      "name": "/model.9/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv2_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv2_bias.bin",
-        "cout": 1024,
-        "cin": 256,
+        "weight_path": "../bin_weights/model.9.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.9.cv2.conv.bias.bin",
+        "cout": 256,
+        "cin": 512,
         "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
         "stride": 1,
         "padding": 0
       },
       "next_steps": [
+        85
+      ]
+    },
+    {
+      "step": 85,
+      "name": "/model.9/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
         86
       ]
     },
     {
       "step": 86,
-      "name": "resnetv17_stage3_batchnorm2_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm2_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm2_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm2_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm2_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 1024,
-        "h_in": 14,
-        "w_in": 14
-      },
+      "name": "/model.9/Add",
+      "kernel_type": 5,
+      "params": {},
       "next_steps": [
-        89
+        87
       ]
     },
     {
       "step": 87,
-      "name": "resnetv17_stage3_conv3_fwd",
+      "name": "/model.10/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv3_weight.bin",
-        "bias_path": "",
-        "cout": 1024,
-        "cin": 512,
+        "weight_path": "../bin_weights/model.10.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.10.cv1.conv.bias.bin",
+        "cout": 256,
+        "cin": 256,
         "groups": 1,
-        "h_in": 28,
-        "w_in": 28,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
-        "stride": 2,
+        "stride": 1,
         "padding": 0
       },
       "next_steps": [
@@ -1381,153 +1588,210 @@
     },
     {
       "step": 88,
-      "name": "resnetv17_stage3_batchnorm3_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm3_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm3_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm3_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm3_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 1024,
-        "h_in": 14,
-        "w_in": 14
-      },
+      "name": "/model.10/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         89
       ]
     },
     {
       "step": 89,
-      "name": "resnetv17_stage3__plus0",
-      "kernel_type": 5,
-      "params": {},
+      "name": "/model.10/Split",
+      "kernel_type": 13,
+      "params": {
+        "axis": 1,
+        "input_shape": [
+          1,
+          256,
+          20,
+          20
+        ],
+        "split": [
+          128,
+          128
+        ],
+        "num_outputs": 2
+      },
       "next_steps": [
-        90
+        109,
+        90,
+        104
+      ],
+      "output_routes": [
+        {
+          "to_step": 109,
+          "output_index": 0
+        },
+        {
+          "to_step": 90,
+          "output_index": 1
+        },
+        {
+          "to_step": 104,
+          "output_index": 1
+        }
       ]
     },
     {
       "step": 90,
-      "name": "resnetv17_stage3_activation0",
-      "kernel_type": 3,
-      "params": {},
-      "next_steps": [
-        91,
-        99
-      ]
-    },
-    {
-      "step": 91,
-      "name": "resnetv17_stage3_conv4_fwd",
+      "name": "/model.10/m/m.0/attn/qkv/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv4_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv4_bias.bin",
+        "weight_path": "../bin_weights/model.10.m.0.attn.qkv.conv.weight.bin",
+        "bias_path": "../bin_weights/model.10.m.0.attn.qkv.conv.bias.bin",
         "cout": 256,
-        "cin": 1024,
+        "cin": 128,
         "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
         "stride": 1,
         "padding": 0
       },
+      "next_steps": [
+        91
+      ]
+    },
+    {
+      "step": 91,
+      "name": "/model.10/m/m.0/attn/Reshape",
+      "kernel_type": 15,
+      "params": {},
       "next_steps": [
         92
       ]
     },
     {
       "step": 92,
-      "name": "resnetv17_stage3_batchnorm4_fwd",
-      "kernel_type": 2,
+      "name": "/model.10/m/m.0/attn/Split",
+      "kernel_type": 13,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm4_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm4_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm4_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm4_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
+        "axis": 2,
+        "input_shape": [
+          1,
+          2,
+          128,
+          400
+        ],
+        "split": [
+          32,
+          32,
+          64
+        ],
+        "num_outputs": 3
       },
       "next_steps": [
-        93
+        93,
+        97,
+        94,
+        100
+      ],
+      "output_routes": [
+        {
+          "to_step": 93,
+          "output_index": 0
+        },
+        {
+          "to_step": 97,
+          "output_index": 1
+        },
+        {
+          "to_step": 94,
+          "output_index": 2
+        },
+        {
+          "to_step": 100,
+          "output_index": 2
+        }
       ]
     },
     {
       "step": 93,
-      "name": "resnetv17_stage3_relu2_fwd",
-      "kernel_type": 3,
-      "params": {},
-      "next_steps": [
-        94
-      ]
-    },
-    {
-      "step": 94,
-      "name": "resnetv17_stage3_conv5_fwd",
-      "kernel_type": 1,
+      "name": "/model.10/m/m.0/attn/Mul",
+      "kernel_type": 11,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv5_weight.bin",
-        "bias_path": "",
-        "cout": 256,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
+        "const_path": "../bin_weights/_model.10_m_m.0_attn_Constant_1_output_0.bin",
+        "const_shape": []
       },
       "next_steps": [
         95
       ]
     },
     {
-      "step": 95,
-      "name": "resnetv17_stage3_batchnorm5_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm5_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm5_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm5_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm5_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
-      },
+      "step": 94,
+      "name": "/model.10/m/m.0/attn/Reshape_2",
+      "kernel_type": 15,
+      "params": {},
       "next_steps": [
         96
       ]
     },
     {
-      "step": 96,
-      "name": "resnetv17_stage3_relu3_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "step": 95,
+      "name": "/model.10/m/m.0/attn/Transpose",
+      "kernel_type": 16,
+      "params": {
+        "input_shape": [
+          1,
+          2,
+          32,
+          400
+        ],
+        "perm": [
+          0,
+          1,
+          3,
+          2
+        ]
+      },
       "next_steps": [
         97
       ]
     },
     {
-      "step": 97,
-      "name": "resnetv17_stage3_conv6_fwd",
+      "step": 96,
+      "name": "/model.10/m/m.0/attn/pe/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv6_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv6_bias.bin",
-        "cout": 1024,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 1,
-        "kw": 1,
+        "weight_path": "../bin_weights/model.10.m.0.attn.pe.conv.weight.bin",
+        "bias_path": "../bin_weights/model.10.m.0.attn.pe.conv.bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 128,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
         "stride": 1,
-        "padding": 0
+        "padding": 1
+      },
+      "next_steps": [
+        102
+      ]
+    },
+    {
+      "step": 97,
+      "name": "/model.10/m/m.0/attn/MatMul",
+      "kernel_type": 17,
+      "params": {
+        "lhs_shape": [
+          1,
+          2,
+          400,
+          32
+        ],
+        "rhs_shape": [
+          1,
+          2,
+          32,
+          400
+        ],
+        "lhs_step": 95,
+        "rhs_step": 92,
+        "lhs_const_path": "",
+        "rhs_const_path": ""
       },
       "next_steps": [
         98
@@ -1535,17 +1799,16 @@
     },
     {
       "step": 98,
-      "name": "resnetv17_stage3_batchnorm6_fwd",
-      "kernel_type": 2,
+      "name": "/model.10/m/m.0/attn/Softmax",
+      "kernel_type": 22,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm6_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm6_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm6_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm6_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 1024,
-        "h_in": 14,
-        "w_in": 14
+        "input_shape": [
+          1,
+          2,
+          400,
+          400
+        ],
+        "axis": 3
       },
       "next_steps": [
         99
@@ -1553,105 +1816,117 @@
     },
     {
       "step": 99,
-      "name": "resnetv17_stage3__plus1",
-      "kernel_type": 5,
-      "params": {},
+      "name": "/model.10/m/m.0/attn/Transpose_1",
+      "kernel_type": 16,
+      "params": {
+        "input_shape": [
+          1,
+          2,
+          400,
+          400
+        ],
+        "perm": [
+          0,
+          1,
+          3,
+          2
+        ]
+      },
       "next_steps": [
         100
       ]
     },
     {
       "step": 100,
-      "name": "resnetv17_stage3_activation1",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.10/m/m.0/attn/MatMul_1",
+      "kernel_type": 17,
+      "params": {
+        "lhs_shape": [
+          1,
+          2,
+          64,
+          400
+        ],
+        "rhs_shape": [
+          1,
+          2,
+          400,
+          400
+        ],
+        "lhs_step": 92,
+        "rhs_step": 99,
+        "lhs_const_path": "",
+        "rhs_const_path": ""
+      },
       "next_steps": [
-        101,
-        109
+        101
       ]
     },
     {
       "step": 101,
-      "name": "resnetv17_stage3_conv7_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv7_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv7_bias.bin",
-        "cout": 256,
-        "cin": 1024,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
+      "name": "/model.10/m/m.0/attn/Reshape_1",
+      "kernel_type": 15,
+      "params": {},
       "next_steps": [
         102
       ]
     },
     {
       "step": 102,
-      "name": "resnetv17_stage3_batchnorm7_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm7_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm7_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm7_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm7_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
-      },
+      "name": "/model.10/m/m.0/attn/Add",
+      "kernel_type": 5,
+      "params": {},
       "next_steps": [
         103
       ]
     },
     {
       "step": 103,
-      "name": "resnetv17_stage3_relu4_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.10/m/m.0/attn/proj/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.10.m.0.attn.proj.conv.weight.bin",
+        "bias_path": "../bin_weights/model.10.m.0.attn.proj.conv.bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
       "next_steps": [
         104
       ]
     },
     {
       "step": 104,
-      "name": "resnetv17_stage3_conv8_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv8_weight.bin",
-        "bias_path": "",
-        "cout": 256,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
-      },
+      "name": "/model.10/m/m.0/Add",
+      "kernel_type": 5,
+      "params": {},
       "next_steps": [
-        105
+        105,
+        108
       ]
     },
     {
       "step": 105,
-      "name": "resnetv17_stage3_batchnorm8_fwd",
-      "kernel_type": 2,
+      "name": "/model.10/m/m.0/ffn/ffn.0/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm8_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm8_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm8_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm8_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
+        "weight_path": "../bin_weights/model.10.m.0.ffn.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.10.m.0.ffn.0.conv.bias.bin",
+        "cout": 256,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         106
@@ -1659,8 +1934,8 @@
     },
     {
       "step": 106,
-      "name": "resnetv17_stage3_relu5_fwd",
-      "kernel_type": 3,
+      "name": "/model.10/m/m.0/ffn/ffn.0/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         107
@@ -1668,16 +1943,16 @@
     },
     {
       "step": 107,
-      "name": "resnetv17_stage3_conv9_fwd",
+      "name": "/model.10/m/m.0/ffn/ffn.1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv9_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv9_bias.bin",
-        "cout": 1024,
+        "weight_path": "../bin_weights/model.10.m.0.ffn.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.10.m.0.ffn.1.conv.bias.bin",
+        "cout": 128,
         "cin": 256,
         "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
         "stride": 1,
@@ -1689,75 +1964,88 @@
     },
     {
       "step": 108,
-      "name": "resnetv17_stage3_batchnorm9_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm9_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm9_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm9_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm9_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 1024,
-        "h_in": 14,
-        "w_in": 14
-      },
+      "name": "/model.10/m/m.0/Add_1",
+      "kernel_type": 5,
+      "params": {},
       "next_steps": [
         109
       ]
     },
     {
       "step": 109,
-      "name": "resnetv17_stage3__plus2",
-      "kernel_type": 5,
-      "params": {},
+      "name": "/model.10/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 89,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 108,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          }
+        ]
+      },
       "next_steps": [
         110
       ]
     },
     {
       "step": 110,
-      "name": "resnetv17_stage3_activation2",
-      "kernel_type": 3,
-      "params": {},
-      "next_steps": [
-        111,
-        119
-      ]
-    },
-    {
-      "step": 111,
-      "name": "resnetv17_stage3_conv10_fwd",
+      "name": "/model.10/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv10_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv10_bias.bin",
+        "weight_path": "../bin_weights/model.10.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.10.cv2.conv.bias.bin",
         "cout": 256,
-        "cin": 1024,
+        "cin": 256,
         "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
         "stride": 1,
         "padding": 0
       },
       "next_steps": [
-        112
+        111
+      ]
+    },
+    {
+      "step": 111,
+      "name": "/model.10/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        112,
+        210
       ]
     },
     {
       "step": 112,
-      "name": "resnetv17_stage3_batchnorm10_fwd",
-      "kernel_type": 2,
+      "name": "/model.11/Resize",
+      "kernel_type": 18,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm10_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm10_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm10_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm10_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
         "channels": 256,
-        "h_in": 14,
-        "w_in": 14
+        "h_in": 20,
+        "w_in": 20,
+        "scale_h": 2.0,
+        "scale_w": 2.0,
+        "mode": "nearest"
       },
       "next_steps": [
         113
@@ -1765,29 +2053,53 @@
     },
     {
       "step": 113,
-      "name": "resnetv17_stage3_relu6_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.12/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 112,
+            "shape": [
+              1,
+              256,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 53,
+            "shape": [
+              1,
+              128,
+              40,
+              40
+            ]
+          }
+        ]
+      },
       "next_steps": [
         114
       ]
     },
     {
       "step": 114,
-      "name": "resnetv17_stage3_conv11_fwd",
+      "name": "/model.13/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv11_weight.bin",
-        "bias_path": "",
-        "cout": 256,
-        "cin": 256,
+        "weight_path": "../bin_weights/model.13.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.cv1.conv.bias.bin",
+        "cout": 128,
+        "cin": 384,
         "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 3,
-        "kw": 3,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
         "stride": 1,
-        "padding": 1
+        "padding": 0
       },
       "next_steps": [
         115
@@ -1795,105 +2107,132 @@
     },
     {
       "step": 115,
-      "name": "resnetv17_stage3_batchnorm11_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm11_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm11_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm11_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm11_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
-      },
+      "name": "/model.13/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         116
       ]
     },
     {
       "step": 116,
-      "name": "resnetv17_stage3_relu7_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.13/Split",
+      "kernel_type": 13,
+      "params": {
+        "axis": 1,
+        "input_shape": [
+          1,
+          128,
+          40,
+          40
+        ],
+        "split": [
+          64,
+          64
+        ],
+        "num_outputs": 2
+      },
       "next_steps": [
-        117
+        134,
+        117,
+        118
+      ],
+      "output_routes": [
+        {
+          "to_step": 134,
+          "output_index": 0
+        },
+        {
+          "to_step": 117,
+          "output_index": 1
+        },
+        {
+          "to_step": 118,
+          "output_index": 1
+        },
+        {
+          "to_step": 134,
+          "output_index": 1
+        }
       ]
     },
     {
       "step": 117,
-      "name": "resnetv17_stage3_conv12_fwd",
+      "name": "/model.13/m.0/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv12_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv12_bias.bin",
-        "cout": 1024,
-        "cin": 256,
+        "weight_path": "../bin_weights/model.13.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.m.0.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 64,
         "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
+        "h_in": 40,
+        "w_in": 40,
         "kh": 1,
         "kw": 1,
         "stride": 1,
         "padding": 0
-      },
-      "next_steps": [
-        118
-      ]
-    },
-    {
-      "step": 118,
-      "name": "resnetv17_stage3_batchnorm12_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm12_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm12_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm12_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm12_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 1024,
-        "h_in": 14,
-        "w_in": 14
       },
       "next_steps": [
         119
       ]
     },
     {
-      "step": 119,
-      "name": "resnetv17_stage3__plus3",
-      "kernel_type": 5,
-      "params": {},
+      "step": 118,
+      "name": "/model.13/m.0/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.13.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.m.0.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
       "next_steps": [
         120
       ]
     },
     {
-      "step": 120,
-      "name": "resnetv17_stage3_activation3",
-      "kernel_type": 3,
+      "step": 119,
+      "name": "/model.13/m.0/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         121,
-        129
+        125
+      ]
+    },
+    {
+      "step": 120,
+      "name": "/model.13/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        131
       ]
     },
     {
       "step": 121,
-      "name": "resnetv17_stage3_conv13_fwd",
+      "name": "/model.13/m.0/m/m.0/cv1/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv13_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv13_bias.bin",
-        "cout": 256,
-        "cin": 1024,
+        "weight_path": "../bin_weights/model.13.m.0.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.m.0.m.0.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
         "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 1,
-        "kw": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
         "stride": 1,
-        "padding": 0
+        "padding": 1
       },
       "next_steps": [
         122
@@ -1901,113 +2240,99 @@
     },
     {
       "step": 122,
-      "name": "resnetv17_stage3_batchnorm13_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm13_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm13_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm13_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm13_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
-      },
+      "name": "/model.13/m.0/m/m.0/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         123
       ]
     },
     {
       "step": 123,
-      "name": "resnetv17_stage3_relu8_fwd",
-      "kernel_type": 3,
-      "params": {},
-      "next_steps": [
-        124
-      ]
-    },
-    {
-      "step": 124,
-      "name": "resnetv17_stage3_conv14_fwd",
+      "name": "/model.13/m.0/m/m.0/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv14_weight.bin",
-        "bias_path": "",
-        "cout": 256,
-        "cin": 256,
+        "weight_path": "../bin_weights/model.13.m.0.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.m.0.m.0.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
         "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
+        "h_in": 40,
+        "w_in": 40,
         "kh": 3,
         "kw": 3,
         "stride": 1,
         "padding": 1
       },
       "next_steps": [
+        124
+      ]
+    },
+    {
+      "step": 124,
+      "name": "/model.13/m.0/m/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
         125
       ]
     },
     {
       "step": 125,
-      "name": "resnetv17_stage3_batchnorm14_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm14_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm14_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm14_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm14_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
-      },
+      "name": "/model.13/m.0/m/m.0/Add",
+      "kernel_type": 5,
+      "params": {},
       "next_steps": [
-        126
+        126,
+        130
       ]
     },
     {
       "step": 126,
-      "name": "resnetv17_stage3_relu9_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.13/m.0/m/m.1/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.13.m.0.m.1.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.m.0.m.1.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
       "next_steps": [
         127
       ]
     },
     {
       "step": 127,
-      "name": "resnetv17_stage3_conv15_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv15_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv15_bias.bin",
-        "cout": 1024,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
+      "name": "/model.13/m.0/m/m.1/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         128
       ]
     },
     {
       "step": 128,
-      "name": "resnetv17_stage3_batchnorm15_fwd",
-      "kernel_type": 2,
+      "name": "/model.13/m.0/m/m.1/cv2/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm15_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm15_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm15_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm15_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 1024,
-        "h_in": 14,
-        "w_in": 14
+        "weight_path": "../bin_weights/model.13.m.0.m.1.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.m.0.m.1.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
       },
       "next_steps": [
         129
@@ -2015,8 +2340,8 @@
     },
     {
       "step": 129,
-      "name": "resnetv17_stage3__plus4",
-      "kernel_type": 5,
+      "name": "/model.13/m.0/m/m.1/cv2/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         130
@@ -2024,30 +2349,41 @@
     },
     {
       "step": 130,
-      "name": "resnetv17_stage3_activation4",
-      "kernel_type": 3,
+      "name": "/model.13/m.0/m/m.1/Add",
+      "kernel_type": 5,
       "params": {},
       "next_steps": [
-        131,
-        139
+        131
       ]
     },
     {
       "step": 131,
-      "name": "resnetv17_stage3_conv16_fwd",
-      "kernel_type": 1,
+      "name": "/model.13/m.0/Concat",
+      "kernel_type": 14,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv16_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv16_bias.bin",
-        "cout": 256,
-        "cin": 1024,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 130,
+            "shape": [
+              1,
+              32,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 120,
+            "shape": [
+              1,
+              32,
+              40,
+              40
+            ]
+          }
+        ]
       },
       "next_steps": [
         132
@@ -2055,17 +2391,20 @@
     },
     {
       "step": 132,
-      "name": "resnetv17_stage3_batchnorm16_fwd",
-      "kernel_type": 2,
+      "name": "/model.13/m.0/cv3/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm16_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm16_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm16_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm16_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
+        "weight_path": "../bin_weights/model.13.m.0.cv3.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.m.0.cv3.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         133
@@ -2073,8 +2412,8 @@
     },
     {
       "step": 133,
-      "name": "resnetv17_stage3_relu10_fwd",
-      "kernel_type": 3,
+      "name": "/model.13/m.0/cv3/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         134
@@ -2082,20 +2421,42 @@
     },
     {
       "step": 134,
-      "name": "resnetv17_stage3_conv17_fwd",
-      "kernel_type": 1,
+      "name": "/model.13/Concat",
+      "kernel_type": 14,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv17_weight.bin",
-        "bias_path": "",
-        "cout": 256,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 116,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 116,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 133,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          }
+        ]
       },
       "next_steps": [
         135
@@ -2103,17 +2464,20 @@
     },
     {
       "step": 135,
-      "name": "resnetv17_stage3_batchnorm17_fwd",
-      "kernel_type": 2,
+      "name": "/model.13/cv2/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm17_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm17_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm17_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm17_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 256,
-        "h_in": 14,
-        "w_in": 14
+        "weight_path": "../bin_weights/model.13.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.13.cv2.conv.bias.bin",
+        "cout": 128,
+        "cin": 192,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         136
@@ -2121,29 +2485,25 @@
     },
     {
       "step": 136,
-      "name": "resnetv17_stage3_relu11_fwd",
-      "kernel_type": 3,
+      "name": "/model.13/cv2/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
-        137
+        137,
+        168
       ]
     },
     {
       "step": 137,
-      "name": "resnetv17_stage3_conv18_fwd",
-      "kernel_type": 1,
+      "name": "/model.14/Resize",
+      "kernel_type": 18,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage3_conv18_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage3_conv18_bias.bin",
-        "cout": 1024,
-        "cin": 256,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
+        "channels": 128,
+        "h_in": 40,
+        "w_in": 40,
+        "scale_h": 2.0,
+        "scale_w": 2.0,
+        "mode": "nearest"
       },
       "next_steps": [
         138
@@ -2151,17 +2511,32 @@
     },
     {
       "step": 138,
-      "name": "resnetv17_stage3_batchnorm18_fwd",
-      "kernel_type": 2,
+      "name": "/model.15/Concat",
+      "kernel_type": 14,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage3_batchnorm18_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage3_batchnorm18_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage3_batchnorm18_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage3_batchnorm18_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 1024,
-        "h_in": 14,
-        "w_in": 14
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 137,
+            "shape": [
+              1,
+              128,
+              80,
+              80
+            ]
+          },
+          {
+            "const": false,
+            "step": 28,
+            "shape": [
+              1,
+              128,
+              80,
+              80
+            ]
+          }
+        ]
       },
       "next_steps": [
         139
@@ -2169,232 +2544,253 @@
     },
     {
       "step": 139,
-      "name": "resnetv17_stage3__plus5",
-      "kernel_type": 5,
-      "params": {},
+      "name": "/model.16/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.16.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.cv1.conv.bias.bin",
+        "cout": 64,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
       "next_steps": [
         140
       ]
     },
     {
       "step": 140,
-      "name": "resnetv17_stage3_activation5",
-      "kernel_type": 3,
+      "name": "/model.16/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
-        141,
-        149
+        141
       ]
     },
     {
       "step": 141,
-      "name": "resnetv17_stage4_conv0_fwd",
-      "kernel_type": 1,
+      "name": "/model.16/Split",
+      "kernel_type": 13,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv0_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage4_conv0_bias.bin",
-        "cout": 512,
-        "cin": 1024,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 1,
-        "kw": 1,
-        "stride": 2,
-        "padding": 0
+        "axis": 1,
+        "input_shape": [
+          1,
+          64,
+          80,
+          80
+        ],
+        "split": [
+          32,
+          32
+        ],
+        "num_outputs": 2
       },
       "next_steps": [
-        142
+        159,
+        142,
+        143
+      ],
+      "output_routes": [
+        {
+          "to_step": 159,
+          "output_index": 0
+        },
+        {
+          "to_step": 142,
+          "output_index": 1
+        },
+        {
+          "to_step": 143,
+          "output_index": 1
+        },
+        {
+          "to_step": 159,
+          "output_index": 1
+        }
       ]
     },
     {
       "step": 142,
-      "name": "resnetv17_stage4_batchnorm0_fwd",
-      "kernel_type": 2,
+      "name": "/model.16/m.0/cv1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm0_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm0_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm0_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm0_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 7,
-        "w_in": 7
+        "weight_path": "../bin_weights/model.16.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.m.0.cv1.conv.bias.bin",
+        "cout": 16,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
-      "next_steps": [
-        143
-      ]
-    },
-    {
-      "step": 143,
-      "name": "resnetv17_stage4_relu0_fwd",
-      "kernel_type": 3,
-      "params": {},
       "next_steps": [
         144
       ]
     },
     {
-      "step": 144,
-      "name": "resnetv17_stage4_conv1_fwd",
+      "step": 143,
+      "name": "/model.16/m.0/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv1_weight.bin",
-        "bias_path": "",
-        "cout": 512,
-        "cin": 512,
+        "weight_path": "../bin_weights/model.16.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.m.0.cv2.conv.bias.bin",
+        "cout": 16,
+        "cin": 32,
         "groups": 1,
-        "h_in": 7,
-        "w_in": 7,
-        "kh": 3,
-        "kw": 3,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
         "stride": 1,
-        "padding": 1
+        "padding": 0
       },
       "next_steps": [
         145
       ]
     },
     {
-      "step": 145,
-      "name": "resnetv17_stage4_batchnorm1_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm1_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm1_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm1_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm1_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 7,
-        "w_in": 7
-      },
+      "step": 144,
+      "name": "/model.16/m.0/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
-        146
+        146,
+        150
+      ]
+    },
+    {
+      "step": 145,
+      "name": "/model.16/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        156
       ]
     },
     {
       "step": 146,
-      "name": "resnetv17_stage4_relu1_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "name": "/model.16/m.0/m/m.0/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.16.m.0.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.m.0.m.0.cv1.conv.bias.bin",
+        "cout": 16,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
       "next_steps": [
         147
       ]
     },
     {
       "step": 147,
-      "name": "resnetv17_stage4_conv2_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv2_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage4_conv2_bias.bin",
-        "cout": 2048,
-        "cin": 512,
-        "groups": 1,
-        "h_in": 7,
-        "w_in": 7,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
+      "name": "/model.16/m.0/m/m.0/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         148
       ]
     },
     {
       "step": 148,
-      "name": "resnetv17_stage4_batchnorm2_fwd",
-      "kernel_type": 2,
+      "name": "/model.16/m.0/m/m.0/cv2/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm2_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm2_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm2_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm2_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 2048,
-        "h_in": 7,
-        "w_in": 7
+        "weight_path": "../bin_weights/model.16.m.0.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.m.0.m.0.cv2.conv.bias.bin",
+        "cout": 16,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
       },
       "next_steps": [
-        151
+        149
       ]
     },
     {
       "step": 149,
-      "name": "resnetv17_stage4_conv3_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv3_weight.bin",
-        "bias_path": "",
-        "cout": 2048,
-        "cin": 1024,
-        "groups": 1,
-        "h_in": 14,
-        "w_in": 14,
-        "kh": 1,
-        "kw": 1,
-        "stride": 2,
-        "padding": 0
-      },
+      "name": "/model.16/m.0/m/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         150
       ]
     },
     {
       "step": 150,
-      "name": "resnetv17_stage4_batchnorm3_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm3_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm3_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm3_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm3_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 2048,
-        "h_in": 7,
-        "w_in": 7
-      },
+      "name": "/model.16/m.0/m/m.0/Add",
+      "kernel_type": 5,
+      "params": {},
       "next_steps": [
-        151
+        151,
+        155
       ]
     },
     {
       "step": 151,
-      "name": "resnetv17_stage4__plus0",
-      "kernel_type": 5,
-      "params": {},
+      "name": "/model.16/m.0/m/m.1/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.16.m.0.m.1.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.m.0.m.1.cv1.conv.bias.bin",
+        "cout": 16,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
       "next_steps": [
         152
       ]
     },
     {
       "step": 152,
-      "name": "resnetv17_stage4_activation0",
-      "kernel_type": 3,
+      "name": "/model.16/m.0/m/m.1/cv1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
-        153,
-        161
+        153
       ]
     },
     {
       "step": 153,
-      "name": "resnetv17_stage4_conv4_fwd",
+      "name": "/model.16/m.0/m/m.1/cv2/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv4_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage4_conv4_bias.bin",
-        "cout": 512,
-        "cin": 2048,
+        "weight_path": "../bin_weights/model.16.m.0.m.1.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.m.0.m.1.cv2.conv.bias.bin",
+        "cout": 16,
+        "cin": 16,
         "groups": 1,
-        "h_in": 7,
-        "w_in": 7,
-        "kh": 1,
-        "kw": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
         "stride": 1,
-        "padding": 0
+        "padding": 1
       },
       "next_steps": [
         154
@@ -2402,26 +2798,17 @@
     },
     {
       "step": 154,
-      "name": "resnetv17_stage4_batchnorm4_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm4_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm4_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm4_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm4_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 7,
-        "w_in": 7
-      },
+      "name": "/model.16/m.0/m/m.1/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         155
       ]
     },
     {
       "step": 155,
-      "name": "resnetv17_stage4_relu2_fwd",
-      "kernel_type": 3,
+      "name": "/model.16/m.0/m/m.1/Add",
+      "kernel_type": 5,
       "params": {},
       "next_steps": [
         156
@@ -2429,20 +2816,32 @@
     },
     {
       "step": 156,
-      "name": "resnetv17_stage4_conv5_fwd",
-      "kernel_type": 1,
+      "name": "/model.16/m.0/Concat",
+      "kernel_type": 14,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv5_weight.bin",
-        "bias_path": "",
-        "cout": 512,
-        "cin": 512,
-        "groups": 1,
-        "h_in": 7,
-        "w_in": 7,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 155,
+            "shape": [
+              1,
+              16,
+              80,
+              80
+            ]
+          },
+          {
+            "const": false,
+            "step": 145,
+            "shape": [
+              1,
+              16,
+              80,
+              80
+            ]
+          }
+        ]
       },
       "next_steps": [
         157
@@ -2450,17 +2849,20 @@
     },
     {
       "step": 157,
-      "name": "resnetv17_stage4_batchnorm5_fwd",
-      "kernel_type": 2,
+      "name": "/model.16/m.0/cv3/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm5_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm5_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm5_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm5_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 7,
-        "w_in": 7
+        "weight_path": "../bin_weights/model.16.m.0.cv3.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.m.0.cv3.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         158
@@ -2468,8 +2870,8 @@
     },
     {
       "step": 158,
-      "name": "resnetv17_stage4_relu3_fwd",
-      "kernel_type": 3,
+      "name": "/model.16/m.0/cv3/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         159
@@ -2477,20 +2879,42 @@
     },
     {
       "step": 159,
-      "name": "resnetv17_stage4_conv6_fwd",
-      "kernel_type": 1,
+      "name": "/model.16/Concat",
+      "kernel_type": 14,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv6_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage4_conv6_bias.bin",
-        "cout": 2048,
-        "cin": 512,
-        "groups": 1,
-        "h_in": 7,
-        "w_in": 7,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 141,
+            "shape": [
+              1,
+              32,
+              80,
+              80
+            ]
+          },
+          {
+            "const": false,
+            "step": 141,
+            "shape": [
+              1,
+              32,
+              80,
+              80
+            ]
+          },
+          {
+            "const": false,
+            "step": 158,
+            "shape": [
+              1,
+              32,
+              80,
+              80
+            ]
+          }
+        ]
       },
       "next_steps": [
         160
@@ -2498,17 +2922,20 @@
     },
     {
       "step": 160,
-      "name": "resnetv17_stage4_batchnorm6_fwd",
-      "kernel_type": 2,
+      "name": "/model.16/cv2/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm6_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm6_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm6_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm6_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 2048,
-        "h_in": 7,
-        "w_in": 7
+        "weight_path": "../bin_weights/model.16.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.16.cv2.conv.bias.bin",
+        "cout": 64,
+        "cin": 96,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         161
@@ -2516,83 +2943,69 @@
     },
     {
       "step": 161,
-      "name": "resnetv17_stage4__plus1",
-      "kernel_type": 5,
+      "name": "/model.16/cv2/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
-        162
-      ]
-    },
-    {
-      "step": 162,
-      "name": "resnetv17_stage4_activation1",
-      "kernel_type": 3,
-      "params": {},
-      "next_steps": [
+        162,
         163,
-        171
-      ]
-    },
-    {
-      "step": 163,
-      "name": "resnetv17_stage4_conv7_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv7_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage4_conv7_bias.bin",
-        "cout": 512,
-        "cin": 2048,
-        "groups": 1,
-        "h_in": 7,
-        "w_in": 7,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
-      "next_steps": [
         164
       ]
     },
     {
-      "step": 164,
-      "name": "resnetv17_stage4_batchnorm7_fwd",
-      "kernel_type": 2,
+      "step": 162,
+      "name": "/model.17/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm7_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm7_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm7_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm7_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 7,
-        "w_in": 7
+        "weight_path": "../bin_weights/model.17.conv.weight.bin",
+        "bias_path": "../bin_weights/model.17.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
       },
       "next_steps": [
         165
       ]
     },
     {
-      "step": 165,
-      "name": "resnetv17_stage4_relu4_fwd",
-      "kernel_type": 3,
-      "params": {},
+      "step": 163,
+      "name": "/model.23/cv2.0/cv2.0.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv2.0.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.0.0.conv.bias.bin",
+        "cout": 16,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
       "next_steps": [
         166
       ]
     },
     {
-      "step": 166,
-      "name": "resnetv17_stage4_conv8_fwd",
+      "step": 164,
+      "name": "/model.23/cv3.0/cv3.0.0/cv3.0.0.0/conv/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv8_weight.bin",
-        "bias_path": "",
-        "cout": 512,
-        "cin": 512,
-        "groups": 1,
-        "h_in": 7,
-        "w_in": 7,
+        "weight_path": "../bin_weights/model.23.cv3.0.0.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.0.0.0.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 64,
+        "h_in": 80,
+        "w_in": 80,
         "kh": 3,
         "kw": 3,
         "stride": 1,
@@ -2603,120 +3016,2027 @@
       ]
     },
     {
-      "step": 167,
-      "name": "resnetv17_stage4_batchnorm8_fwd",
-      "kernel_type": 2,
-      "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm8_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm8_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm8_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm8_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 512,
-        "h_in": 7,
-        "w_in": 7
-      },
+      "step": 165,
+      "name": "/model.17/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         168
       ]
     },
     {
-      "step": 168,
-      "name": "resnetv17_stage4_relu5_fwd",
-      "kernel_type": 3,
+      "step": 166,
+      "name": "/model.23/cv2.0/cv2.0.0/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         169
       ]
     },
     {
-      "step": 169,
-      "name": "resnetv17_stage4_conv9_fwd",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/resnetv17_stage4_conv9_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_stage4_conv9_bias.bin",
-        "cout": 2048,
-        "cin": 512,
-        "groups": 1,
-        "h_in": 7,
-        "w_in": 7,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
+      "step": 167,
+      "name": "/model.23/cv3.0/cv3.0.0/cv3.0.0.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
       "next_steps": [
         170
       ]
     },
     {
-      "step": 170,
-      "name": "resnetv17_stage4_batchnorm9_fwd",
-      "kernel_type": 2,
+      "step": 168,
+      "name": "/model.18/Concat",
+      "kernel_type": 14,
       "params": {
-        "scale_path": "../bin_weights/resnetv17_stage4_batchnorm9_gamma.bin",
-        "beta_path": "../bin_weights/resnetv17_stage4_batchnorm9_beta.bin",
-        "mean_path": "../bin_weights/resnetv17_stage4_batchnorm9_running_mean.bin",
-        "var_path": "../bin_weights/resnetv17_stage4_batchnorm9_running_var.bin",
-        "epsilon": 9.999999747378752e-06,
-        "channels": 2048,
-        "h_in": 7,
-        "w_in": 7
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 165,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 136,
+            "shape": [
+              1,
+              128,
+              40,
+              40
+            ]
+          }
+        ]
       },
       "next_steps": [
         171
       ]
     },
     {
-      "step": 171,
-      "name": "resnetv17_stage4__plus2",
-      "kernel_type": 5,
-      "params": {},
+      "step": 169,
+      "name": "/model.23/cv2.0/cv2.0.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv2.0.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.0.1.conv.bias.bin",
+        "cout": 16,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
       "next_steps": [
         172
       ]
     },
     {
-      "step": 172,
-      "name": "resnetv17_stage4_activation2",
-      "kernel_type": 3,
-      "params": {},
+      "step": 170,
+      "name": "/model.23/cv3.0/cv3.0.0/cv3.0.0.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.0.0.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.0.0.1.conv.bias.bin",
+        "cout": 80,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
       "next_steps": [
         173
       ]
     },
     {
-      "step": 173,
-      "name": "resnetv17_pool1_fwd",
-      "kernel_type": 6,
+      "step": 171,
+      "name": "/model.19/cv1/conv/Conv",
+      "kernel_type": 1,
       "params": {
-        "channels": 2048,
-        "h_in": 7,
-        "w_in": 7
+        "weight_path": "../bin_weights/model.19.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.cv1.conv.bias.bin",
+        "cout": 128,
+        "cin": 192,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
       },
       "next_steps": [
         174
       ]
     },
     {
-      "step": 174,
-      "name": "flatten_473",
-      "kernel_type": 7,
+      "step": 172,
+      "name": "/model.23/cv2.0/cv2.0.1/act/Mul",
+      "kernel_type": 12,
       "params": {},
       "next_steps": [
         175
       ]
     },
     {
+      "step": 173,
+      "name": "/model.23/cv3.0/cv3.0.0/cv3.0.0.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        176
+      ]
+    },
+    {
+      "step": 174,
+      "name": "/model.19/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        177
+      ]
+    },
+    {
       "step": 175,
-      "name": "resnetv17_dense0_fwd",
-      "kernel_type": 8,
+      "name": "/model.23/cv2.0/cv2.0.2/Conv",
+      "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/resnetv17_dense0_weight.bin",
-        "bias_path": "../bin_weights/resnetv17_dense0_bias.bin",
-        "in_features": 2048,
-        "out_features": 1000
+        "weight_path": "../bin_weights/model.23.cv2.0.2.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.0.2.bias.bin",
+        "cout": 4,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        178
+      ]
+    },
+    {
+      "step": 176,
+      "name": "/model.23/cv3.0/cv3.0.1/cv3.0.1.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.0.1.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.0.1.0.conv.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 80,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        179
+      ]
+    },
+    {
+      "step": 177,
+      "name": "/model.19/Split",
+      "kernel_type": 13,
+      "params": {
+        "axis": 1,
+        "input_shape": [
+          1,
+          128,
+          40,
+          40
+        ],
+        "split": [
+          64,
+          64
+        ],
+        "num_outputs": 2
+      },
+      "next_steps": [
+        201,
+        180,
+        181
+      ],
+      "output_routes": [
+        {
+          "to_step": 201,
+          "output_index": 0
+        },
+        {
+          "to_step": 180,
+          "output_index": 1
+        },
+        {
+          "to_step": 181,
+          "output_index": 1
+        },
+        {
+          "to_step": 201,
+          "output_index": 1
+        }
+      ]
+    },
+    {
+      "step": 178,
+      "name": "/model.23/Reshape",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        265
+      ]
+    },
+    {
+      "step": 179,
+      "name": "/model.23/cv3.0/cv3.0.1/cv3.0.1.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        184
+      ]
+    },
+    {
+      "step": 180,
+      "name": "/model.19/m.0/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.19.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.m.0.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        182
+      ]
+    },
+    {
+      "step": 181,
+      "name": "/model.19/m.0/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.19.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.m.0.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        183
+      ]
+    },
+    {
+      "step": 182,
+      "name": "/model.19/m.0/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        186,
+        192
+      ]
+    },
+    {
+      "step": 183,
+      "name": "/model.19/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        198
+      ]
+    },
+    {
+      "step": 184,
+      "name": "/model.23/cv3.0/cv3.0.1/cv3.0.1.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.0.1.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.0.1.1.conv.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        185
+      ]
+    },
+    {
+      "step": 185,
+      "name": "/model.23/cv3.0/cv3.0.1/cv3.0.1.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        188
+      ]
+    },
+    {
+      "step": 186,
+      "name": "/model.19/m.0/m/m.0/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.19.m.0.m.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.m.0.m.0.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        187
+      ]
+    },
+    {
+      "step": 187,
+      "name": "/model.19/m.0/m/m.0/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        190
+      ]
+    },
+    {
+      "step": 188,
+      "name": "/model.23/cv3.0/cv3.0.2/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.0.2.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.0.2.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 1,
+        "h_in": 80,
+        "w_in": 80,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        189
+      ]
+    },
+    {
+      "step": 189,
+      "name": "/model.23/Reshape_3",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        278
+      ]
+    },
+    {
+      "step": 190,
+      "name": "/model.19/m.0/m/m.0/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.19.m.0.m.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.m.0.m.0.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        191
+      ]
+    },
+    {
+      "step": 191,
+      "name": "/model.19/m.0/m/m.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        192
+      ]
+    },
+    {
+      "step": 192,
+      "name": "/model.19/m.0/m/m.0/Add",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        193,
+        197
+      ]
+    },
+    {
+      "step": 193,
+      "name": "/model.19/m.0/m/m.1/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.19.m.0.m.1.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.m.0.m.1.cv1.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        194
+      ]
+    },
+    {
+      "step": 194,
+      "name": "/model.19/m.0/m/m.1/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        195
+      ]
+    },
+    {
+      "step": 195,
+      "name": "/model.19/m.0/m/m.1/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.19.m.0.m.1.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.m.0.m.1.cv2.conv.bias.bin",
+        "cout": 32,
+        "cin": 32,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        196
+      ]
+    },
+    {
+      "step": 196,
+      "name": "/model.19/m.0/m/m.1/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        197
+      ]
+    },
+    {
+      "step": 197,
+      "name": "/model.19/m.0/m/m.1/Add",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        198
+      ]
+    },
+    {
+      "step": 198,
+      "name": "/model.19/m.0/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 197,
+            "shape": [
+              1,
+              32,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 183,
+            "shape": [
+              1,
+              32,
+              40,
+              40
+            ]
+          }
+        ]
+      },
+      "next_steps": [
+        199
+      ]
+    },
+    {
+      "step": 199,
+      "name": "/model.19/m.0/cv3/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.19.m.0.cv3.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.m.0.cv3.conv.bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        200
+      ]
+    },
+    {
+      "step": 200,
+      "name": "/model.19/m.0/cv3/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        201
+      ]
+    },
+    {
+      "step": 201,
+      "name": "/model.19/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 177,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 177,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          },
+          {
+            "const": false,
+            "step": 200,
+            "shape": [
+              1,
+              64,
+              40,
+              40
+            ]
+          }
+        ]
+      },
+      "next_steps": [
+        202
+      ]
+    },
+    {
+      "step": 202,
+      "name": "/model.19/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.19.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.19.cv2.conv.bias.bin",
+        "cout": 128,
+        "cin": 192,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        203
+      ]
+    },
+    {
+      "step": 203,
+      "name": "/model.19/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        204,
+        205,
+        206
+      ]
+    },
+    {
+      "step": 204,
+      "name": "/model.20/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.20.conv.weight.bin",
+        "bias_path": "../bin_weights/model.20.conv.bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
+      "next_steps": [
+        207
+      ]
+    },
+    {
+      "step": 205,
+      "name": "/model.23/cv2.1/cv2.1.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv2.1.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.1.0.conv.bias.bin",
+        "cout": 16,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        208
+      ]
+    },
+    {
+      "step": 206,
+      "name": "/model.23/cv3.1/cv3.1.0/cv3.1.0.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.1.0.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.1.0.0.conv.bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 128,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        209
+      ]
+    },
+    {
+      "step": 207,
+      "name": "/model.20/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        210
+      ]
+    },
+    {
+      "step": 208,
+      "name": "/model.23/cv2.1/cv2.1.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        211
+      ]
+    },
+    {
+      "step": 209,
+      "name": "/model.23/cv3.1/cv3.1.0/cv3.1.0.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        212
+      ]
+    },
+    {
+      "step": 210,
+      "name": "/model.21/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 207,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 111,
+            "shape": [
+              1,
+              256,
+              20,
+              20
+            ]
+          }
+        ]
+      },
+      "next_steps": [
+        213
+      ]
+    },
+    {
+      "step": 211,
+      "name": "/model.23/cv2.1/cv2.1.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv2.1.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.1.1.conv.bias.bin",
+        "cout": 16,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        214
+      ]
+    },
+    {
+      "step": 212,
+      "name": "/model.23/cv3.1/cv3.1.0/cv3.1.0.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.1.0.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.1.0.1.conv.bias.bin",
+        "cout": 80,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        215
+      ]
+    },
+    {
+      "step": 213,
+      "name": "/model.22/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.cv1.conv.bias.bin",
+        "cout": 256,
+        "cin": 384,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        216
+      ]
+    },
+    {
+      "step": 214,
+      "name": "/model.23/cv2.1/cv2.1.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        217
+      ]
+    },
+    {
+      "step": 215,
+      "name": "/model.23/cv3.1/cv3.1.0/cv3.1.0.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        218
+      ]
+    },
+    {
+      "step": 216,
+      "name": "/model.22/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        219
+      ]
+    },
+    {
+      "step": 217,
+      "name": "/model.23/cv2.1/cv2.1.2/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv2.1.2.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.1.2.bias.bin",
+        "cout": 4,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        220
+      ]
+    },
+    {
+      "step": 218,
+      "name": "/model.23/cv3.1/cv3.1.1/cv3.1.1.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.1.1.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.1.1.0.conv.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 80,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        221
+      ]
+    },
+    {
+      "step": 219,
+      "name": "/model.22/Split",
+      "kernel_type": 13,
+      "params": {
+        "axis": 1,
+        "input_shape": [
+          1,
+          256,
+          20,
+          20
+        ],
+        "split": [
+          128,
+          128
+        ],
+        "num_outputs": 2
+      },
+      "next_steps": [
+        250,
+        222,
+        230
+      ],
+      "output_routes": [
+        {
+          "to_step": 250,
+          "output_index": 0
+        },
+        {
+          "to_step": 222,
+          "output_index": 1
+        },
+        {
+          "to_step": 230,
+          "output_index": 1
+        },
+        {
+          "to_step": 250,
+          "output_index": 1
+        }
+      ]
+    },
+    {
+      "step": 220,
+      "name": "/model.23/Reshape_1",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        265
+      ]
+    },
+    {
+      "step": 221,
+      "name": "/model.23/cv3.1/cv3.1.1/cv3.1.1.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        224
+      ]
+    },
+    {
+      "step": 222,
+      "name": "/model.22/m.0/m.0.0/cv1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.m.0.0.cv1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.m.0.0.cv1.conv.bias.bin",
+        "cout": 64,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        223
+      ]
+    },
+    {
+      "step": 223,
+      "name": "/model.22/m.0/m.0.0/cv1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        226
+      ]
+    },
+    {
+      "step": 224,
+      "name": "/model.23/cv3.1/cv3.1.1/cv3.1.1.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.1.1.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.1.1.1.conv.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        225
+      ]
+    },
+    {
+      "step": 225,
+      "name": "/model.23/cv3.1/cv3.1.1/cv3.1.1.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        228
+      ]
+    },
+    {
+      "step": 226,
+      "name": "/model.22/m.0/m.0.0/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.m.0.0.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.m.0.0.cv2.conv.bias.bin",
+        "cout": 128,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        227
+      ]
+    },
+    {
+      "step": 227,
+      "name": "/model.22/m.0/m.0.0/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        230
+      ]
+    },
+    {
+      "step": 228,
+      "name": "/model.23/cv3.1/cv3.1.2/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.1.2.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.1.2.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 1,
+        "h_in": 40,
+        "w_in": 40,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        229
+      ]
+    },
+    {
+      "step": 229,
+      "name": "/model.23/Reshape_4",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        278
+      ]
+    },
+    {
+      "step": 230,
+      "name": "/model.22/m.0/m.0.0/Add",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        231,
+        245
+      ]
+    },
+    {
+      "step": 231,
+      "name": "/model.22/m.0/m.0.1/attn/qkv/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.m.0.1.attn.qkv.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.m.0.1.attn.qkv.conv.bias.bin",
+        "cout": 256,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        232
+      ]
+    },
+    {
+      "step": 232,
+      "name": "/model.22/m.0/m.0.1/attn/Reshape",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        233
+      ]
+    },
+    {
+      "step": 233,
+      "name": "/model.22/m.0/m.0.1/attn/Split",
+      "kernel_type": 13,
+      "params": {
+        "axis": 2,
+        "input_shape": [
+          1,
+          2,
+          128,
+          400
+        ],
+        "split": [
+          32,
+          32,
+          64
+        ],
+        "num_outputs": 3
+      },
+      "next_steps": [
+        234,
+        238,
+        235,
+        241
+      ],
+      "output_routes": [
+        {
+          "to_step": 234,
+          "output_index": 0
+        },
+        {
+          "to_step": 238,
+          "output_index": 1
+        },
+        {
+          "to_step": 235,
+          "output_index": 2
+        },
+        {
+          "to_step": 241,
+          "output_index": 2
+        }
+      ]
+    },
+    {
+      "step": 234,
+      "name": "/model.22/m.0/m.0.1/attn/Mul",
+      "kernel_type": 11,
+      "params": {
+        "const_path": "../bin_weights/_model.10_m_m.0_attn_Constant_1_output_0.bin",
+        "const_shape": []
+      },
+      "next_steps": [
+        236
+      ]
+    },
+    {
+      "step": 235,
+      "name": "/model.22/m.0/m.0.1/attn/Reshape_2",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        237
+      ]
+    },
+    {
+      "step": 236,
+      "name": "/model.22/m.0/m.0.1/attn/Transpose",
+      "kernel_type": 16,
+      "params": {
+        "input_shape": [
+          1,
+          2,
+          32,
+          400
+        ],
+        "perm": [
+          0,
+          1,
+          3,
+          2
+        ]
+      },
+      "next_steps": [
+        238
+      ]
+    },
+    {
+      "step": 237,
+      "name": "/model.22/m.0/m.0.1/attn/pe/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.m.0.1.attn.pe.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.m.0.1.attn.pe.conv.bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 128,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        243
+      ]
+    },
+    {
+      "step": 238,
+      "name": "/model.22/m.0/m.0.1/attn/MatMul",
+      "kernel_type": 17,
+      "params": {
+        "lhs_shape": [
+          1,
+          2,
+          400,
+          32
+        ],
+        "rhs_shape": [
+          1,
+          2,
+          32,
+          400
+        ],
+        "lhs_step": 236,
+        "rhs_step": 233,
+        "lhs_const_path": "",
+        "rhs_const_path": ""
+      },
+      "next_steps": [
+        239
+      ]
+    },
+    {
+      "step": 239,
+      "name": "/model.22/m.0/m.0.1/attn/Softmax",
+      "kernel_type": 22,
+      "params": {
+        "input_shape": [
+          1,
+          2,
+          400,
+          400
+        ],
+        "axis": 3
+      },
+      "next_steps": [
+        240
+      ]
+    },
+    {
+      "step": 240,
+      "name": "/model.22/m.0/m.0.1/attn/Transpose_1",
+      "kernel_type": 16,
+      "params": {
+        "input_shape": [
+          1,
+          2,
+          400,
+          400
+        ],
+        "perm": [
+          0,
+          1,
+          3,
+          2
+        ]
+      },
+      "next_steps": [
+        241
+      ]
+    },
+    {
+      "step": 241,
+      "name": "/model.22/m.0/m.0.1/attn/MatMul_1",
+      "kernel_type": 17,
+      "params": {
+        "lhs_shape": [
+          1,
+          2,
+          64,
+          400
+        ],
+        "rhs_shape": [
+          1,
+          2,
+          400,
+          400
+        ],
+        "lhs_step": 233,
+        "rhs_step": 240,
+        "lhs_const_path": "",
+        "rhs_const_path": ""
+      },
+      "next_steps": [
+        242
+      ]
+    },
+    {
+      "step": 242,
+      "name": "/model.22/m.0/m.0.1/attn/Reshape_1",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        243
+      ]
+    },
+    {
+      "step": 243,
+      "name": "/model.22/m.0/m.0.1/attn/Add",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        244
+      ]
+    },
+    {
+      "step": 244,
+      "name": "/model.22/m.0/m.0.1/attn/proj/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.m.0.1.attn.proj.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.m.0.1.attn.proj.conv.bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        245
+      ]
+    },
+    {
+      "step": 245,
+      "name": "/model.22/m.0/m.0.1/Add",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        246,
+        249
+      ]
+    },
+    {
+      "step": 246,
+      "name": "/model.22/m.0/m.0.1/ffn/ffn.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.m.0.1.ffn.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.m.0.1.ffn.0.conv.bias.bin",
+        "cout": 256,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        247
+      ]
+    },
+    {
+      "step": 247,
+      "name": "/model.22/m.0/m.0.1/ffn/ffn.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        248
+      ]
+    },
+    {
+      "step": 248,
+      "name": "/model.22/m.0/m.0.1/ffn/ffn.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.m.0.1.ffn.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.m.0.1.ffn.1.conv.bias.bin",
+        "cout": 128,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        249
+      ]
+    },
+    {
+      "step": 249,
+      "name": "/model.22/m.0/m.0.1/Add_1",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        250
+      ]
+    },
+    {
+      "step": 250,
+      "name": "/model.22/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 219,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 219,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          },
+          {
+            "const": false,
+            "step": 249,
+            "shape": [
+              1,
+              128,
+              20,
+              20
+            ]
+          }
+        ]
+      },
+      "next_steps": [
+        251
+      ]
+    },
+    {
+      "step": 251,
+      "name": "/model.22/cv2/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.22.cv2.conv.weight.bin",
+        "bias_path": "../bin_weights/model.22.cv2.conv.bias.bin",
+        "cout": 256,
+        "cin": 384,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        252
+      ]
+    },
+    {
+      "step": 252,
+      "name": "/model.22/cv2/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        253,
+        254
+      ]
+    },
+    {
+      "step": 253,
+      "name": "/model.23/cv2.2/cv2.2.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv2.2.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.2.0.conv.bias.bin",
+        "cout": 16,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        255
+      ]
+    },
+    {
+      "step": 254,
+      "name": "/model.23/cv3.2/cv3.2.0/cv3.2.0.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.2.0.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.2.0.0.conv.bias.bin",
+        "cout": 256,
+        "cin": 256,
+        "groups": 256,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        256
+      ]
+    },
+    {
+      "step": 255,
+      "name": "/model.23/cv2.2/cv2.2.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        257
+      ]
+    },
+    {
+      "step": 256,
+      "name": "/model.23/cv3.2/cv3.2.0/cv3.2.0.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        258
+      ]
+    },
+    {
+      "step": 257,
+      "name": "/model.23/cv2.2/cv2.2.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv2.2.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.2.1.conv.bias.bin",
+        "cout": 16,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        259
+      ]
+    },
+    {
+      "step": 258,
+      "name": "/model.23/cv3.2/cv3.2.0/cv3.2.0.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.2.0.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.2.0.1.conv.bias.bin",
+        "cout": 80,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        260
+      ]
+    },
+    {
+      "step": 259,
+      "name": "/model.23/cv2.2/cv2.2.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        261
+      ]
+    },
+    {
+      "step": 260,
+      "name": "/model.23/cv3.2/cv3.2.0/cv3.2.0.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        262
+      ]
+    },
+    {
+      "step": 261,
+      "name": "/model.23/cv2.2/cv2.2.2/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv2.2.2.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv2.2.2.bias.bin",
+        "cout": 4,
+        "cin": 16,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        263
+      ]
+    },
+    {
+      "step": 262,
+      "name": "/model.23/cv3.2/cv3.2.1/cv3.2.1.0/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.2.1.0.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.2.1.0.conv.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 80,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        264
+      ]
+    },
+    {
+      "step": 263,
+      "name": "/model.23/Reshape_2",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        265
+      ]
+    },
+    {
+      "step": 264,
+      "name": "/model.23/cv3.2/cv3.2.1/cv3.2.1.0/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        266
+      ]
+    },
+    {
+      "step": 265,
+      "name": "/model.23/Concat",
+      "kernel_type": 14,
+      "params": {
+        "axis": 2,
+        "input_order": [
+          {
+            "const": false,
+            "step": 178,
+            "shape": [
+              1,
+              4,
+              6400
+            ]
+          },
+          {
+            "const": false,
+            "step": 220,
+            "shape": [
+              1,
+              4,
+              1600
+            ]
+          },
+          {
+            "const": false,
+            "step": 263,
+            "shape": [
+              1,
+              4,
+              400
+            ]
+          }
+        ]
+      },
+      "next_steps": [
+        267,
+        268
+      ]
+    },
+    {
+      "step": 266,
+      "name": "/model.23/cv3.2/cv3.2.1/cv3.2.1.1/conv/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.2.1.1.conv.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.2.1.1.conv.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        269
+      ]
+    },
+    {
+      "step": 267,
+      "name": "/model.23/Slice",
+      "kernel_type": 19,
+      "params": {
+        "input_shape": [
+          1,
+          4,
+          8400
+        ],
+        "starts": [
+          0
+        ],
+        "ends": [
+          2
+        ],
+        "axes": [
+          1
+        ],
+        "steps": [
+          1
+        ]
+      },
+      "next_steps": [
+        270
+      ]
+    },
+    {
+      "step": 268,
+      "name": "/model.23/Slice_1",
+      "kernel_type": 19,
+      "params": {
+        "input_shape": [
+          1,
+          4,
+          8400
+        ],
+        "starts": [
+          2
+        ],
+        "ends": [
+          4
+        ],
+        "axes": [
+          1
+        ],
+        "steps": [
+          1
+        ]
+      },
+      "next_steps": [
+        271
+      ]
+    },
+    {
+      "step": 269,
+      "name": "/model.23/cv3.2/cv3.2.1/cv3.2.1.1/act/Mul",
+      "kernel_type": 12,
+      "params": {},
+      "next_steps": [
+        274
+      ]
+    },
+    {
+      "step": 270,
+      "name": "/model.23/Sub",
+      "kernel_type": 20,
+      "params": {
+        "const_path": "../bin_weights/_model.23_Constant_12_output_0.bin",
+        "const_shape": [
+          1,
+          2,
+          8400
+        ],
+        "const_is_first": true
+      },
+      "next_steps": [
+        272,
+        273
+      ]
+    },
+    {
+      "step": 271,
+      "name": "/model.23/Add_1",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        272,
+        273
+      ]
+    },
+    {
+      "step": 272,
+      "name": "/model.23/Add_2",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        275
+      ]
+    },
+    {
+      "step": 273,
+      "name": "/model.23/Sub_1",
+      "kernel_type": 20,
+      "params": {},
+      "next_steps": [
+        277
+      ]
+    },
+    {
+      "step": 274,
+      "name": "/model.23/cv3.2/cv3.2.2/Conv",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/model.23.cv3.2.2.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.2.2.bias.bin",
+        "cout": 80,
+        "cin": 80,
+        "groups": 1,
+        "h_in": 20,
+        "w_in": 20,
+        "kh": 1,
+        "kw": 1,
+        "stride": 1,
+        "padding": 0
+      },
+      "next_steps": [
+        276
+      ]
+    },
+    {
+      "step": 275,
+      "name": "/model.23/Div_1",
+      "kernel_type": 21,
+      "params": {
+        "const_path": "../bin_weights/_model.23_Constant_14_output_0.bin",
+        "const_shape": [],
+        "const_is_first": false
+      },
+      "next_steps": [
+        277
+      ]
+    },
+    {
+      "step": 276,
+      "name": "/model.23/Reshape_5",
+      "kernel_type": 15,
+      "params": {},
+      "next_steps": [
+        278
+      ]
+    },
+    {
+      "step": 277,
+      "name": "/model.23/Concat_2",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 275,
+            "shape": [
+              1,
+              2,
+              8400
+            ]
+          },
+          {
+            "const": false,
+            "step": 273,
+            "shape": [
+              1,
+              2,
+              8400
+            ]
+          }
+        ]
+      },
+      "next_steps": [
+        279
+      ]
+    },
+    {
+      "step": 278,
+      "name": "/model.23/Concat_1",
+      "kernel_type": 14,
+      "params": {
+        "axis": 2,
+        "input_order": [
+          {
+            "const": false,
+            "step": 189,
+            "shape": [
+              1,
+              80,
+              6400
+            ]
+          },
+          {
+            "const": false,
+            "step": 229,
+            "shape": [
+              1,
+              80,
+              1600
+            ]
+          },
+          {
+            "const": false,
+            "step": 276,
+            "shape": [
+              1,
+              80,
+              400
+            ]
+          }
+        ]
+      },
+      "next_steps": [
+        280
+      ]
+    },
+    {
+      "step": 279,
+      "name": "/model.23/Mul_2",
+      "kernel_type": 11,
+      "params": {
+        "const_path": "../bin_weights/_model.23_Constant_15_output_0.bin",
+        "const_shape": [
+          1,
+          8400
+        ]
+      },
+      "next_steps": [
+        281
+      ]
+    },
+    {
+      "step": 280,
+      "name": "/model.23/Sigmoid",
+      "kernel_type": 10,
+      "params": {},
+      "next_steps": [
+        281
+      ]
+    },
+    {
+      "step": 281,
+      "name": "/model.23/Concat_3",
+      "kernel_type": 14,
+      "params": {
+        "axis": 1,
+        "input_order": [
+          {
+            "const": false,
+            "step": 279,
+            "shape": [
+              1,
+              4,
+              8400
+            ]
+          },
+          {
+            "const": false,
+            "step": 280,
+            "shape": [
+              1,
+              80,
+              8400
+            ]
+          }
+        ]
       },
       "next_steps": []
     }

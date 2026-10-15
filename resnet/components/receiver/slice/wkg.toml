@@ -1,0 +1,2 @@
+[overrides]
+"planner:sliceworld" = { path = "../../kernel/slice/" }

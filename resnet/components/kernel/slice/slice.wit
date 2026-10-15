@@ -1,0 +1,37 @@
+package planner:sliceworld;
+
+interface plan {
+
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // Slice genérico (ONNX Slice): corta um subconjunto de eixos do tensor,
+    // suportando passo (step) positivo ou negativo por eixo. shape = shape
+    // completo do input (batch já resolvido, mesma convenção de Split/
+    // Transpose/Softmax). starts/ends/steps vêm em paralelo com axes (mesmo
+    // índice k = mesmo eixo); eixos não listados em axes passam inteiros
+    // (begin=0, end=shape[i], step=1). axes já vem normalizado (não-negativo)
+    // pelo onnx_to_dfg.py; starts/ends podem ser negativos (relativos ao
+    // fim), clampados igual à spec do ONNX Slice.
+    slice: func(
+        input: list<f32>,
+        shape: list<u32>,
+        starts: list<s32>,
+        ends: list<s32>,
+        axes: list<u32>,
+        steps: list<s32>,
+        result-container: data
+    ) -> data;
+
+}
+
+world sliceworld {
+    export plan;
+}

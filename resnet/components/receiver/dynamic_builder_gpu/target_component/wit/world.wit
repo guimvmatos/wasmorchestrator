@@ -19,6 +19,9 @@ world runner {
     import planner:transposeworld/plan;
     import planner:matmulworld/plan;
     import planner:resizeworld/plan;
+    import planner:sliceworld/plan;
+    import planner:subworld/plan;
+    import planner:divworld/plan;
     import planner:softmaxworld/plan;
     export wasi:cli/run@0.2.7;
 }

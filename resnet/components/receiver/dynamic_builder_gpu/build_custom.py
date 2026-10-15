@@ -742,6 +742,147 @@ KERNELS = {
             },
         },
     },
+    19: {
+        "name": "slice",
+        "wit_import": "    import planner:sliceworld/plan;",
+        # Slice genérico (ONNX Slice), decode do detection head do YOLO —
+        # puro gather de memória (sem FLOPs), sem variante GPU (mesmo
+        # raciocínio de split/concat/resize/reshape/transpose). starts/ends/
+        # steps vêm como i64 no JSON (podem ter sentinelas enormes tipo
+        # INT64_MAX pra "até o fim") e são clampados pra i32 aqui, igual ao
+        # receiver standalone — o kernel em C já clampa de novo contra o
+        # shape real internamente, então o clamp aqui só evita overflow na
+        # conversão, não precisa ser exato.
+        "rust_match": """                19 => {
+                    let shape: Vec<u32> = p.input_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                    let starts: Vec<i32> = p.starts.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();
+                    let ends: Vec<i32> = p.ends.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();
+                    let steps: Vec<i32> = p.steps.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();
+                    let data = bindings::planner::sliceworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::sliceworld::plan::slice(&current_input, &shape, &starts, &ends, &p.axes, &steps, &data);
+                    computed_output = res.output;
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:sliceworld" = { path = "../../../kernel/slice/" }',
+                "wasm_path": "../../../kernel/slice/sliceworld_component.wasm",
+            },
+        },
+    },
+    20: {
+        "name": "sub",
+        "wit_import": "    import planner:subworld/plan;",
+        # Sub tem dois casos, igual ao receiver isolado (kernel/sub/src/lib.rs)
+        # e ao padrão já usado pelo Mul: tensor x constante (ex: anchor_points
+        # fixo no decode do YOLO) ou tensor x tensor (join-buffer por step).
+        # Sub NÃO é comutativo (a - b != b - a) — const_is_first decide a
+        # ordem quando um lado é constante; no caso tensor x tensor, "1º a
+        # chegar" vira `a` (mesma limitação aceita do Mul/onnx_to_dfg.py, não
+        # esperado ocorrer no decode do YOLO onde Sub/Div sempre têm um lado
+        # constante).
+        "rust_match": """                20 => {
+                    if !p.const_path.is_empty() {
+                        let const_vec = load_weights_file_cached(&p.const_path);
+                        let (a, b): (&[f32], &[f32]) = if p.const_is_first {
+                            (const_vec.as_slice(), current_input.as_slice())
+                        } else {
+                            (current_input.as_slice(), const_vec.as_slice())
+                        };
+                        let data = bindings::planner::subworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::subworld::plan::sub(a, b, &data);
+                        computed_output = res.output;
+                    } else if let Some(first_branch) = sub_branches.remove(&current_step) {
+                        println!("Step {}: 2º ramo recebido! Subtraindo buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                        let data = bindings::planner::subworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::subworld::plan::sub(&first_branch, &current_input, &data);
+                        computed_output = res.output;
+                    } else {
+                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                        sub_branches.insert(current_step, current_input);
+                        continue;
+                    }
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:subworld" = { path = "../../../kernel/sub/" }',
+                "wasm_path": "../../../kernel/sub/subworld_component.wasm",
+            },
+        },
+    },
+    21: {
+        "name": "div",
+        "wit_import": "    import planner:divworld/plan;",
+        # Div: mesmo padrão do Sub acima (tensor x constante ou tensor x
+        # tensor via join-buffer), também não-comutativo (a / b != b / a).
+        "rust_match": """                21 => {
+                    if !p.const_path.is_empty() {
+                        let const_vec = load_weights_file_cached(&p.const_path);
+                        let (a, b): (&[f32], &[f32]) = if p.const_is_first {
+                            (const_vec.as_slice(), current_input.as_slice())
+                        } else {
+                            (current_input.as_slice(), const_vec.as_slice())
+                        };
+                        let data = bindings::planner::divworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::divworld::plan::div(a, b, &data);
+                        computed_output = res.output;
+                    } else if let Some(first_branch) = div_branches.remove(&current_step) {
+                        println!("Step {}: 2º ramo recebido! Dividindo buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                        let data = bindings::planner::divworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::divworld::plan::div(&first_branch, &current_input, &data);
+                        computed_output = res.output;
+                    } else {
+                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                        div_branches.insert(current_step, current_input);
+                        continue;
+                    }
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:divworld" = { path = "../../../kernel/div/" }',
+                "wasm_path": "../../../kernel/div/divworld_component.wasm",
+            },
+        },
+    },
 }
 
 WASI_GFX_OVERRIDE = (
@@ -981,6 +1122,26 @@ struct LayerParams {{
     lhs_const_path: String,
     #[serde(default)]
     rhs_const_path: String,
+    // --- Slice (19) --- input_shape já existe acima, reusado (Split/
+    // Transpose/MatMul). starts/ends/steps em i64 (podem ter sentinelas
+    // enormes do ONNX, ex: INT64_MAX pra "até o fim"), clampados pra i32 na
+    // hora de chamar o kernel (ver rust_match do 19). axes é Vec<u32>
+    // (plural, distinto do `axis` singular do Split/Softmax) — já vem
+    // normalizado (não-negativo) pelo onnx_to_dfg.py.
+    #[serde(default)]
+    starts: Vec<i64>,
+    #[serde(default)]
+    ends: Vec<i64>,
+    #[serde(default)]
+    axes: Vec<u32>,
+    #[serde(default)]
+    steps: Vec<i64>,
+    // --- Sub/Div (20/21) --- const_path/const_shape já existem acima
+    // (reusados do Mul). const_is_first = true quando node.input[0] é a
+    // constante (ex: anchor_points - pred, não pred - anchor_points) —
+    // Sub/Div não são comutativos como Mul, então a ordem importa.
+    #[serde(default)]
+    const_is_first: bool,
 }}
 
 #[derive(Deserialize, Debug, Clone)]
@@ -1060,6 +1221,11 @@ fn handle_client(
         // dois lados) não é suportado por este dynamic_builder (ver panic
         // no rust_match do kernel 17) — um slot por origem basta.
         let mut matmul_branches: HashMap<u32, HashMap<u32, Vec<f32>>> = HashMap::new();
+        // Sub (20) / Div (21): mesmo mecanismo de join-buffer do Mul — só
+        // usado no caso raro em que NENHUM lado é constante (ver nota no
+        // rust_match dos kernels 20/21 e no onnx_to_dfg.py).
+        let mut sub_branches: HashMap<u32, Vec<f32>> = HashMap::new();
+        let mut div_branches: HashMap<u32, Vec<f32>> = HashMap::new();
 
         queue.push_back((input_img.current_kernel, input_img.input.clone(), input_img.from_step));
 
@@ -1287,7 +1453,7 @@ def main():
 
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 18, 22.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 21, 22.")
             sys.exit(1)
 
     for k in gpu_ids:

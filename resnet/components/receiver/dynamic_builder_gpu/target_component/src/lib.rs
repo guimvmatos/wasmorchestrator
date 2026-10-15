@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::Deserialize;
 
-const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22];
+const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
 thread_local! {
     // Controla quais weight_id (= weight_path) já foram enviados
     // ao kernel GPU via gemm_load_weights neste processo. Evita
@@ -165,6 +165,26 @@ struct LayerParams {
     lhs_const_path: String,
     #[serde(default)]
     rhs_const_path: String,
+    // --- Slice (19) --- input_shape já existe acima, reusado (Split/
+    // Transpose/MatMul). starts/ends/steps em i64 (podem ter sentinelas
+    // enormes do ONNX, ex: INT64_MAX pra "até o fim"), clampados pra i32 na
+    // hora de chamar o kernel (ver rust_match do 19). axes é Vec<u32>
+    // (plural, distinto do `axis` singular do Split/Softmax) — já vem
+    // normalizado (não-negativo) pelo onnx_to_dfg.py.
+    #[serde(default)]
+    starts: Vec<i64>,
+    #[serde(default)]
+    ends: Vec<i64>,
+    #[serde(default)]
+    axes: Vec<u32>,
+    #[serde(default)]
+    steps: Vec<i64>,
+    // --- Sub/Div (20/21) --- const_path/const_shape já existem acima
+    // (reusados do Mul). const_is_first = true quando node.input[0] é a
+    // constante (ex: anchor_points - pred, não pred - anchor_points) —
+    // Sub/Div não são comutativos como Mul, então a ordem importa.
+    #[serde(default)]
+    const_is_first: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -244,6 +264,11 @@ fn handle_client(
         // dois lados) não é suportado por este dynamic_builder (ver panic
         // no rust_match do kernel 17) — um slot por origem basta.
         let mut matmul_branches: HashMap<u32, HashMap<u32, Vec<f32>>> = HashMap::new();
+        // Sub (20) / Div (21): mesmo mecanismo de join-buffer do Mul — só
+        // usado no caso raro em que NENHUM lado é constante (ver nota no
+        // rust_match dos kernels 20/21 e no onnx_to_dfg.py).
+        let mut sub_branches: HashMap<u32, Vec<f32>> = HashMap::new();
+        let mut div_branches: HashMap<u32, Vec<f32>> = HashMap::new();
 
         queue.push_back((input_img.current_kernel, input_img.input.clone(), input_img.from_step));
 
@@ -681,6 +706,99 @@ fn handle_client(
                         &current_input, p.channels, p.h_in, p.w_in, p.scale_h, p.scale_w, &data,
                     );
                     computed_output = res.output;
+                },
+                19 => {
+                    let shape: Vec<u32> = p.input_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                    let starts: Vec<i32> = p.starts.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();
+                    let ends: Vec<i32> = p.ends.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();
+                    let steps: Vec<i32> = p.steps.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();
+                    let data = bindings::planner::sliceworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::sliceworld::plan::slice(&current_input, &shape, &starts, &ends, &p.axes, &steps, &data);
+                    computed_output = res.output;
+                },
+                20 => {
+                    if !p.const_path.is_empty() {
+                        let const_vec = load_weights_file_cached(&p.const_path);
+                        let (a, b): (&[f32], &[f32]) = if p.const_is_first {
+                            (const_vec.as_slice(), current_input.as_slice())
+                        } else {
+                            (current_input.as_slice(), const_vec.as_slice())
+                        };
+                        let data = bindings::planner::subworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::subworld::plan::sub(a, b, &data);
+                        computed_output = res.output;
+                    } else if let Some(first_branch) = sub_branches.remove(&current_step) {
+                        println!("Step {}: 2º ramo recebido! Subtraindo buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                        let data = bindings::planner::subworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::subworld::plan::sub(&first_branch, &current_input, &data);
+                        computed_output = res.output;
+                    } else {
+                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                        sub_branches.insert(current_step, current_input);
+                        continue;
+                    }
+                },
+                21 => {
+                    if !p.const_path.is_empty() {
+                        let const_vec = load_weights_file_cached(&p.const_path);
+                        let (a, b): (&[f32], &[f32]) = if p.const_is_first {
+                            (const_vec.as_slice(), current_input.as_slice())
+                        } else {
+                            (current_input.as_slice(), const_vec.as_slice())
+                        };
+                        let data = bindings::planner::divworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::divworld::plan::div(a, b, &data);
+                        computed_output = res.output;
+                    } else if let Some(first_branch) = div_branches.remove(&current_step) {
+                        println!("Step {}: 2º ramo recebido! Dividindo buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                        let data = bindings::planner::divworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::divworld::plan::div(&first_branch, &current_input, &data);
+                        computed_output = res.output;
+                    } else {
+                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                        div_branches.insert(current_step, current_input);
+                        continue;
+                    }
                 },
                 22 => {
                     let shape: Vec<u32> = p.input_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();

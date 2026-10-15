@@ -420,6 +420,81 @@ cargo build --target wasm32-wasip2 --release
 cd ..
 wac plug softmax/target/wasm32-wasip2/release/softmaxserver.wasm --plug ../kernel/softmax/softmaxworld_component.wasm -o softmaxFinal.wasm
 
+#### slice (kernel_19)
+# Slice genérico (ONNX Slice), decode do detection head do YOLO — corta um
+# subconjunto de eixos, suporta step positivo ou negativo. Puro gather de
+# memória (sem FLOPs), sem variante GPU. Params: input_shape (reaproveitado
+# de split/transpose/matmul/softmax) + starts/ends/axes/steps (novos — axes
+# já normalizado pelo onnx_to_dfg.py, starts/ends podem ser negativos). Clamp
+# de range segue a spec do ONNX Slice. Testado localmente (1D/2D, eixo
+# não-final, múltiplos eixos simultâneos, step negativo/reverso, slice tipo
+# bbox do decode do YOLO) antes de entregar.
+##### Kernel
+cd ../kernel/slice/
+wit-bindgen c --world sliceworld slice.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  slice.c sliceworld.c sliceworld_component_type.o \
+  -o sliceworld_component.wasm -mexec-model=reactor
+
+##### Receiver
+cd ../../receiver/slice
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug slice/target/wasm32-wasip2/release/sliceserver.wasm --plug ../kernel/slice/sliceworld_component.wasm -o sliceFinal.wasm
+
+#### sub (kernel_20)
+# ONNX Sub (a - b), decode do detection head do YOLO (ex: box - anchor_points
+# fixo). Mesmo padrão de broadcast por módulo do Mul (kernel 11) — não
+# comutativo, então o receiver usa const_is_first (quando um lado é
+# constante) pra montar a/b na ordem certa; no caso raro tensor x tensor sem
+# constante, join-buffer por step igual ao Mul (mesma limitação aceita: "1º a
+# chegar" vira a, não há lhs_step/rhs_step rastreado — não esperado ocorrer
+# no decode do YOLO). Sem variante GPU (sem FLOPs significativos).
+##### Kernel
+cd ../kernel/sub/
+wit-bindgen c --world subworld sub.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  sub.c subworld.c subworld_component_type.o \
+  -o subworld_component.wasm -mexec-model=reactor
+
+##### Receiver
+cd ../../receiver/sub
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug sub/target/wasm32-wasip2/release/subserver.wasm --plug ../kernel/sub/subworld_component.wasm -o subFinal.wasm
+
+#### div (kernel_21)
+# ONNX Div (a / b), decode do detection head do YOLO. Mesmo padrão do sub
+# acima (broadcast por módulo, const_is_first, join-buffer no caso raro
+# tensor x tensor). Sem variante GPU.
+##### Kernel
+cd ../kernel/div/
+wit-bindgen c --world divworld div.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  div.c divworld.c divworld_component_type.o \
+  -o divworld_component.wasm -mexec-model=reactor
+
+##### Receiver
+cd ../../receiver/div
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug div/target/wasm32-wasip2/release/divserver.wasm --plug ../kernel/div/divworld_component.wasm -o divFinal.wasm
+
 #### all (kernel_0) — DEPRECADO, ver "Dynamic Builder" abaixo
 # O crate receiver/all é estático (código Rust escrito à mão, não gerado) e
 # ficou para trás em duas frentes:
@@ -476,19 +551,24 @@ mv transposeFinal.wasm kernel_16.wasm
 mv matmulFinal.wasm kernel_17.wasm
 mv resizeFinal.wasm kernel_18.wasm
 mv softmaxFinal.wasm kernel_22.wasm
+mv sliceFinal.wasm kernel_19.wasm
+mv subFinal.wasm kernel_20.wasm
+mv divFinal.wasm kernel_21.wasm
 mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 
 cd "$WOR/resnet/components/receiver/dynamic_builder"
-python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,22 --gpu 17 --component-dir ./target_component --output ./node_all.wasm
+python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 --gpu 17 --component-dir ./target_component --output ./node_all.wasm
 Change the name of the .wasm and put it on the sys_test folder
-# split(13), concat(14), resize(18), reshape(15), transpose(16) e
-# softmax(22) são kernels CPU puros em C (puro rearranjo/gather de memória,
-# identidade/permutação, ou normalização ponto-a-ponto por eixo — sem FLOPs
-# significativos — sem ganho em GPU, sem variante GPU) — todo kernel CPU
-# segue o padrão wit-bindgen c + wasi-sdk clang (ver seções acima); build
-# prévio de kernel/split, kernel/concat, kernel/resize, kernel/reshape,
-# kernel/transpose e kernel/softmax antes do Dynamic Builder.
+# split(13), concat(14), resize(18), reshape(15), transpose(16), softmax(22)
+# e slice(19) são kernels CPU puros em C (puro rearranjo/gather de memória,
+# identidade/permutação, ou normalização/slice ponto-a-ponto — sem FLOPs
+# significativos — sem ganho em GPU, sem variante GPU); sub(20) e div(21)
+# também são CPU-only (broadcast por módulo igual ao Mul, sem FLOPs
+# relevantes) — todo kernel CPU segue o padrão wit-bindgen c + wasi-sdk
+# clang (ver seções acima); build prévio de kernel/split, kernel/concat,
+# kernel/resize, kernel/reshape, kernel/transpose, kernel/softmax,
+# kernel/slice, kernel/sub e kernel/div antes do Dynamic Builder.
 # matmul(17) É o único destes com FLOPs reais — tem variante GPU (build
 # prévio de kernel/matmul_gpu, ver Compilation_resnet_GPU.md) além da CPU
 # (build prévio de kernel/matmul, mesmo padrão wit-bindgen c acima). Passe

@@ -1,0 +1,2 @@
+[overrides]
+"planner:subworld" = { path = "../../kernel/sub/" }

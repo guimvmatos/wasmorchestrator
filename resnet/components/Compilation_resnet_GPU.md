@@ -201,22 +201,23 @@ python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output ../sys_test/resnet18DF
 # AutoGenerate
 cd "$WOR/resnet/components/receiver/dynamic_builder_gpu"
 python3 build_custom.py \
-  --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,22 \
+  --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 \
   --gpu 1,2,4,6,8,10,11,12,17 \
   --component-dir ./target_component \
   --output ../../../sys_test/kernel_0_gpu.wasm
 # relu(3), add(5), flatten(7), dropout(9), split(13), concat(14), reshape(15),
-# transpose(16), resize(18) e softmax(22) não têm variante GPU (puro
-# rearranjo/gather de memória, identidade/permutação, ou normalização
-# ponto-a-ponto por eixo — sem FLOPs significativos — sem ganho em shader) —
-# ficam de fora de --gpu e são plugados na variante CPU automaticamente
-# (fallback do catálogo). matmul(17) É o único entre 13-18/22 com FLOPs
-# reais e por isso TEM variante GPU — incluído em --gpu acima; sem --gpu 17,
-# cai na variante CPU automaticamente (mesmo fallback).
+# transpose(16), resize(18), softmax(22), slice(19), sub(20) e div(21) não
+# têm variante GPU (puro rearranjo/gather de memória, identidade/permutação,
+# normalização/slice ponto-a-ponto, ou broadcast elementwise simples — sem
+# FLOPs significativos — sem ganho em shader) — ficam de fora de --gpu e são
+# plugados na variante CPU automaticamente (fallback do catálogo). matmul(17)
+# É o único entre 13-22 com FLOPs reais e por isso TEM variante GPU —
+# incluído em --gpu acima; sem --gpu 17, cai na variante CPU automaticamente
+# (mesmo fallback).
 #
-# split(13), concat(14), resize(18), reshape(15), transpose(16) e
-# softmax(22) são kernels CPU em C (wit-bindgen c + wasi-sdk clang, ver
-# Compilation_resnet.md), não crates Rust — exigem que o
+# split(13), concat(14), resize(18), reshape(15), transpose(16), softmax(22),
+# slice(19), sub(20) e div(21) são kernels CPU em C (wit-bindgen c +
+# wasi-sdk clang, ver Compilation_resnet.md), não crates Rust — exigem que o
 # <nome>world_component.wasm já tenha sido compilado antes, já que o
 # build_custom.py só faz `wac plug` sobre o .wasm pronto, não compila os
 # kernels em si:
@@ -249,6 +250,21 @@ cd "$WOR/resnet/components/kernel/softmax" && wit-bindgen c --world softmaxworld
   $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
   softmax.c softmaxworld.c softmaxworld_component_type.o -o softmaxworld_component.wasm -mexec-model=reactor
+
+cd "$WOR/resnet/components/kernel/slice" && wit-bindgen c --world sliceworld slice.wit && \
+  $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
+  slice.c sliceworld.c sliceworld_component_type.o -o sliceworld_component.wasm -mexec-model=reactor
+
+cd "$WOR/resnet/components/kernel/sub" && wit-bindgen c --world subworld sub.wit && \
+  $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
+  sub.c subworld.c subworld_component_type.o -o subworld_component.wasm -mexec-model=reactor
+
+cd "$WOR/resnet/components/kernel/div" && wit-bindgen c --world divworld div.wit && \
+  $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
+  div.c divworld.c divworld_component_type.o -o divworld_component.wasm -mexec-model=reactor
 
 # matmul(17) só precisa deste build se você NÃO passar 17 em --gpu (cai na
 # variante CPU em C); se passar 17 em --gpu, o build prévio é o do

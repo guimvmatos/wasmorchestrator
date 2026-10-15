@@ -17,5 +17,8 @@
 "planner:transposeworld" = { path = "../../../kernel/transpose/" }
 "planner:matmulworld" = { path = "../../../kernel/matmul_gpu/wit" }
 "planner:resizeworld" = { path = "../../../kernel/resize/" }
+"planner:sliceworld" = { path = "../../../kernel/slice/" }
+"planner:subworld" = { path = "../../../kernel/sub/" }
+"planner:divworld" = { path = "../../../kernel/div/" }
 "planner:softmaxworld" = { path = "../../../kernel/softmax/" }
 "wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }
