@@ -8,7 +8,8 @@ interface plan {
         reply-to: string,
         kernels: list<u8>,
         current-kernel: u32,
-        request: u32
+        request: u32,
+        from-step: u32
     }
   
     maxpool: func(

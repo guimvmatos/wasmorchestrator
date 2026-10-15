@@ -1,0 +1,35 @@
+package planner:concatworld;
+
+interface plan {
+
+    // Mesmo record "data" usado em todo o pipeline, com UM campo novo:
+    // from-step. É o que permite ao receiver do Concat (que recebe N
+    // ramos diferentes no mesmo current-kernel) saber de QUAL step cada
+    // mensagem que chega veio — sem isso não dá pra montar input_order
+    // na ordem certa. Ver nota no lib.rs do receiver sobre o que isso
+    // implica pro resto do pipeline.
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // inputs/shapes vêm na MESMA ordem — input_order do onnx_to_dfg.py.
+    // shapes[i] é o shape completo (rank igual pra todos, só difere no
+    // próprio axis) já resolvido com batch=1 no lugar de dims desconhecidas.
+    concat: func(
+        inputs: list<list<f32>>,
+        shapes: list<list<u32>>,
+        axis: u32,
+        result-container: data
+    ) -> data;
+
+}
+
+world concatworld {
+    export plan;
+}

@@ -1,0 +1,35 @@
+package planner:splitworld;
+
+interface plan {
+
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // sizes é o tamanho de cada fatia no próprio axis (já resolvido pelo
+    // receiver — split explícito do ONNX ou shape[axis]/num_outputs no
+    // caso de split igual). Devolve uma lista de buffers, um por saída,
+    // na MESMA ordem de `sizes` — quem decide pra onde cada um vai é o
+    // receiver, usando output_routes do grafo. result-container não é
+    // usado pelo cálculo em si (não há reply_to/request por-fatia); é só
+    // pra garantir que o tipo `data` (com from-step) é gerado por aqui
+    // também, já que este kernel não tem nenhum outro campo que o referencie.
+    split: func(
+        input: list<f32>,
+        shape: list<u32>,
+        axis: u32,
+        sizes: list<u32>,
+        result-container: data
+    ) -> list<list<f32>>;
+
+}
+
+world splitworld {
+    export plan;
+}

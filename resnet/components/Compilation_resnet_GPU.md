@@ -176,10 +176,12 @@ python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output ../sys_test/resnet18DF
 # AutoGenerate
 cd "$WOR/resnet/components/receiver/dynamic_builder_gpu"
 python3 build_custom.py \
-  --kernels 1,2,3,4,5,6,7,8,9 \
-  --gpu 1,2,4,6,8 \
+  --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13 \
+  --gpu 1,2,4,6,8,10,11,12 \
   --component-dir ./target_component \
   --output ../../../sys_test/kernel_0_gpu.wasm
+# relu(3), add(5), flatten(7) e dropout(9) não têm variante GPU — ficam de fora
+# de --gpu e são plugados na variante CPU automaticamente (fallback do catálogo).
 
 cd "$WOR/resnet/sys_test"
 "$WOR/wasi-gfx-runtime/target/release/runtime" \

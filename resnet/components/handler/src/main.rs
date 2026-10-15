@@ -24,7 +24,8 @@ struct Data {
     reply_to: String,
     kernels: Vec<u8>,
     current_kernel: u32,
-    request: u32
+    request: u32,
+    from_step: u32, // precisa bater com o record `data` dos .wit (campo novo, from-step)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -132,6 +133,7 @@ let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no pars
         kernels: vec![], // A rota agora é guiada pelos steps no model_graph.json
         current_kernel: first_step, // Carrega o step inicial (ex: 1)
         request: client_req.request_id,
+        from_step: 0, // handler é a origem da requisição, não vem de nenhum step anterior
     };
 
     println!(
@@ -190,7 +192,7 @@ let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no pars
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
-    let port = args.get(1).map(|s| s.as_str()).unwrap_or("8090");
+    let port = args.get(1).map(|s| s.as_str()).unwrap_or("8050"); // era 8090, agora é o kernel_10 (sigmoid_gpu)
     let ip = args.get(2).map(|s| s.as_str()).unwrap_or("0.0.0.0");
 
     let bind_addr = format!("{}:{}", ip, port);

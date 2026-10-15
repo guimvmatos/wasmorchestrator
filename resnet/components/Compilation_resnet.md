@@ -228,7 +228,20 @@ CC="" cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug silu/target/wasm32-wasip2/release/siluserver.wasm --plug ../kernel/silu/siluworld_component.wasm -o siluFinal.wasm
 
-#### all (kernel_0)  
+#### all (kernel_0) — DEPRECADO, ver "Dynamic Builder" abaixo
+# O crate receiver/all é estático (código Rust escrito à mão, não gerado) e
+# ficou para trás em duas frentes:
+#   1. Nunca ganhou os match arms de sigmoid/mul/silu (daí os comentários
+#      abaixo) — exigiria editar receiver/all/src/lib.rs igual ao que foi
+#      feito no catálogo do dynamic_builder.
+#   2. O record `data` dos .wit ganhou o campo `from-step: u32` (patch
+#      aplicado em todo o repo); qualquer `Data { .. }` literal escrito à mão
+#      em receiver/all/src/lib.rs vai quebrar a compilação até adicionar
+#      `from_step` nos literais, igual ao que foi feito nos dois
+#      build_custom.py do dynamic_builder.
+# allFinal.wasm no disco está desatualizado (mtime anterior ao patch from-step
+# e aos kernels 10/11/12). Prefira a seção "Dynamic Builder" — ela já cobre
+# os 12 kernels e compila sem exigir mudanças manuais no receiver/all.
 ##### Receiver
 cd "$WOR/resnet/components/receiver/all/"
 wkg wit fetch
@@ -244,9 +257,9 @@ wac plug all/target/wasm32-wasip2/release/allserver.wasm \
 --plug ../kernel/gemm/gemmworld_component.wasm \
 --plug ../kernel/maxpool/maxpoolworld_component.wasm \
 --plug ../kernel/relu/reluworld_component.wasm \
---plug ../kernel/sigmoid/sigmoidworld_component.wasm \ # é necessário arrumar o codigo pra aceitar isso primeiro...
---plug ../kernel/mul/mulworld_component.wasm \ # é necessário arrumar o codigo pra aceitar isso primeiro...
---plug ../kernel/silu/siluworld_component.wasm \ # é necessário arrumar o codigo pra aceitar isso primeiro...
+--plug ../kernel/sigmoid/sigmoidworld_component.wasm \ # receiver/all ainda não trata kernel_type 10 — ver nota acima
+--plug ../kernel/mul/mulworld_component.wasm \ # receiver/all ainda não trata kernel_type 11 — ver nota acima
+--plug ../kernel/silu/siluworld_component.wasm \ # receiver/all ainda não trata kernel_type 12 — ver nota acima
 -o allFinal.wasm
 
 
@@ -268,7 +281,7 @@ mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 
 cd "$WOR/resnet/components/receiver/dynamic_builder"
-python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9 --component-dir ./target_component --output ./node_all.wasm
+python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12 --component-dir ./target_component --output ./node_all.wasm
 Change the name of the .wasm and put it on the sys_test folder
 
 #### Onnx to Json
@@ -293,7 +306,9 @@ Client
 
 portas:
 orquestrador: escuta em 0.0.0.0:9998. envia para 9999 dos sys
-handler escuta em 0.0.0.0:8090
-client envia para server address: 127..1:8090 e escute em 0.0.0.0:9000
+handler escuta em 0.0.0.0:8050 (era 8090 — porta tomada pelo kernel_10/sigmoid_gpu)
+client envia para server address: 127.0.0.1:8050 e escute em 0.0.0.0:9000
 sys: escuta em 0.0.0.0:9999 envia para 0.0.0.0:9998 do orquestrador
 receiver escuta em 0.0.0.0:8080
+
+kernels GPU (ver Compilation_resnet_GPU.md): 8081(1) 8082(2) 8084(4) 8086(6) 8088(8) 8090(10) 8091(11) 8092(12)

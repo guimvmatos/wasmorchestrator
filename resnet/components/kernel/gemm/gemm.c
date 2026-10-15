@@ -41,4 +41,5 @@ void exports_planner_gemmworld_plan_gemm(uint32_t in_features, uint32_t out_feat
     ret->kernels = result_container->kernels;
     ret->current_kernel = result_container->current_kernel;
     ret->request = result_container->request;
+    ret->from_step = result_container->from_step;
 }

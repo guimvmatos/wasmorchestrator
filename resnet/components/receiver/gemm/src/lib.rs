@@ -171,6 +171,7 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
                 let mut next_status = status.clone();
                 next_status.current_kernel = next_step;
+                next_status.from_step = current_step; // marca ESTE step como origem pro próximo receiver
                 next_status.input = computed_output.clone();
 
                 let mut next_stream = TcpStream::connect(&target_address)?;

@@ -51,7 +51,7 @@ void *cabi_realloc(void *ptr, size_t old_size, size_t align, size_t new_size) {
 }
 
 __attribute__((__aligned__(sizeof(void*))))
-static uint8_t RET_AREA[(8+8*sizeof(void*))];
+static uint8_t RET_AREA[(8+9*sizeof(void*))];
 
 // Helper Functions
 
@@ -110,18 +110,19 @@ void flattenworld_string_free(flattenworld_string_t *ret) {
 // Component Adapters
 
 __attribute__((__export_name__("planner:flattenworld/plan#flatten")))
-uint8_t * __wasm_export_exports_planner_flattenworld_plan_flatten(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, uint8_t * arg3, size_t arg4, uint8_t * arg5, size_t arg6, uint8_t * arg7, size_t arg8, int32_t arg9, int32_t arg10) {
-  flattenworld_list_f32_t arg11 = (flattenworld_list_f32_t) { (float*)(arg), (arg0) };
-  exports_planner_flattenworld_plan_data_t arg12 = (exports_planner_flattenworld_plan_data_t) {
+uint8_t * __wasm_export_exports_planner_flattenworld_plan_flatten(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, uint8_t * arg3, size_t arg4, uint8_t * arg5, size_t arg6, uint8_t * arg7, size_t arg8, int32_t arg9, int32_t arg10, int32_t arg11) {
+  flattenworld_list_f32_t arg12 = (flattenworld_list_f32_t) { (float*)(arg), (arg0) };
+  exports_planner_flattenworld_plan_data_t arg13 = (exports_planner_flattenworld_plan_data_t) {
     (flattenworld_list_f32_t) (flattenworld_list_f32_t) { (float*)(arg1), (arg2) },
     (flattenworld_list_f32_t) (flattenworld_list_f32_t) { (float*)(arg3), (arg4) },
     (flattenworld_string_t) (flattenworld_string_t) { (uint8_t*)(arg5), (arg6) },
     (flattenworld_list_u8_t) (flattenworld_list_u8_t) { (uint8_t*)(arg7), (arg8) },
     (uint32_t) (uint32_t) (arg9),
     (uint32_t) (uint32_t) (arg10),
+    (uint32_t) (uint32_t) (arg11),
   };
   exports_planner_flattenworld_plan_data_t ret;
-  exports_planner_flattenworld_plan_flatten(&arg11, &arg12, &ret);
+  exports_planner_flattenworld_plan_flatten(&arg12, &arg13, &ret);
   uint8_t *ptr = (uint8_t *) &RET_AREA;
   *((size_t*)(ptr + sizeof(void*))) = ((ret).input).len;
   *((uint8_t **)(ptr + 0)) = (uint8_t *) ((ret).input).ptr;
@@ -133,6 +134,7 @@ uint8_t * __wasm_export_exports_planner_flattenworld_plan_flatten(uint8_t * arg,
   *((uint8_t **)(ptr + (6*sizeof(void*)))) = (uint8_t *) ((ret).kernels).ptr;
   *((int32_t*)(ptr + (8*sizeof(void*)))) = (int32_t) ((ret).current_kernel);
   *((int32_t*)(ptr + (4+8*sizeof(void*)))) = (int32_t) ((ret).request);
+  *((int32_t*)(ptr + (8+8*sizeof(void*)))) = (int32_t) ((ret).from_step);
   return ptr;
 }
 

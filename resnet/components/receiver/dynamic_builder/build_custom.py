@@ -24,6 +24,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: current_step,
                     };
                     let res = bindings::planner::convworld::plan::conv(
                         p.cout, p.cin, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding,
@@ -50,6 +51,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: current_step,
                     };
                     let res = bindings::planner::bnworld::plan::bn(
                         p.channels, p.h_in, p.w_in, p.epsilon,
@@ -72,6 +74,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: current_step,
                     };
                     let res = bindings::planner::reluworld::plan::relu(&mut data);
                     computed_output = res.output;
@@ -94,6 +97,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: current_step,
                     };
                     let res = bindings::planner::maxpoolworld::plan::maxpool(
                         p.channels, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, &mut data,
@@ -117,6 +121,7 @@ KERNELS = {
                             current_kernel: current_step,
                             request: request_id,
                             kernels: vec![],
+                            from_step: current_step,
                         };
                         let res = bindings::planner::addworld::plan::add(&first_branch, &current_input, &data);
                         computed_output = res.output;
@@ -141,6 +146,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: current_step,
                     };
                     let res = bindings::planner::gapworld::plan::gap(&current_input, &mut data);
                     computed_output = res.output;
@@ -160,6 +166,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: current_step,
                     };
                     let res = bindings::planner::flattenworld::plan::flatten(&current_input, &data);
                     computed_output = res.output;
@@ -181,6 +188,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: current_step,
                     };
                     let res = bindings::planner::gemmworld::plan::gemm(
                         p.in_features, p.out_features, &weights, &bias, &data,
@@ -202,8 +210,91 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: current_step,
                     };
                     let res = bindings::planner::dropoutworld::plan::dropout(&current_input, &data);
+                    computed_output = res.output;
+                },"""
+    },
+    10: {
+        "name": "sigmoid",
+        "wit_import": "    import planner:sigmoidworld/plan;",
+        "wkg_override": '"planner:sigmoidworld" = { path = "../../../kernel/sigmoid/" }',
+        "module_name": "sigmoidworld",
+        "c_wasm": "../../../kernel/sigmoid/sigmoidworld_component.wasm",
+        "rust_match": """                10 => {
+                    let data = bindings::planner::sigmoidworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![0.0f32; current_input.len()],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: current_step,
+                    };
+                    let res = bindings::planner::sigmoidworld::plan::sigmoid(&data);
+                    computed_output = res.output;
+                },"""
+    },
+    11: {
+        "name": "mul",
+        "wit_import": "    import planner:mulworld/plan;",
+        "wkg_override": '"planner:mulworld" = { path = "../../../kernel/mul/" }',
+        "module_name": "mulworld",
+        "c_wasm": "../../../kernel/mul/mulworld_component.wasm",
+        # Mesmo esquema de dois casos do receiver isolado (kernel/mul/src/lib.rs):
+        # tensor x constante (params.const_path) ou tensor x tensor (join-buffer).
+        "rust_match": """                11 => {
+                    if !p.const_path.is_empty() {
+                        let const_vec = load_weights_file(&p.const_path);
+                        let data = bindings::planner::mulworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: current_step,
+                        };
+                        let res = bindings::planner::mulworld::plan::mul(&current_input, &const_vec, &data);
+                        computed_output = res.output;
+                    } else if let Some(first_branch) = mul_branches.remove(&current_step) {
+                        println!("Step {}: 2º ramo recebido! Multiplicando buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                        let data = bindings::planner::mulworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: current_step,
+                        };
+                        let res = bindings::planner::mulworld::plan::mul(&first_branch, &current_input, &data);
+                        computed_output = res.output;
+                    } else {
+                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                        mul_branches.insert(current_step, current_input);
+                        continue;
+                    }
+                },"""
+    },
+    12: {
+        "name": "silu",
+        "wit_import": "    import planner:siluworld/plan;",
+        "wkg_override": '"planner:siluworld" = { path = "../../../kernel/silu/" }',
+        "module_name": "siluworld",
+        "c_wasm": "../../../kernel/silu/siluworld_component.wasm",
+        "rust_match": """                12 => {
+                    let data = bindings::planner::siluworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![0.0f32; current_input.len()],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: current_step,
+                    };
+                    let res = bindings::planner::siluworld::plan::silu(&data);
                     computed_output = res.output;
                 },"""
     }
@@ -311,6 +402,10 @@ struct LayerParams {{
     in_features: u32,
     #[serde(default)]
     out_features: u32,
+    #[serde(default)]
+    const_path: String,
+    #[serde(default)]
+    const_shape: Vec<u32>,
 }}
 
 #[derive(Deserialize, Debug, Clone)]
@@ -358,6 +453,7 @@ fn handle_client(mut stream: TcpStream, _initialized: &mut i32) -> std::io::Resu
 
         let mut queue: VecDeque<(u32, Vec<f32>)> = VecDeque::new();
         let mut add_branches: HashMap<u32, Vec<f32>> = HashMap::new();
+        let mut mul_branches: HashMap<u32, Vec<f32>> = HashMap::new();
 
         queue.push_back((input_img.current_kernel, input_img.input.clone()));
 
@@ -412,6 +508,7 @@ fn handle_client(mut stream: TcpStream, _initialized: &mut i32) -> std::io::Resu
             current_kernel: 0,
             request: request_id,
             kernels: vec![],
+            from_step: 0,
         }};
 
         let mut next_stream = TcpStream::connect(&reply_to)?;
@@ -469,7 +566,7 @@ def main():
     kernel_ids = [int(k.strip()) for k in args.kernels.split(",") if k.strip()]
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 9.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 12.")
             sys.exit(1)
 
     print(f"[*] Gerando configuração para os kernels: {kernel_ids}")

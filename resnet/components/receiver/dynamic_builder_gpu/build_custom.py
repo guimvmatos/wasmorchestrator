@@ -28,6 +28,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::convworld::plan::conv(
                         p.cout, p.cin, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, conv_groups,
@@ -61,6 +62,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::bnworld::plan::bn(
                         p.channels, p.h_in, p.w_in, p.epsilon,
@@ -90,6 +92,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::reluworld::plan::relu(&data);
                     computed_output = res.output;
@@ -115,6 +118,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::maxpoolworld::plan::maxpool(
                         p.channels, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, &data,
@@ -145,6 +149,7 @@ KERNELS = {
                             current_kernel: current_step,
                             request: request_id,
                             kernels: vec![],
+                            from_step: origin_step,
                         };
                         let res = bindings::planner::addworld::plan::add(&first_branch, &current_input, &data);
                         computed_output = res.output;
@@ -174,6 +179,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::gapworld::plan::gap(&current_input, &data);
                     computed_output = res.output;
@@ -186,6 +192,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::gapworld::plan::gap(p.channels, &data);
                     computed_output = res.output;
@@ -213,6 +220,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::flattenworld::plan::flatten(&current_input, &data);
                     computed_output = res.output;
@@ -243,6 +251,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::gemmworld::plan::gemm(
                         p.in_features, p.out_features, weights.as_slice(), bias.as_slice(), &data,
@@ -266,6 +275,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::gemmworld::plan::gemm(
                         &weight_id, p.in_features, p.out_features, &data,
@@ -295,6 +305,7 @@ KERNELS = {
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     };
                     let res = bindings::planner::dropoutworld::plan::dropout(&current_input, &data);
                     computed_output = res.output;
@@ -303,6 +314,110 @@ KERNELS = {
             "cpu": {
                 "wkg_override": '"planner:dropoutworld" = { path = "../../../kernel/dropout/" }',
                 "wasm_path": "../../../kernel/dropout/dropoutworld_component.wasm",
+            },
+        },
+    },
+    10: {
+        "name": "sigmoid",
+        "wit_import": "    import planner:sigmoidworld/plan;",
+        "rust_match": """                10 => {
+                    let data = bindings::planner::sigmoidworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![0.0f32; current_input.len()],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::sigmoidworld::plan::sigmoid(&data);
+                    computed_output = res.output;
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:sigmoidworld" = { path = "../../../kernel/sigmoid/" }',
+                "wasm_path": "../../../kernel/sigmoid/sigmoidworld_component.wasm",
+            },
+            "gpu": {
+                "wkg_override": '"planner:sigmoidworld" = { path = "../../../kernel/sigmoid_gpu/wit" }',
+                "wasm_path": "../../../kernel/sigmoid_gpu/target/wasm32-wasip2/release/sigmoid_gpu.wasm",
+            },
+        },
+    },
+    11: {
+        "name": "mul",
+        "wit_import": "    import planner:mulworld/plan;",
+        # Mul tem dois casos, igual ao receiver isolado (kernel/mul*/src/lib.rs):
+        # tensor x constante (params.const_path preenchido, ex: SE-block/scale
+        # fixo) ou tensor x tensor (join-buffer por step, igual ao Add).
+        "rust_match": """                11 => {
+                    if !p.const_path.is_empty() {
+                        let const_vec = load_weights_file_cached(&p.const_path);
+                        let data = bindings::planner::mulworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::mulworld::plan::mul(&current_input, const_vec.as_slice(), &data);
+                        computed_output = res.output;
+                    } else if let Some(first_branch) = mul_branches.remove(&current_step) {
+                        println!("Step {}: 2º ramo recebido! Multiplicando buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                        let data = bindings::planner::mulworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::mulworld::plan::mul(&first_branch, &current_input, &data);
+                        computed_output = res.output;
+                    } else {
+                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                        mul_branches.insert(current_step, current_input);
+                        continue;
+                    }
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:mulworld" = { path = "../../../kernel/mul/" }',
+                "wasm_path": "../../../kernel/mul/mulworld_component.wasm",
+            },
+            "gpu": {
+                "wkg_override": '"planner:mulworld" = { path = "../../../kernel/mul_gpu/wit" }',
+                "wasm_path": "../../../kernel/mul_gpu/target/wasm32-wasip2/release/mul_gpu.wasm",
+            },
+        },
+    },
+    12: {
+        "name": "silu",
+        "wit_import": "    import planner:siluworld/plan;",
+        "rust_match": """                12 => {
+                    let data = bindings::planner::siluworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![0.0f32; current_input.len()],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::siluworld::plan::silu(&data);
+                    computed_output = res.output;
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:siluworld" = { path = "../../../kernel/silu/" }',
+                "wasm_path": "../../../kernel/silu/siluworld_component.wasm",
+            },
+            "gpu": {
+                "wkg_override": '"planner:siluworld" = { path = "../../../kernel/silu_gpu/wit" }',
+                "wasm_path": "../../../kernel/silu_gpu/target/wasm32-wasip2/release/silu_gpu.wasm",
             },
         },
     },
@@ -484,6 +599,10 @@ struct LayerParams {{
     in_features: u32,
     #[serde(default)]
     out_features: u32,
+    #[serde(default)]
+    const_path: String,
+    #[serde(default)]
+    const_shape: Vec<u32>,
 }}
 
 #[derive(Deserialize, Debug, Clone)]
@@ -543,17 +662,21 @@ fn handle_client(
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
 
-        let mut queue: VecDeque<(u32, Vec<f32>)> = VecDeque::new();
+        // Terceiro elemento da tupla = step de origem (from_step), propagado
+        // igual ao `next_status.from_step = current_step` dos receivers isolados.
+        let mut queue: VecDeque<(u32, Vec<f32>, u32)> = VecDeque::new();
         let mut add_branches: HashMap<u32, Vec<f32>> = HashMap::new();
+        let mut mul_branches: HashMap<u32, Vec<f32>> = HashMap::new();
 
-        queue.push_back((input_img.current_kernel, input_img.input.clone()));
+        queue.push_back((input_img.current_kernel, input_img.input.clone(), input_img.from_step));
 
         let mut final_output: Vec<f32> = Vec::new();
+        let mut final_from_step: u32 = 0;
         let mut reached_final = false;
         let reply_to = input_img.reply_to.clone();
         let request_id = input_img.request;
 
-        while let Some((current_step, current_input)) = queue.pop_front() {{
+        while let Some((current_step, current_input, origin_step)) = queue.pop_front() {{
             let current_node = graph.steps.iter().find(|s| s.step == current_step)
                 .unwrap_or_else(|| panic!("Step {{}} não encontrado no grafo", current_step));
 
@@ -593,6 +716,7 @@ fn handle_client(
                         current_kernel: current_step,
                         request: request_id,
                         kernels: vec![],
+                        from_step: origin_step,
                     }};
 
                     let t_ser = Instant::now(); // [T]
@@ -678,11 +802,12 @@ fn handle_client(
             if current_node.next_steps.is_empty() {{
                 println!("Fim da rede alcançado localmente no Step {{}}! Saída com {{}} elementos.", current_step, computed_output.len());
                 final_output = computed_output;
+                final_from_step = current_step;
                 reached_final = true;
                 break;
             }} else {{
                 for &nxt in &current_node.next_steps {{
-                    queue.push_back((nxt, computed_output.clone()));
+                    queue.push_back((nxt, computed_output.clone(), current_step));
                 }}
             }}
         }}
@@ -697,6 +822,7 @@ fn handle_client(
                 current_kernel: 0,
                 request: request_id,
                 kernels: vec![],
+                from_step: final_from_step,
             }};
 
             let mut next_stream = TcpStream::connect(&reply_to)?;
@@ -768,7 +894,7 @@ def main():
 
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 9.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 12.")
             sys.exit(1)
 
     for k in gpu_ids:

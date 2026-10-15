@@ -248,6 +248,7 @@ fn handle_client(
                 let t = Instant::now(); // [T]
                 let mut next_status = status.clone();
                 next_status.current_kernel = next_step;
+                next_status.from_step = current_step; // marca ESTE step como origem pro próximo receiver
                 next_status.input = computed_output.clone();
                 clone_in_send_us += t.elapsed().as_micros() as u64; // [T]
 

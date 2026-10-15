@@ -15,7 +15,8 @@ struct Data {
     reply_to: String,
     kernels: Vec<u8>,
     current_kernel: u32,
-    request: u32
+    request: u32,
+    from_step: u32, // precisa bater com o record `data` dos .wit (campo novo, from-step)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -61,7 +62,7 @@ fn main() -> std::io::Result<()> {
 
     let path = &args[3];
 
-    let server_address = args.get(4).map(|s| s.as_str()).unwrap_or("127.0.0.1:8090");
+    let server_address = args.get(4).map(|s| s.as_str()).unwrap_or("127.0.0.1:8050"); // era 8090, agora é o kernel_10 (sigmoid_gpu)
     let listen_address = "0.0.0.0:9000"; // Porta onde o cliente aguarda o retorno final
     
     let start_read = Instant::now(); // Time counter 2 measures time to reads the input

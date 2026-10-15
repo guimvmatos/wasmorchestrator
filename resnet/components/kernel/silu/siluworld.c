@@ -51,7 +51,7 @@ void *cabi_realloc(void *ptr, size_t old_size, size_t align, size_t new_size) {
 }
 
 __attribute__((__aligned__(sizeof(void*))))
-static uint8_t RET_AREA[(8+8*sizeof(void*))];
+static uint8_t RET_AREA[(8+9*sizeof(void*))];
 
 // Helper Functions
 
@@ -110,17 +110,18 @@ void siluworld_string_free(siluworld_string_t *ret) {
 // Component Adapters
 
 __attribute__((__export_name__("planner:siluworld/plan#silu")))
-uint8_t * __wasm_export_exports_planner_siluworld_plan_silu(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, uint8_t * arg3, size_t arg4, uint8_t * arg5, size_t arg6, int32_t arg7, int32_t arg8) {
-  exports_planner_siluworld_plan_data_t arg9 = (exports_planner_siluworld_plan_data_t) {
+uint8_t * __wasm_export_exports_planner_siluworld_plan_silu(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, uint8_t * arg3, size_t arg4, uint8_t * arg5, size_t arg6, int32_t arg7, int32_t arg8, int32_t arg9) {
+  exports_planner_siluworld_plan_data_t arg10 = (exports_planner_siluworld_plan_data_t) {
     (siluworld_list_f32_t) (siluworld_list_f32_t) { (float*)(arg), (arg0) },
     (siluworld_list_f32_t) (siluworld_list_f32_t) { (float*)(arg1), (arg2) },
     (siluworld_string_t) (siluworld_string_t) { (uint8_t*)(arg3), (arg4) },
     (siluworld_list_u8_t) (siluworld_list_u8_t) { (uint8_t*)(arg5), (arg6) },
     (uint32_t) (uint32_t) (arg7),
     (uint32_t) (uint32_t) (arg8),
+    (uint32_t) (uint32_t) (arg9),
   };
   exports_planner_siluworld_plan_data_t ret;
-  exports_planner_siluworld_plan_silu(&arg9, &ret);
+  exports_planner_siluworld_plan_silu(&arg10, &ret);
   uint8_t *ptr = (uint8_t *) &RET_AREA;
   *((size_t*)(ptr + sizeof(void*))) = ((ret).input).len;
   *((uint8_t **)(ptr + 0)) = (uint8_t *) ((ret).input).ptr;
@@ -132,6 +133,7 @@ uint8_t * __wasm_export_exports_planner_siluworld_plan_silu(uint8_t * arg, size_
   *((uint8_t **)(ptr + (6*sizeof(void*)))) = (uint8_t *) ((ret).kernels).ptr;
   *((int32_t*)(ptr + (8*sizeof(void*)))) = (int32_t) ((ret).current_kernel);
   *((int32_t*)(ptr + (4+8*sizeof(void*)))) = (int32_t) ((ret).request);
+  *((int32_t*)(ptr + (8+8*sizeof(void*)))) = (int32_t) ((ret).from_step);
   return ptr;
 }
 

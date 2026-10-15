@@ -25,6 +25,7 @@ void exports_planner_addworld_plan_add(
     ret->reply_to = result_container->reply_to;
     ret->current_kernel = result_container->current_kernel;
     ret->request = result_container->request;
+    ret->from_step = result_container->from_step;
 
     // Inicializa listas auxiliares
     ret->input.ptr = NULL;

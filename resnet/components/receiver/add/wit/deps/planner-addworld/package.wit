@@ -8,6 +8,7 @@ interface plan {
     kernels: list<u8>,
     current-kernel: u32,
     request: u32,
+    from-step: u32,
   }
 
   add: func(a: list<f32>, b: list<f32>, result-container: data) -> data;

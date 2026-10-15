@@ -51,7 +51,7 @@ void *cabi_realloc(void *ptr, size_t old_size, size_t align, size_t new_size) {
 }
 
 __attribute__((__aligned__(sizeof(void*))))
-static uint8_t RET_AREA[(8+8*sizeof(void*))];
+static uint8_t RET_AREA[(8+9*sizeof(void*))];
 
 // Helper Functions
 
@@ -122,6 +122,7 @@ uint8_t * __wasm_export_exports_planner_bnworld_plan_bn(uint8_t * arg) {
     (bnworld_list_u8_t) (bnworld_list_u8_t) { (uint8_t*)(*((uint8_t **) (arg + (16+14*sizeof(void*))))), (*((size_t*) (arg + (16+15*sizeof(void*))))) },
     (uint32_t) (uint32_t) (*((int32_t*) (arg + (16+16*sizeof(void*))))),
     (uint32_t) (uint32_t) (*((int32_t*) (arg + (20+16*sizeof(void*))))),
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (24+16*sizeof(void*))))),
   };
   exports_planner_bnworld_plan_data_t ret;
   exports_planner_bnworld_plan_bn((uint32_t) (*((int32_t*) (arg + 0))), (uint32_t) (*((int32_t*) (arg + 4))), (uint32_t) (*((int32_t*) (arg + 8))), *((float*) (arg + 12)), &arg0, &arg1, &arg2, &arg3, &arg4, &ret);
@@ -137,6 +138,7 @@ uint8_t * __wasm_export_exports_planner_bnworld_plan_bn(uint8_t * arg) {
   *((uint8_t **)(ptr + (6*sizeof(void*)))) = (uint8_t *) ((ret).kernels).ptr;
   *((int32_t*)(ptr + (8*sizeof(void*)))) = (int32_t) ((ret).current_kernel);
   *((int32_t*)(ptr + (4+8*sizeof(void*)))) = (int32_t) ((ret).request);
+  *((int32_t*)(ptr + (8+8*sizeof(void*)))) = (int32_t) ((ret).from_step);
   return ptr;
 }
 

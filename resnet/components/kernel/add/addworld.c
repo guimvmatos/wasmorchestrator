@@ -51,7 +51,7 @@ void *cabi_realloc(void *ptr, size_t old_size, size_t align, size_t new_size) {
 }
 
 __attribute__((__aligned__(sizeof(void*))))
-static uint8_t RET_AREA[(8+8*sizeof(void*))];
+static uint8_t RET_AREA[(8+9*sizeof(void*))];
 
 // Helper Functions
 
@@ -110,19 +110,20 @@ void addworld_string_free(addworld_string_t *ret) {
 // Component Adapters
 
 __attribute__((__export_name__("planner:addworld/plan#add")))
-uint8_t * __wasm_export_exports_planner_addworld_plan_add(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, uint8_t * arg3, size_t arg4, uint8_t * arg5, size_t arg6, uint8_t * arg7, size_t arg8, uint8_t * arg9, size_t arg10, int32_t arg11, int32_t arg12) {
-  addworld_list_f32_t arg13 = (addworld_list_f32_t) { (float*)(arg), (arg0) };
-  addworld_list_f32_t arg14 = (addworld_list_f32_t) { (float*)(arg1), (arg2) };
-  exports_planner_addworld_plan_data_t arg15 = (exports_planner_addworld_plan_data_t) {
+uint8_t * __wasm_export_exports_planner_addworld_plan_add(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, uint8_t * arg3, size_t arg4, uint8_t * arg5, size_t arg6, uint8_t * arg7, size_t arg8, uint8_t * arg9, size_t arg10, int32_t arg11, int32_t arg12, int32_t arg13) {
+  addworld_list_f32_t arg14 = (addworld_list_f32_t) { (float*)(arg), (arg0) };
+  addworld_list_f32_t arg15 = (addworld_list_f32_t) { (float*)(arg1), (arg2) };
+  exports_planner_addworld_plan_data_t arg16 = (exports_planner_addworld_plan_data_t) {
     (addworld_list_f32_t) (addworld_list_f32_t) { (float*)(arg3), (arg4) },
     (addworld_list_f32_t) (addworld_list_f32_t) { (float*)(arg5), (arg6) },
     (addworld_string_t) (addworld_string_t) { (uint8_t*)(arg7), (arg8) },
     (addworld_list_u8_t) (addworld_list_u8_t) { (uint8_t*)(arg9), (arg10) },
     (uint32_t) (uint32_t) (arg11),
     (uint32_t) (uint32_t) (arg12),
+    (uint32_t) (uint32_t) (arg13),
   };
   exports_planner_addworld_plan_data_t ret;
-  exports_planner_addworld_plan_add(&arg13, &arg14, &arg15, &ret);
+  exports_planner_addworld_plan_add(&arg14, &arg15, &arg16, &ret);
   uint8_t *ptr = (uint8_t *) &RET_AREA;
   *((size_t*)(ptr + sizeof(void*))) = ((ret).input).len;
   *((uint8_t **)(ptr + 0)) = (uint8_t *) ((ret).input).ptr;
@@ -134,6 +135,7 @@ uint8_t * __wasm_export_exports_planner_addworld_plan_add(uint8_t * arg, size_t 
   *((uint8_t **)(ptr + (6*sizeof(void*)))) = (uint8_t *) ((ret).kernels).ptr;
   *((int32_t*)(ptr + (8*sizeof(void*)))) = (int32_t) ((ret).current_kernel);
   *((int32_t*)(ptr + (4+8*sizeof(void*)))) = (int32_t) ((ret).request);
+  *((int32_t*)(ptr + (8+8*sizeof(void*)))) = (int32_t) ((ret).from_step);
   return ptr;
 }
 

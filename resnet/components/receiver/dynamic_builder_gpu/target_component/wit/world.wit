@@ -10,5 +10,8 @@ world runner {
     import planner:flattenworld/plan;
     import planner:gemmworld/plan;
     import planner:dropoutworld/plan;
+    import planner:sigmoidworld/plan;
+    import planner:mulworld/plan;
+    import planner:siluworld/plan;
     export wasi:cli/run@0.2.7;
 }

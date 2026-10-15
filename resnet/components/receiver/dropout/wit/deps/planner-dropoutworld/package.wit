@@ -8,6 +8,7 @@ interface plan {
     kernels: list<u8>,
     current-kernel: u32,
     request: u32,
+    from-step: u32,
   }
 
   dropout: func(a: list<f32>, result-container: data) -> data;

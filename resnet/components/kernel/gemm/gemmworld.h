@@ -31,6 +31,7 @@ typedef struct exports_planner_gemmworld_plan_data_t {
   gemmworld_list_u8_t   kernels;
   uint32_t   current_kernel;
   uint32_t   request;
+  uint32_t   from_step;
 } exports_planner_gemmworld_plan_data_t;
 
 // Exported Functions from `planner:gemmworld/plan`

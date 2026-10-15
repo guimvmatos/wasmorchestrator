@@ -1,0 +1,2 @@
+[overrides]
+"planner:splitworld" = { path = "../../kernel/split/wit" }

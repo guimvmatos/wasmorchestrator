@@ -110,6 +110,34 @@ def get_node_attribute(node, attr_name, default=None):
                 return attr.s.decode("utf-8")
     return default
 
+def normalize_axis(axis, rank):
+    """axis negativo (ex: -1 visto no head de detecção do YOLO) vira índice
+    positivo quando o rank do tensor é conhecido. Sem rank confiável, devolve
+    o axis cru — quem consome o DFG decide."""
+    if axis is None:
+        return axis
+    if axis < 0 and rank:
+        return rank + axis
+    return axis
+
+def get_split_sizes(node, initializers):
+    """
+    Tamanhos de cada saída do Split. Dois formatos coexistem no ONNX:
+    - opset < 13: atributo INTS "split" no próprio node.
+    - opset >= 13: segundo input do node ("split"), um initializer int64.
+    Quando nenhum dos dois existe (ex: atributo "num_outputs" do opset 18,
+    split igual entre as saídas), devolve None — quem consome o DFG calcula
+    o tamanho igual a partir do shape de entrada e do num_outputs.
+    """
+    attr_split = get_node_attribute(node, "split", None)
+    if attr_split is not None:
+        return [int(x) for x in attr_split]
+    if len(node.input) > 1 and node.input[1] in initializers:
+        sizes_tensor = initializers[node.input[1]]
+        arr = numpy_helper.to_array(sizes_tensor)
+        return [int(x) for x in arr.tolist()]
+    return None
+
 def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(1, 3, 224, 224)):
     os.makedirs(weights_dir, exist_ok=True)
     
@@ -331,11 +359,65 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
             else:
                 params = {}
 
+        elif kernel_type == 13:  # Split
+            # input_shape é o shape COMPLETO de entrada (não só c_in/h_in/w_in
+            # do topo da função) — o receiver precisa do rank inteiro pra
+            # calcular outer/inner ao fatiar, igual ao Concat.
+            full_in_shape = value_info_shapes.get(main_input_name, in_shape)
+            rank = len(full_in_shape) if full_in_shape else None
+            axis = normalize_axis(get_node_attribute(node, "axis", 0), rank)
+            sizes = get_split_sizes(node, initializers)
+            num_outputs = get_node_attribute(node, "num_outputs", None)
+            params = {
+                "axis": int(axis),
+                "input_shape": [int(d) if d is not None else -1 for d in full_in_shape],
+                # None quando nem atributo "split" nem input "split" definem
+                # tamanhos explícitos — nesse caso é split igual, e quem
+                # consome o DFG divide o shape de entrada por num_outputs.
+                "split": sizes,
+                "num_outputs": int(num_outputs) if num_outputs is not None else (len(sizes) if sizes else len(node.output)),
+            }
+
+        elif kernel_type == 14:  # Concat
+            # Shape de referência vem do input[0], mas cada ramo pode ter
+            # tamanho diferente no próprio axis — por isso cada entrada de
+            # input_order carrega seu shape resolvido individualmente
+            # (value_info_shapes), não o in_shape genérico do topo da função.
+            rank = len(in_shape) if in_shape else None
+            axis = normalize_axis(get_node_attribute(node, "axis", 1), rank)
+            # Ordem importa: input_order preserva a ordem real do node.input
+            # do ONNX, resolvendo cada entrada para o step que a produziu
+            # (ou marcando como constante, quando vier de um initializer),
+            # junto do shape concreto de cada ramo — necessário pro receiver
+            # saber quantos floats copiar de cada um sem ter que inferir em
+            # runtime.
+            input_order = []
+            for inp in node.input:
+                if inp in initializers:
+                    const_tensor = initializers[inp]
+                    input_order.append({
+                        "const": True,
+                        "step": None,
+                        "shape": [int(d) for d in const_tensor.dims],
+                    })
+                else:
+                    branch_shape = value_info_shapes.get(inp, [])
+                    input_order.append({
+                        "const": False,
+                        "step": tensor_producer.get(inp),
+                        "shape": [int(d) if d is not None else -1 for d in branch_shape],
+                    })
+            params = {
+                "axis": int(axis),
+                "input_order": input_order,
+            }
+
         # Encontrar next_steps observando quem consome a saída deste nó.
         # Para um SiLU fundido, "node" já foi redirecionado para o mul_node
         # acima, então node.output continua correto (é a saída real do par).
         next_steps = []
-        for out_name in node.output:
+        output_routes = []  # só populado quando este step tem >1 saída nomeada (ex: Split)
+        for out_idx, out_name in enumerate(node.output):
             for consumer_step, consumer_entry in enumerate(fused_nodes, start=1):
                 if consumer_step == step_id:
                     continue
@@ -343,14 +425,18 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
                 if out_name in consumer_node.input:
                     if consumer_step not in next_steps:
                         next_steps.append(consumer_step)
+                    output_routes.append({"to_step": consumer_step, "output_index": out_idx})
 
-        steps.append({
+        step_entry = {
             "step": step_id,
             "name": layer_name,
             "kernel_type": kernel_type,
             "params": params,
             "next_steps": next_steps
-        })
+        }
+        if len(node.output) > 1:
+            step_entry["output_routes"] = output_routes
+        steps.append(step_entry)
 
     model_dfg = {
         "model": os.path.basename(onnx_path).replace(".onnx", ""),

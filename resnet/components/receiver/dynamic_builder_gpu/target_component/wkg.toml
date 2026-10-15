@@ -8,4 +8,7 @@
 "planner:flattenworld" = { path = "../../../kernel/flatten/" }
 "planner:gemmworld" = { path = "../../../kernel/gemm_gpu/wit" }
 "planner:dropoutworld" = { path = "../../../kernel/dropout/" }
+"planner:sigmoidworld" = { path = "../../../kernel/sigmoid_gpu/wit" }
+"planner:mulworld" = { path = "../../../kernel/mul_gpu/wit" }
+"planner:siluworld" = { path = "../../../kernel/silu_gpu/wit" }
 "wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }
