@@ -592,6 +592,33 @@ KERNELS = {
             },
         },
     },
+    16: {
+        "name": "transpose",
+        "wit_import": "    import planner:transposeworld/plan;",
+        # Transpose é puro gather de memória por permutação de eixos (sem
+        # FLOPs, sem ganho em GPU). Reusa input_shape (já existe em
+        # LayerParams, compartilhado com Split) + perm (novo).
+        "rust_match": """                16 => {
+                    let shape: Vec<u32> = p.input_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                    let data = bindings::planner::transposeworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::transposeworld::plan::transpose(&current_input, &shape, &p.perm, &data);
+                    computed_output = res.output;
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:transposeworld" = { path = "../../../kernel/transpose/" }',
+                "wasm_path": "../../../kernel/transpose/transposeworld_component.wasm",
+            },
+        },
+    },
 }
 
 WASI_GFX_OVERRIDE = (
@@ -812,6 +839,9 @@ struct LayerParams {{
     scale_w: f32,
     #[serde(default)]
     mode: String,
+    // --- Transpose (16) --- input_shape já existe acima, reusado (Split).
+    #[serde(default)]
+    perm: Vec<u32>,
 }}
 
 #[derive(Deserialize, Debug, Clone)]
@@ -1112,7 +1142,7 @@ def main():
 
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 15, 18.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 16, 18.")
             sys.exit(1)
 
     for k in gpu_ids:

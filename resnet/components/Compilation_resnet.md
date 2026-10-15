@@ -36,7 +36,7 @@ $WASI_SDK/bin/clang --target=wasm32-wasip2 \
   -O3 -msimd128 \
   conv.c convworld.c convworld_component_type.o \
   -o convworld_component.wasm -mexec-model=reactor
-  
+
 ##### Receiver
 cd ../../receiver/conv
 wkg wit fetch
@@ -333,6 +333,28 @@ cargo build --target wasm32-wasip2 --release
 cd ..
 wac plug reshape/target/wasm32-wasip2/release/reshapeserver.wasm --plug ../kernel/reshape/reshapeworld_component.wasm -o reshapeFinal.wasm
 
+#### transpose (kernel_16)
+# permutação genérica de eixos — puro gather de memória (sem FLOPs), sem
+# variante GPU. Testado localmente (2D e 3D, permutações não-triviais)
+# antes de entregar.
+##### Kernel
+cd ../kernel/transpose/
+wit-bindgen c --world transposeworld transpose.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  transpose.c transposeworld.c transposeworld_component_type.o \
+  -o transposeworld_component.wasm -mexec-model=reactor
+
+##### Receiver
+cd ../../receiver/transpose
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug transpose/target/wasm32-wasip2/release/transposeserver.wasm --plug ../kernel/transpose/transposeworld_component.wasm -o transposeFinal.wasm
+
 #### all (kernel_0) — DEPRECADO, ver "Dynamic Builder" abaixo
 # O crate receiver/all é estático (código Rust escrito à mão, não gerado) e
 # ficou para trás em duas frentes:
@@ -386,18 +408,19 @@ mv splitFinal.wasm kernel_13.wasm
 mv concatFinal.wasm kernel_14.wasm
 mv reshapeFinal.wasm kernel_15.wasm
 mv resizeFinal.wasm kernel_18.wasm
+mv transposeFinal.wasm kernel_16.wasm
 mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 
 cd "$WOR/resnet/components/receiver/dynamic_builder"
-python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,18 --component-dir ./target_component --output ./node_all.wasm
+python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,18 --component-dir ./target_component --output ./node_all.wasm
 Change the name of the .wasm and put it on the sys_test folder
-# split(13), concat(14), resize(18) e reshape(15) são kernels CPU puros em C
-# (puro rearranjo/gather de memória — ou identidade, no caso do reshape —
-# sem ganho em GPU, sem variante GPU) — todo kernel CPU segue o padrão
-# wit-bindgen c + wasi-sdk clang (ver seções acima); build prévio de
-# kernel/split, kernel/concat, kernel/resize e kernel/reshape antes do
-# Dynamic Builder.
+# split(13), concat(14), resize(18), reshape(15) e transpose(16) são
+# kernels CPU puros em C (puro rearranjo/gather de memória — ou
+# identidade/permutação, sem FLOPs — sem ganho em GPU, sem variante GPU) —
+# todo kernel CPU segue o padrão wit-bindgen c + wasi-sdk clang (ver seções
+# acima); build prévio de kernel/split, kernel/concat, kernel/resize,
+# kernel/reshape e kernel/transpose antes do Dynamic Builder.
 
 #### Onnx to Json
 cd "$WOR/resnet/test_onnx/"

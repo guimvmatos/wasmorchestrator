@@ -1,0 +1,29 @@
+package planner:transposeworld;
+
+interface plan {
+
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // Transpose genérico por permutação de eixos (ONNX Transpose):
+    // output_shape[i] = shape[perm[i]]. shape vem já resolvido com batch=1
+    // no lugar de dims desconhecidas (mesma convenção de Split/Concat).
+    transpose: func(
+        input: list<f32>,
+        shape: list<u32>,
+        perm: list<u32>,
+        result-container: data
+    ) -> data;
+
+}
+
+world transposeworld {
+    export plan;
+}

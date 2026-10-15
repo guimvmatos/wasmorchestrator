@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::Deserialize;
 
-const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18];
+const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
 thread_local! {
     // Controla quais weight_id (= weight_path) já foram enviados
     // ao kernel GPU via gemm_load_weights neste processo. Evita
@@ -146,6 +146,9 @@ struct LayerParams {
     scale_w: f32,
     #[serde(default)]
     mode: String,
+    // --- Transpose (16) --- input_shape já existe acima, reusado (Split).
+    #[serde(default)]
+    perm: Vec<u32>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -555,6 +558,20 @@ fn handle_client(
                         from_step: origin_step,
                     };
                     let res = bindings::planner::reshapeworld::plan::reshape(&current_input, &data);
+                    computed_output = res.output;
+                },
+                16 => {
+                    let shape: Vec<u32> = p.input_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                    let data = bindings::planner::transposeworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::transposeworld::plan::transpose(&current_input, &shape, &p.perm, &data);
                     computed_output = res.output;
                 },
                 18 => {
