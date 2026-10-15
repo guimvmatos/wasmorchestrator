@@ -1,4 +1,4 @@
-package planner:sigmoidworld;
+package planner:mulworld;
 
 interface plan {
 
@@ -11,11 +11,11 @@ interface plan {
         request: u32
     }
 
-    sigmoid: func(img: data) -> data;
+    mul: func(a: list<f32>, b: list<f32>, result-container: data) -> data;
 
 }
 
-world sigmoidworld-gpu {
+world mulworld-gpu {
     import wasi:webgpu/webgpu@0.3.0-rc.2;
     import wasi-gfx-runtime:wasi-webgpu/sync-io;
     export plan;

@@ -90,6 +90,20 @@ wac plug sigmoid_gpu/target/wasm32-wasip2/release/sigmoidserver.wasm \
   --plug ../kernel/sigmoid_gpu/target/wasm32-wasip2/release/sigmoid_gpu.wasm \
   -o ../../sys_test/kernel_10_gpu.wasm
 
+## mul
+cd "$WOR/resnet/components/kernel/mul_gpu"
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
+
+cd "$WOR/resnet/components/receiver/mul_gpu"
+wkg wit fetch
+cargo build --target=wasm32-wasip2 --release
+
+cd ..
+wac plug mul_gpu/target/wasm32-wasip2/release/mulserver.wasm \
+  --plug ../kernel/mul_gpu/target/wasm32-wasip2/release/mul_gpu.wasm \
+  -o ../../sys_test/kernel_11_gpu.wasm
+
 ## SILU
 cd "$WOR/resnet/components/kernel/silu_gpu"
 wkg wit fetch
@@ -141,6 +155,12 @@ cd "$WOR/resnet/sys_test"
   --wasm ./kernel_10_gpu.wasm \
   --port 8090 \
   --ip 127.0.0.1
+
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_11_gpu.wasm \
+  --port 8091 \
+  --ip 127.0.0.1  
 
 cd "$WOR/resnet/sys_test"
 "$WOR/wasi-gfx-runtime/target/release/runtime" \

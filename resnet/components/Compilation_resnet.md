@@ -190,6 +190,25 @@ CC="" cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug sigmoid/target/wasm32-wasip2/release/sigmoidserver.wasm --plug ../kernel/sigmoid/sigmoidworld_component.wasm -o sigmoidFinal.wasm
 
+#### mul (kernel_11)
+##### Kernel
+cd ../kernel/mul/
+wit-bindgen c --world mulworld mul.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  mul.c mulworld.c mulworld_component_type.o \
+  -o mulworld_component.wasm -mexec-model=reactor
+  
+##### Receiver
+cd ../../receiver/mul
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
+cd ..
+wac plug mul/target/wasm32-wasip2/release/mulserver.wasm --plug ../kernel/mul/mulworld_component.wasm -o mulFinal.wasm
+
 #### silu (kernel_12)
 ##### Kernel
 cd ../kernel/silu/
@@ -226,6 +245,7 @@ wac plug all/target/wasm32-wasip2/release/allserver.wasm \
 --plug ../kernel/maxpool/maxpoolworld_component.wasm \
 --plug ../kernel/relu/reluworld_component.wasm \
 --plug ../kernel/sigmoid/sigmoidworld_component.wasm \ # é necessário arrumar o codigo pra aceitar isso primeiro...
+--plug ../kernel/mul/mulworld_component.wasm \ # é necessário arrumar o codigo pra aceitar isso primeiro...
 --plug ../kernel/silu/siluworld_component.wasm \ # é necessário arrumar o codigo pra aceitar isso primeiro...
 -o allFinal.wasm
 
@@ -242,6 +262,7 @@ mv flattenFinal.wasm kernel_7.wasm
 mv gemmFinal.wasm kernel_8.wasm
 mv dropoutFinal.wasm kernel_9.wasm
 mv sigmoidFinal.wasm kernel_10.wasm
+mv mulFinal.wasm kernel_11.wasm
 mv siluFinal.wasm kernel_12.wasm
 mv allFinal.wasm kernel_0.wasm
 

@@ -1,10 +1,10 @@
 wit_bindgen::generate!({
-    world: "sigmoidworld-gpu",
+    world: "mulworld-gpu",
     path: "wit",
     generate_all,
 });
 
-use exports::planner::sigmoidworld::plan::{Data, Guest};
+use exports::planner::mulworld::plan::{Data, Guest};
 use wasi::webgpu::webgpu;
 use wasi_gfx_runtime::wasi_webgpu::sync_io;
 use wit_bindgen::block_on;
@@ -33,7 +33,7 @@ fn build_gpu_context() -> GpuContext {
 
     let info = adapter.info();
     eprintln!(
-        "GPU selecionada (Sigmoid): vendor='{}' device='{}' architecture='{}'",
+        "GPU selecionada (Mul): vendor='{}' device='{}' architecture='{}'",
         info.vendor(),
         info.device(),
         info.architecture()
@@ -42,13 +42,13 @@ fn build_gpu_context() -> GpuContext {
     let device = block_on(adapter.request_device(None)).unwrap();
 
     let cs_module = device.create_shader_module(&webgpu::GpuShaderModuleDescriptor {
-        label: Some("Sigmoid Shader".to_string()),
-        code: include_str!("sigmoid.wgsl").to_string(),
+        label: Some("Mul Shader".to_string()),
+        code: include_str!("mul.wgsl").to_string(),
         compilation_hints: None,
     });
 
     let pipeline = device.create_compute_pipeline(webgpu::GpuComputePipelineDescriptor {
-        label: Some("Sigmoid Pipeline".to_string()),
+        label: Some("Mul Pipeline".to_string()),
         layout: webgpu::GpuLayoutMode::Auto,
         compute: webgpu::GpuProgrammableStage {
             module: &cs_module,
@@ -61,14 +61,21 @@ fn build_gpu_context() -> GpuContext {
 }
 
 impl Guest for Component {
-    fn sigmoid(mut img: Data) -> Data {
-        let result = execute_sigmoid_gpu(&img.input);
-        img.output = result;
-        img
+    fn mul(a: Vec<f32>, b: Vec<f32>, result_container: Data) -> Data {
+        let output = execute_mul_gpu(&a, &b);
+
+        Data {
+            input: vec![],
+            output,
+            reply_to: result_container.reply_to,
+            kernels: vec![],
+            current_kernel: result_container.current_kernel,
+            request: result_container.request,
+        }
     }
 }
 
-fn execute_sigmoid_gpu(input: &[f32]) -> Vec<f32> {
+fn execute_mul_gpu(a: &[f32], b: &[f32]) -> Vec<f32> {
     let t_fn_start = std::time::Instant::now(); // [T]
 
     GPU_CTX.with(|cell| {
@@ -81,20 +88,30 @@ fn execute_sigmoid_gpu(input: &[f32]) -> Vec<f32> {
         let compute_pipeline = &ctx.pipeline;
 
         let t_input_buf = std::time::Instant::now(); // [T]
-        let input_bytes = bytemuck::cast_slice(input);
-        let input_buffer = device.create_buffer(&webgpu::GpuBufferDescriptor {
-            label: Some("Input Buffer".to_string()),
-            size: input_bytes.len() as webgpu::GpuSize64,
+
+        let a_bytes = bytemuck::cast_slice(a);
+        let a_buffer = device.create_buffer(&webgpu::GpuBufferDescriptor {
+            label: Some("A Buffer".to_string()),
+            size: a_bytes.len() as webgpu::GpuSize64,
             usage: webgpu::GpuBufferUsage::STORAGE | webgpu::GpuBufferUsage::COPY_DST,
             mapped_at_creation: Some(true),
         });
-        input_buffer
-            .get_mapped_range_set_with_copy(input_bytes, None, None)
-            .unwrap();
-        input_buffer.unmap().unwrap();
+        a_buffer.get_mapped_range_set_with_copy(a_bytes, None, None).unwrap();
+        a_buffer.unmap().unwrap();
+
+        let b_bytes = bytemuck::cast_slice(b);
+        let b_buffer = device.create_buffer(&webgpu::GpuBufferDescriptor {
+            label: Some("B Buffer".to_string()),
+            size: b_bytes.len() as webgpu::GpuSize64,
+            usage: webgpu::GpuBufferUsage::STORAGE | webgpu::GpuBufferUsage::COPY_DST,
+            mapped_at_creation: Some(true),
+        });
+        b_buffer.get_mapped_range_set_with_copy(b_bytes, None, None).unwrap();
+        b_buffer.unmap().unwrap();
+
         let input_buf_us = t_input_buf.elapsed().as_micros() as u64; // [T]
 
-        let output_byte_size = input_bytes.len() as webgpu::GpuSize64;
+        let output_byte_size = a_bytes.len() as webgpu::GpuSize64;
         let output_buffer = device.create_buffer(&webgpu::GpuBufferDescriptor {
             label: Some("Output Buffer".to_string()),
             size: output_byte_size,
@@ -113,19 +130,27 @@ fn execute_sigmoid_gpu(input: &[f32]) -> Vec<f32> {
 
         let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
         let bind_group = device.create_bind_group(&webgpu::GpuBindGroupDescriptor {
-            label: Some("Sigmoid Bind Group".to_string()),
+            label: Some("Mul Bind Group".to_string()),
             layout: &bind_group_layout,
             entries: vec![
                 webgpu::GpuBindGroupEntry {
                     binding: 0,
                     resource: webgpu::GpuBindingResource::GpuBufferBinding(webgpu::GpuBufferBinding {
-                        buffer: &input_buffer,
+                        buffer: &a_buffer,
                         offset: Some(0),
                         size: None,
                     }),
                 },
                 webgpu::GpuBindGroupEntry {
                     binding: 1,
+                    resource: webgpu::GpuBindingResource::GpuBufferBinding(webgpu::GpuBufferBinding {
+                        buffer: &b_buffer,
+                        offset: Some(0),
+                        size: None,
+                    }),
+                },
+                webgpu::GpuBindGroupEntry {
+                    binding: 2,
                     resource: webgpu::GpuBindingResource::GpuBufferBinding(webgpu::GpuBufferBinding {
                         buffer: &output_buffer,
                         offset: Some(0),
@@ -144,7 +169,7 @@ fn execute_sigmoid_gpu(input: &[f32]) -> Vec<f32> {
                 .set_bind_group(0, Some(&bind_group), None, None, None)
                 .unwrap();
 
-            let workgroups = ((input.len() as u32) + 63) / 64;
+            let workgroups = ((a.len() as u32) + 63) / 64;
             cpass.dispatch_workgroups(workgroups, Some(1), Some(1));
             cpass.end();
         }
@@ -165,14 +190,14 @@ fn execute_sigmoid_gpu(input: &[f32]) -> Vec<f32> {
 
         let fn_total_us = t_fn_start.elapsed().as_micros() as u64; // [T]
         eprintln!( // [T]
-            "[SIGMOID_TIMING] len={} | input_buf_us={} dispatch_submit_us={} readback_us={} fn_total_us={}",
-            input.len(), input_buf_us, dispatch_submit_us, readback_us, fn_total_us
+            "[MUL_TIMING] len_a={} len_b={} | input_buf_us={} dispatch_submit_us={} readback_us={} fn_total_us={}",
+            a.len(), b.len(), input_buf_us, dispatch_submit_us, readback_us, fn_total_us
         );
 
         if !data.is_empty() {
             bytemuck::cast_slice(&data).to_vec()
         } else {
-            vec![0.0f32; input.len()]
+            vec![0.0f32; a.len()]
         }
     })
 }
