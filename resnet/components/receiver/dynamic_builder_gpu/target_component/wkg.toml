@@ -13,5 +13,6 @@
 "planner:siluworld" = { path = "../../../kernel/silu_gpu/wit" }
 "planner:splitworld" = { path = "../../../kernel/split/" }
 "planner:concatworld" = { path = "../../../kernel/concat/" }
+"planner:reshapeworld" = { path = "../../../kernel/reshape/" }
 "planner:resizeworld" = { path = "../../../kernel/resize/" }
 "wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }

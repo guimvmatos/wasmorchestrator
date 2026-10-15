@@ -1,3 +1,28 @@
+## REGRA DE ARQUITETURA (NÃO VIOLAR)
+
+Todo kernel que roda em CPU é escrito em **C**, sempre — sem exceção, mesmo
+que pareça mais rápido fazer em Rust. O padrão é:
+
+- **Kernel (CPU) = C**: um único `.wit` solto na raiz da pasta do kernel
+  (NUNCA numa subpasta `wit/`), gerado/compilado com:
+  1. `wit-bindgen c --world <nome>world <nome>.wit` → gera `<nome>world.c`,
+     `<nome>world.h`, `<nome>world_component_type.o`
+  2. wasi-sdk clang: `$WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=... -O3 -msimd128 <nome>.c <nome>world.c <nome>world_component_type.o -o <nome>world_component.wasm -mexec-model=reactor`
+  - Nunca um crate Rust (`Cargo.toml` + `wit_bindgen::generate!` macro) para
+    um kernel CPU — isso já causou retrabalho (split/resize/concat tiveram
+    que ser refeitos em C depois de terem sido escritos em Rust por engano).
+- **Receiver = Rust, sempre** (kernel CPU ou GPU, tanto faz): crate normal
+  (`Cargo.toml`, `wkg.toml`, `wit/world.wit`, `src/lib.rs`).
+  - O `wkg.toml` do receiver aponta pro kernel em C **sem** sufixo `/wit`:
+    `"planner:<nome>world" = { path = "../../kernel/<nome>/" }` — porque o
+    `.wit` está na raiz do kernel, não numa subpasta.
+  - Kernels GPU (que são Rust nativo via `wit_bindgen::generate!`) continuam
+    apontando com `/wit` no override, pois lá sim o `.wit` fica em subpasta —
+    não confundir os dois padrões.
+
+Antes de criar um kernel novo, copie a estrutura de `kernel/add/` (`add.wit`
++ `add.c`) como referência, não a de um kernel GPU.
+
 #### Conv (kernel_1)
 ##### Kernel
 cd "$WOR/resnet/components"
@@ -286,6 +311,28 @@ cargo build --target wasm32-wasip2 --release
 cd ..
 wac plug resize/target/wasm32-wasip2/release/resizeserver.wasm --plug ../kernel/resize/resizeworld_component.wasm -o resizeFinal.wasm
 
+#### reshape (kernel_15)
+# identidade pura — ONNX Reshape não move memória, só reinterpreta o shape
+# (metadado do grafo, resolvido pelo onnx_to_dfg.py). Sem params, sem
+# variante GPU.
+##### Kernel
+cd ../kernel/reshape/
+wit-bindgen c --world reshapeworld reshape.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  reshape.c reshapeworld.c reshapeworld_component_type.o \
+  -o reshapeworld_component.wasm -mexec-model=reactor
+
+##### Receiver
+cd ../../receiver/reshape
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug reshape/target/wasm32-wasip2/release/reshapeserver.wasm --plug ../kernel/reshape/reshapeworld_component.wasm -o reshapeFinal.wasm
+
 #### all (kernel_0) — DEPRECADO, ver "Dynamic Builder" abaixo
 # O crate receiver/all é estático (código Rust escrito à mão, não gerado) e
 # ficou para trás em duas frentes:
@@ -337,17 +384,20 @@ mv mulFinal.wasm kernel_11.wasm
 mv siluFinal.wasm kernel_12.wasm
 mv splitFinal.wasm kernel_13.wasm
 mv concatFinal.wasm kernel_14.wasm
+mv reshapeFinal.wasm kernel_15.wasm
 mv resizeFinal.wasm kernel_18.wasm
 mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 
 cd "$WOR/resnet/components/receiver/dynamic_builder"
-python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,18 --component-dir ./target_component --output ./node_all.wasm
+python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,18 --component-dir ./target_component --output ./node_all.wasm
 Change the name of the .wasm and put it on the sys_test folder
-# split(13), concat(14) e resize(18) são kernels CPU puros (puro rearranjo/
-# gather de memória, sem ganho em GPU) — ver Compilation_resnet_GPU.md pro
-# --gpu equivalente e pro build prévio das crates kernel/split, kernel/concat
-# e kernel/resize.
+# split(13), concat(14), resize(18) e reshape(15) são kernels CPU puros em C
+# (puro rearranjo/gather de memória — ou identidade, no caso do reshape —
+# sem ganho em GPU, sem variante GPU) — todo kernel CPU segue o padrão
+# wit-bindgen c + wasi-sdk clang (ver seções acima); build prévio de
+# kernel/split, kernel/concat, kernel/resize e kernel/reshape antes do
+# Dynamic Builder.
 
 #### Onnx to Json
 cd "$WOR/resnet/test_onnx/"

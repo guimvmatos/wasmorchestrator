@@ -176,20 +176,21 @@ python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output ../sys_test/resnet18DF
 # AutoGenerate
 cd "$WOR/resnet/components/receiver/dynamic_builder_gpu"
 python3 build_custom.py \
-  --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,18 \
+  --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,18 \
   --gpu 1,2,4,6,8,10,11,12 \
   --component-dir ./target_component \
   --output ../../../sys_test/kernel_0_gpu.wasm
-# relu(3), add(5), flatten(7), dropout(9), split(13), concat(14) e resize(18)
-# não têm variante GPU (puro rearranjo/gather de memória, sem ganho em
-# shader) — ficam de fora de --gpu e são plugados na variante CPU
-# automaticamente (fallback do catálogo).
+# relu(3), add(5), flatten(7), dropout(9), split(13), concat(14), reshape(15)
+# e resize(18) não têm variante GPU (puro rearranjo/gather de memória — ou
+# identidade, no caso do reshape — sem ganho em shader) — ficam de fora de
+# --gpu e são plugados na variante CPU automaticamente (fallback do
+# catálogo).
 #
-# split(13), concat(14) e resize(18) são kernels CPU em C (wit-bindgen c +
-# wasi-sdk clang, ver Compilation_resnet.md), não crates Rust — exigem que
-# o <nome>world_component.wasm já tenha sido compilado antes, já que o
-# build_custom.py só faz `wac plug` sobre o .wasm pronto, não compila os
-# kernels em si:
+# split(13), concat(14), resize(18) e reshape(15) são kernels CPU em C
+# (wit-bindgen c + wasi-sdk clang, ver Compilation_resnet.md), não crates
+# Rust — exigem que o <nome>world_component.wasm já tenha sido compilado
+# antes, já que o build_custom.py só faz `wac plug` sobre o .wasm pronto,
+# não compila os kernels em si:
 cd "$WOR/resnet/components/kernel/split" && wit-bindgen c --world splitworld split.wit && \
   $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
@@ -204,6 +205,11 @@ cd "$WOR/resnet/components/kernel/resize" && wit-bindgen c --world resizeworld r
   $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
   resize.c resizeworld.c resizeworld_component_type.o -o resizeworld_component.wasm -mexec-model=reactor
+
+cd "$WOR/resnet/components/kernel/reshape" && wit-bindgen c --world reshapeworld reshape.wit && \
+  $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
+  reshape.c reshapeworld.c reshapeworld_component_type.o -o reshapeworld_component.wasm -mexec-model=reactor
 
 cd "$WOR/resnet/sys_test"
 "$WOR/wasi-gfx-runtime/target/release/runtime" \

@@ -15,6 +15,7 @@ world runner {
     import planner:siluworld/plan;
     import planner:splitworld/plan;
     import planner:concatworld/plan;
+    import planner:reshapeworld/plan;
     import planner:resizeworld/plan;
     export wasi:cli/run@0.2.7;
 }

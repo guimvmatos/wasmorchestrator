@@ -1,0 +1,26 @@
+package planner:reshapeworld;
+
+interface plan {
+
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // Reshape é identidade pura: o buffer linear já está no layout certo
+    // (ONNX Reshape não move memória, só reinterpreta o shape — isso é
+    // metadado do grafo, resolvido pelo onnx_to_dfg.py, não algo que o
+    // kernel precise calcular). Por isso não recebe shape/new_shape como
+    // parâmetro: só repassa o buffer de input pra output.
+    reshape: func(input: list<f32>, result-container: data) -> data;
+
+}
+
+world reshapeworld {
+    export plan;
+}

@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::Deserialize;
 
-const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 18];
+const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18];
 thread_local! {
     // Controla quais weight_id (= weight_path) já foram enviados
     // ao kernel GPU via gemm_load_weights neste processo. Evita
@@ -542,6 +542,19 @@ fn handle_client(
                         from_step: origin_step,
                     };
                     let res = bindings::planner::concatworld::plan::concat(&inputs, &shapes, p.axis, &data);
+                    computed_output = res.output;
+                },
+                15 => {
+                    let data = bindings::planner::reshapeworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::reshapeworld::plan::reshape(&current_input, &data);
                     computed_output = res.output;
                 },
                 18 => {

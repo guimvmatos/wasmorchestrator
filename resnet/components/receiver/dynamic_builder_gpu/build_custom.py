@@ -566,6 +566,32 @@ KERNELS = {
             },
         },
     },
+    15: {
+        "name": "reshape",
+        "wit_import": "    import planner:reshapeworld/plan;",
+        # Reshape é identidade pura (ONNX Reshape não move memória, só
+        # reinterpreta o shape — buffer linear já está no layout certo).
+        # Não usa nenhum campo de LayerParams.
+        "rust_match": """                15 => {
+                    let data = bindings::planner::reshapeworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::reshapeworld::plan::reshape(&current_input, &data);
+                    computed_output = res.output;
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:reshapeworld" = { path = "../../../kernel/reshape/" }',
+                "wasm_path": "../../../kernel/reshape/reshapeworld_component.wasm",
+            },
+        },
+    },
 }
 
 WASI_GFX_OVERRIDE = (
@@ -1086,7 +1112,7 @@ def main():
 
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 14, 18.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 15, 18.")
             sys.exit(1)
 
     for k in gpu_ids:
