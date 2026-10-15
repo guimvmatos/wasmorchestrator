@@ -118,6 +118,25 @@ wac plug silu_gpu/target/wasm32-wasip2/release/siluserver.wasm \
   --plug ../kernel/silu_gpu/target/wasm32-wasip2/release/silu_gpu.wasm \
   -o ../../sys_test/kernel_12_gpu.wasm
 
+## MatMul
+# MatMul em lote (batched), bloco de atenção do YOLO — o ÚNICO kernel entre
+# 13-18 com FLOPs reais, por isso tem variante GPU (os demais — split,
+# concat, reshape, transpose, resize — são puro rearranjo/gather de
+# memória, sem ganho em shader). Mesma assinatura WIT nas duas variantes
+# (lhs, rhs, lhs-shape, rhs-shape, data), igual Conv/BN/MaxPool/Gemm-CPU.
+cd "$WOR/resnet/components/kernel/matmul_gpu"
+wkg wit fetch
+CC="" cargo build --target=wasm32-wasip2 --release
+
+cd "$WOR/resnet/components/receiver/matmul_gpu"
+wkg wit fetch
+cargo build --target=wasm32-wasip2 --release
+
+cd ..
+wac plug matmul_gpu/target/wasm32-wasip2/release/matmulserver.wasm \
+  --plug ../kernel/matmul_gpu/target/wasm32-wasip2/release/matmul_gpu.wasm \
+  -o ../../sys_test/kernel_17_gpu.wasm
+
 # to run
 
 cd "$WOR/resnet/sys_test"
@@ -168,6 +187,12 @@ cd "$WOR/resnet/sys_test"
   --port 8092 \
   --ip 127.0.0.1
 
+cd "$WOR/resnet/sys_test"
+"$WOR/wasi-gfx-runtime/target/release/runtime" \
+  --wasm ./kernel_17_gpu.wasm \
+  --port 8097 \
+  --ip 127.0.0.1
+
 # onnx to dfg.py
 cd "$WOR/resnet/test_onnx"
 python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output ../sys_test/resnet18DFG.json --weights-dir ../bin_weights
@@ -176,15 +201,17 @@ python3 onnx_to_dfg.py --onnx resnet50-v1-7.onnx --output ../sys_test/resnet18DF
 # AutoGenerate
 cd "$WOR/resnet/components/receiver/dynamic_builder_gpu"
 python3 build_custom.py \
-  --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,18 \
-  --gpu 1,2,4,6,8,10,11,12 \
+  --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18 \
+  --gpu 1,2,4,6,8,10,11,12,17 \
   --component-dir ./target_component \
   --output ../../../sys_test/kernel_0_gpu.wasm
 # relu(3), add(5), flatten(7), dropout(9), split(13), concat(14), reshape(15),
 # transpose(16) e resize(18) não têm variante GPU (puro rearranjo/gather de
 # memória — ou identidade/permutação, sem FLOPs — sem ganho em shader) —
 # ficam de fora de --gpu e são plugados na variante CPU automaticamente
-# (fallback do catálogo).
+# (fallback do catálogo). matmul(17) É o único entre 13-18 com FLOPs reais
+# e por isso TEM variante GPU — incluído em --gpu acima; sem --gpu 17,
+# cai na variante CPU automaticamente (mesmo fallback).
 #
 # split(13), concat(14), resize(18), reshape(15) e transpose(16) são
 # kernels CPU em C (wit-bindgen c + wasi-sdk clang, ver Compilation_resnet.md),
@@ -215,6 +242,14 @@ cd "$WOR/resnet/components/kernel/transpose" && wit-bindgen c --world transposew
   $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
   -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
   transpose.c transposeworld.c transposeworld_component_type.o -o transposeworld_component.wasm -mexec-model=reactor
+
+# matmul(17) só precisa deste build se você NÃO passar 17 em --gpu (cai na
+# variante CPU em C); se passar 17 em --gpu, o build prévio é o do
+# kernel/matmul_gpu (crate Rust, ver seção "## MatMul" acima), não este:
+cd "$WOR/resnet/components/kernel/matmul" && wit-bindgen c --world matmulworld matmul.wit && \
+  $WASI_SDK/bin/clang --target=wasm32-wasip2 --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 -O3 -msimd128 \
+  matmul.c matmulworld.c matmulworld_component_type.o -o matmulworld_component.wasm -mexec-model=reactor
 
 cd "$WOR/resnet/sys_test"
 "$WOR/wasi-gfx-runtime/target/release/runtime" \

@@ -1,0 +1,35 @@
+package planner:matmulworld;
+
+interface plan {
+
+    // Mesmo record "data" usado em todo o pipeline (ver concat/split/transpose).
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // MatMul em lote (batched), seguindo as regras de broadcasting de batch
+    // do ONNX MatMul: lhs-shape/rhs-shape são o shape COMPLETO de cada
+    // tensor (ex.: [batch, heads, M, K] e [batch, heads, K, N]), resolvidos
+    // estaticamente pelo onnx_to_dfg.py a partir do value_info do grafo. As
+    // duas últimas dimensões de cada shape são as dimensões de matriz (M,K)
+    // e (K,N); tudo antes disso é dimensão de batch e pode fazer broadcast
+    // (dimensão 1 contra qualquer tamanho, igual numpy/ONNX).
+    matmul: func(
+        lhs: list<f32>,
+        rhs: list<f32>,
+        lhs-shape: list<u32>,
+        rhs-shape: list<u32>,
+        result-container: data
+    ) -> data;
+
+}
+
+world matmulworld {
+    export plan;
+}

@@ -355,6 +355,46 @@ cargo build --target wasm32-wasip2 --release
 cd ..
 wac plug transpose/target/wasm32-wasip2/release/transposeserver.wasm --plug ../kernel/transpose/transposeworld_component.wasm -o transposeFinal.wasm
 
+#### matmul (kernel_17)
+# MatMul em lote (batched), usado no bloco de atenção do YOLO — o ÚNICO
+# destes kernels "recentes" (13-18) com FLOPs reais (os outros são puro
+# rearranjo/gather de memória), por isso tem variante GPU além da CPU.
+# Params: lhs_shape/rhs_shape (shape completo de cada tensor) +
+# lhs_step/rhs_step (step que produziu node.input[0]/node.input[1] —
+# MatMul NÃO é comutativo como Add/Mul, então o receiver precisa saber
+# qual ramo é qual, não só "os dois chegaram"). Testado localmente
+# (matmul simples, batch igual, broadcast de batch, batch tipo
+# attention/heads) antes de entregar.
+##### Kernel (CPU)
+cd ../kernel/matmul/
+wit-bindgen c --world matmulworld matmul.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  matmul.c matmulworld.c matmulworld_component_type.o \
+  -o matmulworld_component.wasm -mexec-model=reactor
+
+##### Receiver (CPU)
+cd ../../receiver/matmul
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug matmul/target/wasm32-wasip2/release/matmulserver.wasm --plug ../kernel/matmul/matmulworld_component.wasm -o matmulFinal.wasm
+
+##### Kernel (GPU) — ver Compilation_resnet_GPU.md
+cd ../kernel/matmul_gpu/
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+
+##### Receiver (GPU)
+cd ../../receiver/matmul_gpu
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug matmul_gpu/target/wasm32-wasip2/release/matmulserver.wasm --plug ../kernel/matmul_gpu/target/wasm32-wasip2/release/matmul_gpu.wasm -o matmul_gpuFinal.wasm
+
 #### all (kernel_0) — DEPRECADO, ver "Dynamic Builder" abaixo
 # O crate receiver/all é estático (código Rust escrito à mão, não gerado) e
 # ficou para trás em duas frentes:
@@ -407,13 +447,14 @@ mv siluFinal.wasm kernel_12.wasm
 mv splitFinal.wasm kernel_13.wasm
 mv concatFinal.wasm kernel_14.wasm
 mv reshapeFinal.wasm kernel_15.wasm
-mv resizeFinal.wasm kernel_18.wasm
 mv transposeFinal.wasm kernel_16.wasm
+mv matmulFinal.wasm kernel_17.wasm
+mv resizeFinal.wasm kernel_18.wasm
 mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 
 cd "$WOR/resnet/components/receiver/dynamic_builder"
-python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,18 --component-dir ./target_component --output ./node_all.wasm
+python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18 --gpu 17 --component-dir ./target_component --output ./node_all.wasm
 Change the name of the .wasm and put it on the sys_test folder
 # split(13), concat(14), resize(18), reshape(15) e transpose(16) são
 # kernels CPU puros em C (puro rearranjo/gather de memória — ou
@@ -421,6 +462,10 @@ Change the name of the .wasm and put it on the sys_test folder
 # todo kernel CPU segue o padrão wit-bindgen c + wasi-sdk clang (ver seções
 # acima); build prévio de kernel/split, kernel/concat, kernel/resize,
 # kernel/reshape e kernel/transpose antes do Dynamic Builder.
+# matmul(17) É o único destes com FLOPs reais — tem variante GPU (build
+# prévio de kernel/matmul_gpu, ver Compilation_resnet_GPU.md) além da CPU
+# (build prévio de kernel/matmul, mesmo padrão wit-bindgen c acima). Passe
+# --gpu 17 só se quiser a variante GPU neste nó; sem --gpu, cai na CPU.
 
 #### Onnx to Json
 cd "$WOR/resnet/test_onnx/"
@@ -449,4 +494,4 @@ client envia para server address: 127.0.0.1:8050 e escute em 0.0.0.0:9000
 sys: escuta em 0.0.0.0:9999 envia para 0.0.0.0:9998 do orquestrador
 receiver escuta em 0.0.0.0:8080
 
-kernels GPU (ver Compilation_resnet_GPU.md): 8081(1) 8082(2) 8084(4) 8086(6) 8088(8) 8090(10) 8091(11) 8092(12)
+kernels GPU (ver Compilation_resnet_GPU.md): 8081(1) 8082(2) 8084(4) 8086(6) 8088(8) 8090(10) 8091(11) 8092(12) 8097(17, matmul)

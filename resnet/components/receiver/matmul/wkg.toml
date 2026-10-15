@@ -1,0 +1,2 @@
+[overrides]
+"planner:matmulworld" = { path = "../../kernel/matmul/" }

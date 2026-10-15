@@ -619,6 +619,100 @@ KERNELS = {
             },
         },
     },
+    17: {
+        "name": "matmul",
+        "wit_import": "    import planner:matmulworld/plan;",
+        # MatMul em lote (batched), usado no bloco de atenção do YOLO — o
+        # ÚNICO destes kernels "recentes" (13-18) com FLOPs reais, por isso
+        # tem variante GPU (mesma assinatura WIT nas duas, igual Conv/BN/
+        # MaxPool/Gemm-CPU). NÃO é comutativo como Add/Mul (kernel 5/11):
+        # lhs_step/rhs_step (resolvidos pelo onnx_to_dfg.py a partir do
+        # producer real de node.input[0]/node.input[1]) dizem qual ramo é
+        # lhs e qual é rhs — join-buffer por (step, origin_step), não por
+        # ordem de chegada. Caso lhs/rhs constante (ex: projeção fixa) não
+        # espera 2º ramo, igual ao Mul.
+        "rust_match": """                17 => {
+                    if !p.lhs_const_path.is_empty() {
+                        let lhs_const = load_weights_file_cached(&p.lhs_const_path);
+                        let lhs_shape: Vec<u32> = p.lhs_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                        let rhs_shape: Vec<u32> = p.rhs_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                        let data = bindings::planner::matmulworld::plan::Data {
+                            input: vec![],
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::matmulworld::plan::matmul(lhs_const.as_slice(), &current_input, &lhs_shape, &rhs_shape, &data);
+                        computed_output = res.output;
+                    } else if !p.rhs_const_path.is_empty() {
+                        let rhs_const = load_weights_file_cached(&p.rhs_const_path);
+                        let lhs_shape: Vec<u32> = p.lhs_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                        let rhs_shape: Vec<u32> = p.rhs_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                        let data = bindings::planner::matmulworld::plan::Data {
+                            input: vec![],
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::matmulworld::plan::matmul(&current_input, rhs_const.as_slice(), &lhs_shape, &rhs_shape, &data);
+                        computed_output = res.output;
+                    } else {
+                        let lhs_step = p.lhs_step.unwrap_or_else(|| panic!("Step {}: MatMul sem params.lhs_step — grafo desatualizado?", current_step));
+                        let rhs_step = p.rhs_step.unwrap_or_else(|| panic!("Step {}: MatMul sem params.rhs_step — grafo desatualizado?", current_step));
+                        if lhs_step == rhs_step {
+                            panic!("Step {}: MatMul com lhs_step == rhs_step ({}) não é suportado por este dynamic_builder (precisaria de fila por origem, como o Concat) — caso raro, avise se ocorrer de verdade.", current_step, lhs_step);
+                        }
+
+                        {
+                            let step_slots = matmul_branches.entry(current_step).or_insert_with(HashMap::new);
+                            step_slots.insert(origin_step, current_input.clone());
+                        }
+
+                        let ready = matmul_branches.get(&current_step)
+                            .map(|m| m.contains_key(&lhs_step) && m.contains_key(&rhs_step))
+                            .unwrap_or(false);
+
+                        if !ready {
+                            println!("Step {}: ramo from_step={} guardado no MatMul (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
+                            continue;
+                        }
+
+                        let mut slots = matmul_branches.remove(&current_step).unwrap();
+                        let lhs_vec = slots.remove(&lhs_step).unwrap();
+                        let rhs_vec = slots.remove(&rhs_step).unwrap();
+
+                        let lhs_shape: Vec<u32> = p.lhs_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                        let rhs_shape: Vec<u32> = p.rhs_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                        let data = bindings::planner::matmulworld::plan::Data {
+                            input: vec![],
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::matmulworld::plan::matmul(&lhs_vec, &rhs_vec, &lhs_shape, &rhs_shape, &data);
+                        computed_output = res.output;
+                    }
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:matmulworld" = { path = "../../../kernel/matmul/" }',
+                "wasm_path": "../../../kernel/matmul/matmulworld_component.wasm",
+            },
+            "gpu": {
+                "wkg_override": '"planner:matmulworld" = { path = "../../../kernel/matmul_gpu/wit" }',
+                "wasm_path": "../../../kernel/matmul_gpu/target/wasm32-wasip2/release/matmul_gpu.wasm",
+            },
+        },
+    },
 }
 
 WASI_GFX_OVERRIDE = (
@@ -842,6 +936,22 @@ struct LayerParams {{
     // --- Transpose (16) --- input_shape já existe acima, reusado (Split).
     #[serde(default)]
     perm: Vec<u32>,
+    // --- MatMul (17) --- -1 = dimensão desconhecida (mesmo fallback do
+    // Split/Transpose, convertido pra 1 na chamada). lhs_step/rhs_step =
+    // step que produziu node.input[0]/node.input[1] (None quando aquele
+    // lado é constante — ver lhs_const_path/rhs_const_path).
+    #[serde(default)]
+    lhs_shape: Vec<i64>,
+    #[serde(default)]
+    rhs_shape: Vec<i64>,
+    #[serde(default)]
+    lhs_step: Option<u32>,
+    #[serde(default)]
+    rhs_step: Option<u32>,
+    #[serde(default)]
+    lhs_const_path: String,
+    #[serde(default)]
+    rhs_const_path: String,
 }}
 
 #[derive(Deserialize, Debug, Clone)]
@@ -915,6 +1025,12 @@ fn handle_client(
         // from_step; valor = fila (não Vec simples) porque o MESMO from_step
         // pode aparecer 2x em input_order (duas metades do mesmo Split).
         let mut concat_branches: HashMap<u32, HashMap<u32, VecDeque<Vec<f32>>>> = HashMap::new();
+        // MatMul (17): chave externa = step do MatMul; chave interna =
+        // from_step (lhs_step ou rhs_step) -> buffer. Não usa VecDeque como
+        // o Concat porque lhs_step == rhs_step (mesma origem alimentando os
+        // dois lados) não é suportado por este dynamic_builder (ver panic
+        // no rust_match do kernel 17) — um slot por origem basta.
+        let mut matmul_branches: HashMap<u32, HashMap<u32, Vec<f32>>> = HashMap::new();
 
         queue.push_back((input_img.current_kernel, input_img.input.clone(), input_img.from_step));
 
@@ -1142,7 +1258,7 @@ def main():
 
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 16, 18.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 18.")
             sys.exit(1)
 
     for k in gpu_ids:

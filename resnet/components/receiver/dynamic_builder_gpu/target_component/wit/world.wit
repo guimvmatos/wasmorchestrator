@@ -17,6 +17,7 @@ world runner {
     import planner:concatworld/plan;
     import planner:reshapeworld/plan;
     import planner:transposeworld/plan;
+    import planner:matmulworld/plan;
     import planner:resizeworld/plan;
     export wasi:cli/run@0.2.7;
 }

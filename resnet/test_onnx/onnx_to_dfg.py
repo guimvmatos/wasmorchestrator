@@ -435,11 +435,28 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
             }
 
         elif kernel_type == 17:  # MatMul (tensor x tensor dinâmico, não é Gemm)
-            in0_shape = value_info_shapes.get(node.input[0], [])
-            in1_shape = value_info_shapes.get(node.input[1], [])
+            # MatMul NÃO é comutativo — diferente de Add/Mul (kernel 5/11),
+            # o receiver precisa saber EXATAMENTE qual ramo é lhs e qual é
+            # rhs, não só "os dois ramos chegaram". Por isso, igual ao
+            # input_order do Concat, resolvemos aqui o producer real de
+            # node.input[0] (lhs) e node.input[1] (rhs) via tensor_producer
+            # — o receiver usa lhs_step/rhs_step pra casar cada branch que
+            # chega (identificado pelo from_step) com o slot certo, em vez
+            # de assumir ordem de chegada. Quando um dos lados é constante
+            # (initializer), não há join: o outro lado é o único ramo
+            # dinâmico esperado.
+            in0, in1 = node.input[0], node.input[1]
+            in0_shape = value_info_shapes.get(in0, [])
+            in1_shape = value_info_shapes.get(in1, [])
+            lhs_const = initializers.get(in0)
+            rhs_const = initializers.get(in1)
             params = {
                 "lhs_shape": [int(d) if d is not None else -1 for d in in0_shape],
                 "rhs_shape": [int(d) if d is not None else -1 for d in in1_shape],
+                "lhs_step": tensor_producer.get(in0) if lhs_const is None else None,
+                "rhs_step": tensor_producer.get(in1) if rhs_const is None else None,
+                "lhs_const_path": save_weight_bin(lhs_const, weights_dir) if lhs_const is not None else "",
+                "rhs_const_path": save_weight_bin(rhs_const, weights_dir) if rhs_const is not None else "",
             }
 
         elif kernel_type == 18:  # Resize (upsample nearest, usado no FPN do YOLO)

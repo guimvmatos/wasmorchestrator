@@ -15,5 +15,6 @@
 "planner:concatworld" = { path = "../../../kernel/concat/" }
 "planner:reshapeworld" = { path = "../../../kernel/reshape/" }
 "planner:transposeworld" = { path = "../../../kernel/transpose/" }
+"planner:matmulworld" = { path = "../../../kernel/matmul_gpu/wit" }
 "planner:resizeworld" = { path = "../../../kernel/resize/" }
 "wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }
