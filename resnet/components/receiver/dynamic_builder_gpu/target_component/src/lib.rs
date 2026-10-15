@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::Deserialize;
 
-const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 18];
 thread_local! {
     // Controla quais weight_id (= weight_path) já foram enviados
     // ao kernel GPU via gemm_load_weights neste processo. Evita
@@ -139,6 +139,13 @@ struct LayerParams {
     // --- Concat (14) ---
     #[serde(default)]
     input_order: Vec<InputOrderEntry>,
+    // --- Resize (18) --- channels/h_in/w_in já existem acima, reusados.
+    #[serde(default)]
+    scale_h: f32,
+    #[serde(default)]
+    scale_w: f32,
+    #[serde(default)]
+    mode: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -535,6 +542,21 @@ fn handle_client(
                         from_step: origin_step,
                     };
                     let res = bindings::planner::concatworld::plan::concat(&inputs, &shapes, p.axis, &data);
+                    computed_output = res.output;
+                },
+                18 => {
+                    let data = bindings::planner::resizeworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::resizeworld::plan::resize(
+                        &current_input, p.channels, p.h_in, p.w_in, p.scale_h, p.scale_w, &data,
+                    );
                     computed_output = res.output;
                 },
                 _ => {

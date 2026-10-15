@@ -1,0 +1,36 @@
+package planner:resizeworld;
+
+interface plan {
+
+    // Mesmo record "data" usado em todo o pipeline (ver concat/split).
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32
+    }
+
+    // Upsample nearest-neighbor 2D, canal a canal, assumindo batch=1 e
+    // layout CHW achatado (mesma convenção de channels/h-in/w-in usada
+    // por Conv/MaxPool/GlobalAveragePool no resto do pipeline). scale-h e
+    // scale-w já vêm resolvidos pelo exporter (onnx_to_dfg.py), a partir
+    // do initializer "scales" ou "sizes" do nó Resize original — o
+    // receiver não precisa saber de onde vieram.
+    resize: func(
+        input: list<f32>,
+        channels: u32,
+        h-in: u32,
+        w-in: u32,
+        scale-h: f32,
+        scale-w: f32,
+        result-container: data
+    ) -> data;
+
+}
+
+world resizeworld {
+    export plan;
+}

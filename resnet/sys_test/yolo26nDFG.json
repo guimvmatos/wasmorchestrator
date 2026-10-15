@@ -1,520 +1,254 @@
 {
   "model": "yolo26n",
   "steps": [
+    1,
     {
-      "step": 1,
-      "name": "/model.0/conv/Conv",
-      "kernel_type": 1,
+      "step": 268,
+      "name": "/model.23/Slice_1",
+      "kernel_type": 19,
       "params": {
-        "weight_path": "../bin_weights/model.0.conv.weight.bin",
-        "bias_path": "../bin_weights/model.0.conv.bias.bin",
-        "cout": 16,
-        "cin": 3,
-        "groups": 1,
-        "h_in": 640,
-        "w_in": 640,
-        "kh": 3,
-        "kw": 3,
-        "stride": 2,
-        "padding": 1
+        "input_shape": [
+          1,
+          4,
+          8400
+        ],
+        "starts": [
+          2
+        ],
+        "ends": [
+          4
+        ],
+        "axes": [
+          1
+        ],
+        "steps": [
+          1
+        ]
       },
       "next_steps": [
-        2
+        271
       ]
     },
     {
-      "step": 2,
-      "name": "/model.0/act/Mul",
+      "step": 269,
+      "name": "/model.23/cv3.2/cv3.2.1/cv3.2.1.1/act/Mul",
       "kernel_type": 12,
       "params": {},
       "next_steps": [
-        3
+        274
       ]
     },
     {
-      "step": 3,
-      "name": "/model.1/conv/Conv",
-      "kernel_type": 1,
+      "step": 270,
+      "name": "/model.23/Sub",
+      "kernel_type": 20,
       "params": {
-        "weight_path": "../bin_weights/model.1.conv.weight.bin",
-        "bias_path": "../bin_weights/model.1.conv.bias.bin",
-        "cout": 32,
-        "cin": 16,
-        "groups": 1,
-        "h_in": 320,
-        "w_in": 320,
-        "kh": 3,
-        "kw": 3,
-        "stride": 2,
-        "padding": 1
+        "const_path": "../bin_weights/_model.23_Constant_12_output_0.bin",
+        "const_shape": [
+          1,
+          2,
+          8400
+        ],
+        "const_is_first": true
       },
       "next_steps": [
-        4
+        272,
+        273
       ]
     },
     {
-      "step": 4,
-      "name": "/model.1/act/Mul",
-      "kernel_type": 12,
+      "step": 271,
+      "name": "/model.23/Add_1",
+      "kernel_type": 5,
       "params": {},
       "next_steps": [
-        5
+        272,
+        273
       ]
     },
     {
-      "step": 5,
-      "name": "/model.2/cv1/conv/Conv",
+      "step": 272,
+      "name": "/model.23/Add_2",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        275
+      ]
+    },
+    {
+      "step": 273,
+      "name": "/model.23/Sub_1",
+      "kernel_type": 20,
+      "params": {},
+      "next_steps": [
+        277
+      ]
+    },
+    {
+      "step": 274,
+      "name": "/model.23/cv3.2/cv3.2.2/Conv",
       "kernel_type": 1,
       "params": {
-        "weight_path": "../bin_weights/model.2.cv1.conv.weight.bin",
-        "bias_path": "../bin_weights/model.2.cv1.conv.bias.bin",
-        "cout": 32,
-        "cin": 32,
+        "weight_path": "../bin_weights/model.23.cv3.2.2.weight.bin",
+        "bias_path": "../bin_weights/model.23.cv3.2.2.bias.bin",
+        "cout": 80,
+        "cin": 80,
         "groups": 1,
-        "h_in": 160,
-        "w_in": 160,
+        "h_in": 20,
+        "w_in": 20,
         "kh": 1,
         "kw": 1,
         "stride": 1,
         "padding": 0
       },
       "next_steps": [
-        6
+        276
       ]
     },
     {
-      "step": 6,
-      "name": "/model.2/cv1/act/Mul",
-      "kernel_type": 12,
-      "params": {},
-      "next_steps": [
-        7
-      ]
-    },
-    {
-      "step": 7,
-      "name": "/model.2/Split",
-      "kernel_type": 13,
+      "step": 275,
+      "name": "/model.23/Div_1",
+      "kernel_type": 21,
       "params": {
-        "axis": 1,
-        "input_shape": [
-          1,
-          32,
-          160,
-          160
-        ],
-        "split": [
-          16,
-          16
-        ],
-        "num_outputs": 2
+        "const_path": "../bin_weights/_model.23_Constant_14_output_0.bin",
+        "const_shape": [],
+        "const_is_first": false
       },
       "next_steps": [
-        13,
-        8,
-        12
-      ],
-      "output_routes": [
-        {
-          "to_step": 13,
-          "output_index": 0
-        },
-        {
-          "to_step": 8,
-          "output_index": 1
-        },
-        {
-          "to_step": 12,
-          "output_index": 1
-        },
-        {
-          "to_step": 13,
-          "output_index": 1
-        }
+        277
       ]
     },
     {
-      "step": 8,
-      "name": "/model.2/m.0/cv1/conv/Conv",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/model.2.m.0.cv1.conv.weight.bin",
-        "bias_path": "../bin_weights/model.2.m.0.cv1.conv.bias.bin",
-        "cout": 8,
-        "cin": 16,
-        "groups": 1,
-        "h_in": 160,
-        "w_in": 160,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
-      },
-      "next_steps": [
-        9
-      ]
-    },
-    {
-      "step": 9,
-      "name": "/model.2/m.0/cv1/act/Mul",
-      "kernel_type": 12,
+      "step": 276,
+      "name": "/model.23/Reshape_5",
+      "kernel_type": 15,
       "params": {},
       "next_steps": [
-        10
+        278
       ]
     },
     {
-      "step": 10,
-      "name": "/model.2/m.0/cv2/conv/Conv",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/model.2.m.0.cv2.conv.weight.bin",
-        "bias_path": "../bin_weights/model.2.m.0.cv2.conv.bias.bin",
-        "cout": 16,
-        "cin": 8,
-        "groups": 1,
-        "h_in": 160,
-        "w_in": 160,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
-      },
-      "next_steps": [
-        11
-      ]
-    },
-    {
-      "step": 11,
-      "name": "/model.2/m.0/cv2/act/Mul",
-      "kernel_type": 12,
-      "params": {},
-      "next_steps": [
-        12
-      ]
-    },
-    {
-      "step": 12,
-      "name": "/model.2/m.0/Add",
-      "kernel_type": 5,
-      "params": {},
-      "next_steps": [
-        13
-      ]
-    },
-    {
-      "step": 13,
-      "name": "/model.2/Concat",
+      "step": 277,
+      "name": "/model.23/Concat_2",
       "kernel_type": 14,
       "params": {
         "axis": 1,
         "input_order": [
           {
             "const": false,
-            "step": 7,
+            "step": 275,
             "shape": [
               1,
-              16,
-              160,
-              160
+              2,
+              8400
             ]
           },
           {
             "const": false,
-            "step": 7,
+            "step": 273,
             "shape": [
               1,
-              16,
-              160,
-              160
-            ]
-          },
-          {
-            "const": false,
-            "step": 12,
-            "shape": [
-              1,
-              16,
-              160,
-              160
+              2,
+              8400
             ]
           }
         ]
       },
       "next_steps": [
-        14
+        279
       ]
     },
     {
-      "step": 14,
-      "name": "/model.2/cv2/conv/Conv",
-      "kernel_type": 1,
+      "step": 278,
+      "name": "/model.23/Concat_1",
+      "kernel_type": 14,
       "params": {
-        "weight_path": "../bin_weights/model.2.cv2.conv.weight.bin",
-        "bias_path": "../bin_weights/model.2.cv2.conv.bias.bin",
-        "cout": 64,
-        "cin": 48,
-        "groups": 1,
-        "h_in": 160,
-        "w_in": 160,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
+        "axis": 2,
+        "input_order": [
+          {
+            "const": false,
+            "step": 189,
+            "shape": [
+              1,
+              80,
+              6400
+            ]
+          },
+          {
+            "const": false,
+            "step": 229,
+            "shape": [
+              1,
+              80,
+              1600
+            ]
+          },
+          {
+            "const": false,
+            "step": 276,
+            "shape": [
+              1,
+              80,
+              400
+            ]
+          }
+        ]
       },
       "next_steps": [
-        15
+        280
       ]
     },
     {
-      "step": 15,
-      "name": "/model.2/cv2/act/Mul",
-      "kernel_type": 12,
-      "params": {},
-      "next_steps": [
-        16
-      ]
-    },
-    {
-      "step": 16,
-      "name": "/model.3/conv/Conv",
-      "kernel_type": 1,
+      "step": 279,
+      "name": "/model.23/Mul_2",
+      "kernel_type": 11,
       "params": {
-        "weight_path": "../bin_weights/model.3.conv.weight.bin",
-        "bias_path": "../bin_weights/model.3.conv.bias.bin",
-        "cout": 64,
-        "cin": 64,
-        "groups": 1,
-        "h_in": 160,
-        "w_in": 160,
-        "kh": 3,
-        "kw": 3,
-        "stride": 2,
-        "padding": 1
-      },
-      "next_steps": [
-        17
-      ]
-    },
-    {
-      "step": 17,
-      "name": "/model.3/act/Mul",
-      "kernel_type": 12,
-      "params": {},
-      "next_steps": [
-        18
-      ]
-    },
-    {
-      "step": 18,
-      "name": "/model.4/cv1/conv/Conv",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/model.4.cv1.conv.weight.bin",
-        "bias_path": "../bin_weights/model.4.cv1.conv.bias.bin",
-        "cout": 64,
-        "cin": 64,
-        "groups": 1,
-        "h_in": 80,
-        "w_in": 80,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
-      "next_steps": [
-        19
-      ]
-    },
-    {
-      "step": 19,
-      "name": "/model.4/cv1/act/Mul",
-      "kernel_type": 12,
-      "params": {},
-      "next_steps": [
-        20
-      ]
-    },
-    {
-      "step": 20,
-      "name": "/model.4/Split",
-      "kernel_type": 13,
-      "params": {
-        "axis": 1,
-        "input_shape": [
+        "const_path": "../bin_weights/_model.23_Constant_15_output_0.bin",
+        "const_shape": [
           1,
-          64,
-          80,
-          80
-        ],
-        "split": [
-          32,
-          32
-        ],
-        "num_outputs": 2
+          8400
+        ]
       },
       "next_steps": [
-        26,
-        21,
-        25
-      ],
-      "output_routes": [
-        {
-          "to_step": 26,
-          "output_index": 0
-        },
-        {
-          "to_step": 21,
-          "output_index": 1
-        },
-        {
-          "to_step": 25,
-          "output_index": 1
-        },
-        {
-          "to_step": 26,
-          "output_index": 1
-        }
+        281
       ]
     },
     {
-      "step": 21,
-      "name": "/model.4/m.0/cv1/conv/Conv",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/model.4.m.0.cv1.conv.weight.bin",
-        "bias_path": "../bin_weights/model.4.m.0.cv1.conv.bias.bin",
-        "cout": 16,
-        "cin": 32,
-        "groups": 1,
-        "h_in": 80,
-        "w_in": 80,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
-      },
-      "next_steps": [
-        22
-      ]
-    },
-    {
-      "step": 22,
-      "name": "/model.4/m.0/cv1/act/Mul",
-      "kernel_type": 12,
+      "step": 280,
+      "name": "/model.23/Sigmoid",
+      "kernel_type": 10,
       "params": {},
       "next_steps": [
-        23
+        281
       ]
     },
     {
-      "step": 23,
-      "name": "/model.4/m.0/cv2/conv/Conv",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/model.4.m.0.cv2.conv.weight.bin",
-        "bias_path": "../bin_weights/model.4.m.0.cv2.conv.bias.bin",
-        "cout": 32,
-        "cin": 16,
-        "groups": 1,
-        "h_in": 80,
-        "w_in": 80,
-        "kh": 3,
-        "kw": 3,
-        "stride": 1,
-        "padding": 1
-      },
-      "next_steps": [
-        24
-      ]
-    },
-    {
-      "step": 24,
-      "name": "/model.4/m.0/cv2/act/Mul",
-      "kernel_type": 12,
-      "params": {},
-      "next_steps": [
-        25
-      ]
-    },
-    {
-      "step": 25,
-      "name": "/model.4/m.0/Add",
-      "kernel_type": 5,
-      "params": {},
-      "next_steps": [
-        26
-      ]
-    },
-    {
-      "step": 26,
-      "name": "/model.4/Concat",
+      "step": 281,
+      "name": "/model.23/Concat_3",
       "kernel_type": 14,
       "params": {
         "axis": 1,
         "input_order": [
           {
             "const": false,
-            "step": 20,
+            "step": 279,
             "shape": [
               1,
-              32,
-              80,
-              80
+              4,
+              8400
             ]
           },
           {
             "const": false,
-            "step": 20,
+            "step": 280,
             "shape": [
               1,
-              32,
               80,
-              80
-            ]
-          },
-          {
-            "const": false,
-            "step": 25,
-            "shape": [
-              1,
-              32,
-              80,
-              80
+              8400
             ]
           }
         ]
       },
-      "next_steps": [
-        27
-      ]
-    },
-    {
-      "step": 27,
-      "name": "/model.4/cv2/conv/Conv",
-      "kernel_type": 1,
-      "params": {
-        "weight_path": "../bin_weights/model.4.cv2.conv.weight.bin",
-        "bias_path": "../bin_weights/model.4.cv2.conv.bias.bin",
-        "cout": 128,
-        "cin": 96,
-        "groups": 1,
-        "h_in": 80,
-        "w_in": 80,
-        "kh": 1,
-        "kw": 1,
-        "stride": 1,
-        "padding": 0
-      },
-      "next_steps": [
-        28
-      ]
-    },
-    {
-      "step": 28,
-      "name": "/model.4/cv2/act/Mul",
-      "kernel_type": 12,
-      "params": {},
       "next_steps": []
     }
   ]

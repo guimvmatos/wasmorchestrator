@@ -228,6 +228,64 @@ CC="" cargo build --target=wasm32-wasip2 --release
 cd ..
 wac plug silu/target/wasm32-wasip2/release/siluserver.wasm --plug ../kernel/silu/siluworld_component.wasm -o siluFinal.wasm
 
+#### split (kernel_13)
+cd ../kernel/split/
+wit-bindgen c --world splitworld split.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  split.c splitworld.c splitworld_component_type.o \
+  -o splitworld_component.wasm -mexec-model=reactor
+
+##### Receiver
+cd ../../receiver/split
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug split/target/wasm32-wasip2/release/splitserver.wasm --plug ../kernel/split/splitworld_component.wasm -o splitFinal.wasm
+
+
+#### concat (kernel_14)
+##### Kernel
+cd ../kernel/concat/
+wit-bindgen c --world concatworld concat.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  concat.c concatworld.c concatworld_component_type.o \
+  -o concatworld_component.wasm -mexec-model=reactor
+
+##### Receiver
+cd ../../receiver/concat
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug concat/target/wasm32-wasip2/release/concatserver.wasm --plug ../kernel/concat/concatworld_component.wasm -o concatFinal.wasm
+
+#### resize (kernel_18)
+# upsample nearest 2D (FPN top-down do YOLO) — puro CPU, sem variante GPU.
+##### Kernel
+cd ../kernel/resize/
+wit-bindgen c --world resizeworld resize.wit
+export WASI_SDK=/opt/wasi-sdk
+$WASI_SDK/bin/clang --target=wasm32-wasip2 \
+  --sysroot=$WASI_SDK/share/wasi-sysroot \
+  -I$WASI_SDK/share/wasi-sysroot/include/wasm32-wasip2 \
+  -O3 -msimd128 \
+  resize.c resizeworld.c resizeworld_component_type.o \
+  -o resizeworld_component.wasm -mexec-model=reactor
+
+##### Receiver
+cd ../../receiver/resize
+wkg wit fetch
+cargo build --target wasm32-wasip2 --release
+cd ..
+wac plug resize/target/wasm32-wasip2/release/resizeserver.wasm --plug ../kernel/resize/resizeworld_component.wasm -o resizeFinal.wasm
+
 #### all (kernel_0) — DEPRECADO, ver "Dynamic Builder" abaixo
 # O crate receiver/all é estático (código Rust escrito à mão, não gerado) e
 # ficou para trás em duas frentes:
@@ -277,15 +335,19 @@ mv dropoutFinal.wasm kernel_9.wasm
 mv sigmoidFinal.wasm kernel_10.wasm
 mv mulFinal.wasm kernel_11.wasm
 mv siluFinal.wasm kernel_12.wasm
+mv splitFinal.wasm kernel_13.wasm
+mv concatFinal.wasm kernel_14.wasm
+mv resizeFinal.wasm kernel_18.wasm
 mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 
 cd "$WOR/resnet/components/receiver/dynamic_builder"
-python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14 --component-dir ./target_component --output ./node_all.wasm
+python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14,18 --component-dir ./target_component --output ./node_all.wasm
 Change the name of the .wasm and put it on the sys_test folder
-# split(13) e concat(14) são kernels CPU puros (puro rearranjo de memória,
-# sem ganho em GPU) — ver Compilation_resnet_GPU.md pro --gpu equivalente e
-# pro build prévio das crates kernel/split e kernel/concat.
+# split(13), concat(14) e resize(18) são kernels CPU puros (puro rearranjo/
+# gather de memória, sem ganho em GPU) — ver Compilation_resnet_GPU.md pro
+# --gpu equivalente e pro build prévio das crates kernel/split, kernel/concat
+# e kernel/resize.
 
 #### Onnx to Json
 cd "$WOR/resnet/test_onnx/"

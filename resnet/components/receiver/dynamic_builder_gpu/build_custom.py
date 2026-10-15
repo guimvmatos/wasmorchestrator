@@ -477,11 +477,8 @@ KERNELS = {
                 },""",
         "variants": {
             "cpu": {
-                # split é crate Rust nativa (wit_bindgen macro, não wit-bindgen c),
-                # igual às *_gpu — o override aponta pro subdir "wit", não a raiz
-                # do crate (confirmado contra receiver/split/wkg.toml já funcional).
-                "wkg_override": '"planner:splitworld" = { path = "../../../kernel/split/wit" }',
-                "wasm_path": "../../../kernel/split/target/wasm32-wasip2/release/split.wasm",
+                "wkg_override": '"planner:splitworld" = { path = "../../../kernel/split/" }',
+                "wasm_path": "../../../kernel/split/splitworld_component.wasm",
             },
         },
     },
@@ -534,8 +531,38 @@ KERNELS = {
                 },""",
         "variants": {
             "cpu": {
-                "wkg_override": '"planner:concatworld" = { path = "../../../kernel/concat/wit" }',
-                "wasm_path": "../../../kernel/concat/target/wasm32-wasip2/release/concat.wasm",
+                "wkg_override": '"planner:concatworld" = { path = "../../../kernel/concat/" }',
+                "wasm_path": "../../../kernel/concat/concatworld_component.wasm",
+            },
+        },
+    },
+    18: {
+        "name": "resize",
+        "wit_import": "    import planner:resizeworld/plan;",
+        # Upsample nearest 2D (FPN top-down do YOLO) — único input/output,
+        # mesma forma dos kernels simples (Conv/MaxPool/GAP). channels/h_in/
+        # w_in já existem em LayerParams (compartilhados com Conv/BN/MaxPool);
+        # scale_h/scale_w vêm resolvidos pelo onnx_to_dfg.py a partir do
+        # initializer "scales" ou "sizes" do nó Resize original.
+        "rust_match": """                18 => {
+                    let data = bindings::planner::resizeworld::plan::Data {
+                        input: current_input.clone(),
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::resizeworld::plan::resize(
+                        &current_input, p.channels, p.h_in, p.w_in, p.scale_h, p.scale_w, &data,
+                    );
+                    computed_output = res.output;
+                },""",
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:resizeworld" = { path = "../../../kernel/resize/" }',
+                "wasm_path": "../../../kernel/resize/resizeworld_component.wasm",
             },
         },
     },
@@ -752,6 +779,13 @@ struct LayerParams {{
     // --- Concat (14) ---
     #[serde(default)]
     input_order: Vec<InputOrderEntry>,
+    // --- Resize (18) --- channels/h_in/w_in já existem acima, reusados.
+    #[serde(default)]
+    scale_h: f32,
+    #[serde(default)]
+    scale_w: f32,
+    #[serde(default)]
+    mode: String,
 }}
 
 #[derive(Deserialize, Debug, Clone)]
@@ -1052,7 +1086,7 @@ def main():
 
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 14.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 14, 18.")
             sys.exit(1)
 
     for k in gpu_ids:

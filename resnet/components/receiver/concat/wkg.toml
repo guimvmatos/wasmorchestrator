@@ -1,2 +1,2 @@
 [overrides]
-"planner:concatworld" = { path = "../../kernel/concat/wit" }
+"planner:concatworld" = { path = "../../kernel/concat" }

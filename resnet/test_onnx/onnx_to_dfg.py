@@ -412,6 +412,137 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
                 "input_order": input_order,
             }
 
+        elif kernel_type == 15:  # Reshape
+            # Reshape nunca reordena elementos de um buffer row-major — só
+            # reinterpreta as dimensões. Como este pipeline passa tensores
+            # como Vec<f32> já achatado (sem metadado de shape viajando
+            # junto do dado), o kernel de Reshape é um pass-through puro:
+            # os consumidores downstream (Transpose, MatMul, Slice, Softmax)
+            # recebem seu próprio shape resolvido estaticamente aqui no
+            # grafo, não inferido a partir deste Reshape.
+            params = {}
+
+        elif kernel_type == 16:  # Transpose
+            full_in_shape = value_info_shapes.get(main_input_name, in_shape)
+            rank = len(full_in_shape) if full_in_shape else None
+            perm = get_node_attribute(node, "perm", None)
+            if perm is None:
+                # Sem atributo "perm": default do ONNX é inverter todos os eixos.
+                perm = list(reversed(range(rank))) if rank else []
+            params = {
+                "input_shape": [int(d) if d is not None else -1 for d in full_in_shape],
+                "perm": [int(p) for p in perm],
+            }
+
+        elif kernel_type == 17:  # MatMul (tensor x tensor dinâmico, não é Gemm)
+            in0_shape = value_info_shapes.get(node.input[0], [])
+            in1_shape = value_info_shapes.get(node.input[1], [])
+            params = {
+                "lhs_shape": [int(d) if d is not None else -1 for d in in0_shape],
+                "rhs_shape": [int(d) if d is not None else -1 for d in in1_shape],
+            }
+
+        elif kernel_type == 18:  # Resize (upsample nearest, usado no FPN do YOLO)
+            mode = get_node_attribute(node, "mode", "nearest")
+            # Desde opset 11, scales/sizes chegam como inputs opcionais, não
+            # atributos: node.input = [X, roi, scales, sizes]. Resolve o
+            # fator de upsample a partir do initializer de "scales" quando
+            # presente; cai pra "sizes" (dividido pelo h_in/w_in de entrada)
+            # quando o exporter usou sizes explícito em vez de scales.
+            scale_h, scale_w = 2.0, 2.0
+            if len(node.input) > 2 and node.input[2] and node.input[2] in initializers:
+                scales_arr = numpy_helper.to_array(initializers[node.input[2]])
+                if len(scales_arr) >= 4:
+                    scale_h, scale_w = float(scales_arr[2]), float(scales_arr[3])
+            elif len(node.input) > 3 and node.input[3] and node.input[3] in initializers:
+                sizes_arr = numpy_helper.to_array(initializers[node.input[3]])
+                if len(sizes_arr) >= 4 and h_in and w_in:
+                    scale_h = float(sizes_arr[2]) / float(h_in)
+                    scale_w = float(sizes_arr[3]) / float(w_in)
+            params = {
+                "channels": int(c_in),
+                "h_in": int(h_in),
+                "w_in": int(w_in),
+                "scale_h": scale_h,
+                "scale_w": scale_w,
+                "mode": str(mode),
+            }
+
+        elif kernel_type == 19:  # Slice
+            full_in_shape = value_info_shapes.get(main_input_name, in_shape)
+            rank = len(full_in_shape) if full_in_shape else None
+
+            def _ints_input(idx):
+                if len(node.input) > idx and node.input[idx] and node.input[idx] in initializers:
+                    return [int(x) for x in numpy_helper.to_array(initializers[node.input[idx]]).tolist()]
+                return None
+
+            starts = get_node_attribute(node, "starts", None)
+            if starts is None:
+                starts = _ints_input(1)
+            ends = get_node_attribute(node, "ends", None)
+            if ends is None:
+                ends = _ints_input(2)
+            axes = get_node_attribute(node, "axes", None)
+            if axes is None:
+                axes = _ints_input(3)
+            if axes is None and starts is not None:
+                axes = list(range(len(starts)))
+            # NUNCA chamar esta variável de "steps" — esse nome já é usado pela
+            # lista acumuladora de todo o DFG (steps = [] lá em cima, uma por
+            # função). Reatribuir "steps" aqui sobrescreve silenciosamente essa
+            # lista inteira a partir deste ponto do loop, descartando todos os
+            # StepNodes já acumulados (bug real encontrado: um Slice no meio do
+            # grafo truncava o JSON exportado para poucos steps finais).
+            slice_strides = get_node_attribute(node, "steps", None)
+            if slice_strides is None:
+                slice_strides = _ints_input(4)
+            if slice_strides is None and starts is not None:
+                slice_strides = [1] * len(starts)
+
+            params = {
+                "input_shape": [int(d) if d is not None else -1 for d in full_in_shape],
+                "starts": [int(s) for s in starts] if starts else [],
+                "ends": [int(e) for e in ends] if ends else [],
+                "axes": [int(normalize_axis(a, rank)) for a in axes] if axes else [],
+                "steps": [int(s) for s in slice_strides] if slice_strides else [],
+            }
+
+        elif kernel_type in (20, 21):  # Sub / Div
+            # Mesmo padrão do Mul (kernel 11): um dos dois inputs pode ser
+            # constante (initializer) — ex: anchor_points fixo no decode do
+            # YOLO (grid constante pra resolução de entrada fixa). Sub/Div
+            # NÃO são comutativos como Add/Mul, então guardamos qual lado é
+            # a constante (const_is_first) pro kernel montar a - b na ordem
+            # certa. Quando os dois lados são dinâmicos, o kernel trata como
+            # binário elementwise simples (mesmo shape), igual ao Add.
+            in0, in1 = node.input[0], node.input[1]
+            const_tensor = None
+            const_is_first = False
+            if in0 in initializers:
+                const_tensor = initializers[in0]
+                const_is_first = True
+            elif in1 in initializers:
+                const_tensor = initializers[in1]
+
+            if const_tensor is not None:
+                params = {
+                    "const_path": save_weight_bin(const_tensor, weights_dir),
+                    "const_shape": [int(d) for d in const_tensor.dims],
+                    "const_is_first": const_is_first,
+                }
+            else:
+                params = {}
+
+        elif kernel_type == 22:  # Softmax
+            full_in_shape = value_info_shapes.get(main_input_name, in_shape)
+            rank = len(full_in_shape) if full_in_shape else None
+            axis = normalize_axis(get_node_attribute(node, "axis", -1), rank)
+            params = {
+                "input_shape": [int(d) if d is not None else -1 for d in full_in_shape],
+                "axis": int(axis),
+            }
+
         # Encontrar next_steps observando quem consome a saída deste nó.
         # Para um SiLU fundido, "node" já foi redirecionado para o mul_node
         # acima, então node.output continua correto (é a saída real do par).

@@ -1,0 +1,2 @@
+[overrides]
+"planner:resizeworld" = { path = "../../kernel/resize" }

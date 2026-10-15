@@ -11,6 +11,7 @@
 "planner:sigmoidworld" = { path = "../../../kernel/sigmoid_gpu/wit" }
 "planner:mulworld" = { path = "../../../kernel/mul_gpu/wit" }
 "planner:siluworld" = { path = "../../../kernel/silu_gpu/wit" }
-"planner:splitworld" = { path = "../../../kernel/split/wit" }
-"planner:concatworld" = { path = "../../../kernel/concat/wit" }
+"planner:splitworld" = { path = "../../../kernel/split/" }
+"planner:concatworld" = { path = "../../../kernel/concat/" }
+"planner:resizeworld" = { path = "../../../kernel/resize/" }
 "wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }
