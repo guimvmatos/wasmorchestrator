@@ -13,5 +13,7 @@ world runner {
     import planner:sigmoidworld/plan;
     import planner:mulworld/plan;
     import planner:siluworld/plan;
+    import planner:splitworld/plan;
+    import planner:concatworld/plan;
     export wasi:cli/run@0.2.7;
 }

@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::Deserialize;
 
-const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const LOCAL_KERNELS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 thread_local! {
     // Controla quais weight_id (= weight_path) já foram enviados
     // ao kernel GPU via gemm_load_weights neste processo. Evita
@@ -65,6 +65,24 @@ struct RoutingTable {
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
+struct OutputRoute {
+    to_step: u32,
+    output_index: u32,
+}
+
+// Espelha o formato emitido pelo onnx_to_dfg.py pros params de Concat
+// (kernel_type 14): {"const": bool, "step": Option<u32>, "shape": [i64, ...]}.
+#[derive(Deserialize, Debug, Clone, Default)]
+struct InputOrderEntry {
+    #[serde(default, rename = "const")]
+    is_const: bool,
+    #[serde(default)]
+    step: Option<u32>,
+    #[serde(default)]
+    shape: Vec<i64>,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
 struct LayerParams {
     #[serde(default)]
     weight_path: String,
@@ -108,6 +126,19 @@ struct LayerParams {
     const_path: String,
     #[serde(default)]
     const_shape: Vec<u32>,
+    // --- Split (13) ---
+    #[serde(default)]
+    axis: u32,
+    #[serde(default)]
+    input_shape: Vec<i64>,
+    // None = split igual (opset 18 "num_outputs", sem tamanhos explícitos).
+    #[serde(default)]
+    split: Option<Vec<u32>>,
+    #[serde(default)]
+    num_outputs: u32,
+    // --- Concat (14) ---
+    #[serde(default)]
+    input_order: Vec<InputOrderEntry>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -120,6 +151,11 @@ struct StepNode {
     params: LayerParams,
     #[serde(default)]
     next_steps: Vec<u32>,
+    // Preenchido pelo onnx_to_dfg.py só pra steps com >1 saída roteada
+    // individualmente (Split é sempre um deles). Usado em vez de next_steps
+    // genérico quando presente.
+    #[serde(default)]
+    output_routes: Vec<OutputRoute>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -172,6 +208,10 @@ fn handle_client(
         let mut queue: VecDeque<(u32, Vec<f32>, u32)> = VecDeque::new();
         let mut add_branches: HashMap<u32, Vec<f32>> = HashMap::new();
         let mut mul_branches: HashMap<u32, Vec<f32>> = HashMap::new();
+        // Concat (14): chave externa = step do Concat; chave interna =
+        // from_step; valor = fila (não Vec simples) porque o MESMO from_step
+        // pode aparecer 2x em input_order (duas metades do mesmo Split).
+        let mut concat_branches: HashMap<u32, HashMap<u32, VecDeque<Vec<f32>>>> = HashMap::new();
 
         queue.push_back((input_img.current_kernel, input_img.input.clone(), input_img.from_step));
 
@@ -411,6 +451,90 @@ fn handle_client(
                         from_step: origin_step,
                     };
                     let res = bindings::planner::siluworld::plan::silu(&data);
+                    computed_output = res.output;
+                },
+                13 => {
+                    if current_node.output_routes.is_empty() {
+                        panic!("Step {} (Split) sem output_routes — grafo desatualizado?", current_step);
+                    }
+                    let shape: Vec<u32> = p.input_shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect();
+                    let sizes: Vec<u32> = match &p.split {
+                        Some(s) => s.clone(),
+                        None => {
+                            let n = p.num_outputs.max(1);
+                            let total = *shape.get(p.axis as usize).unwrap_or(&0);
+                            assert_eq!(total % n, 0, "Split step {}: shape[axis]={} não divide igualmente em num_outputs={}", current_step, total, n);
+                            vec![total / n; n as usize]
+                        }
+                    };
+                    let data = bindings::planner::splitworld::plan::Data {
+                        input: vec![],
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let outputs = bindings::planner::splitworld::plan::split(&current_input, &shape, p.axis, &sizes, &data);
+                    let out_len: usize = outputs.iter().map(|o| o.len()).sum();
+                    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open("receiver_logs.jsonl") {
+                        let log_linha = serde_json::json!({
+                            "request": request_id,
+                            "kernel_id": 13u8,
+                            "step": current_step,
+                            "layer_name": current_node.name,
+                            "dispatch": "local-split",
+                            "output_routes": current_node.output_routes.iter().map(|r| (r.to_step, r.output_index)).collect::<Vec<_>>(),
+                            "input_len": input_len,
+                            "output_len": out_len,
+                        });
+                        let _ = writeln!(file, "{}", log_linha);
+                    }
+                    for route in &current_node.output_routes {
+                        let slice = outputs.get(route.output_index as usize).unwrap_or_else(|| {
+                            panic!("Split step {}: output_routes aponta output_index {} mas o kernel só devolveu {} fatias", current_step, route.output_index, outputs.len())
+                        });
+                        queue.push_back((route.to_step, slice.clone(), current_step));
+                    }
+                    continue;
+                },
+                14 => {
+                    if p.input_order.is_empty() {
+                        panic!("Step {} (Concat) sem input_order nos params — grafo desatualizado?", current_step);
+                    }
+                    if p.input_order.iter().any(|e| e.is_const) {
+                        panic!("Concat step {}: entrada constante no input_order ainda não é suportada por este dynamic_builder", current_step);
+                    }
+                    let expected = p.input_order.iter().filter(|e| !e.is_const).count();
+                    {
+                        let step_slots = concat_branches.entry(current_step).or_insert_with(HashMap::new);
+                        step_slots.entry(origin_step).or_insert_with(VecDeque::new).push_back(current_input.clone());
+                    }
+                    let filled: usize = concat_branches.get(&current_step).map(|m| m.values().map(|v| v.len()).sum()).unwrap_or(0);
+                    if filled < expected {
+                        println!("Step {}: ramo from_step={} guardado no Concat ({}/{}). Aguardando o resto...", current_step, origin_step, filled, expected);
+                        continue;
+                    }
+                    let mut slots = concat_branches.remove(&current_step).unwrap();
+                    let inputs: Vec<Vec<f32>> = p.input_order.iter().map(|e| {
+                        let src_step = e.step.unwrap_or_else(|| panic!("Concat step {}: entrada sem step de origem", current_step));
+                        slots.get_mut(&src_step).and_then(|dq| dq.pop_front())
+                            .unwrap_or_else(|| panic!("Concat step {}: faltou o ramo do step {}", current_step, src_step))
+                    }).collect();
+                    let shapes: Vec<Vec<u32>> = p.input_order.iter()
+                        .map(|e| e.shape.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect())
+                        .collect();
+                    let data = bindings::planner::concatworld::plan::Data {
+                        input: vec![],
+                        output: vec![],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    };
+                    let res = bindings::planner::concatworld::plan::concat(&inputs, &shapes, p.axis, &data);
                     computed_output = res.output;
                 },
                 _ => {

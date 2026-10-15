@@ -281,8 +281,11 @@ mv allFinal.wasm kernel_0.wasm
 
 #### Dynamic Builder (kernel_0) 
 cd "$WOR/resnet/components/receiver/dynamic_builder"
-python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12 --component-dir ./target_component --output ./node_all.wasm
+python3 build_custom.py --kernels 1,2,3,4,5,6,7,8,9,10,11,12,13,14 --component-dir ./target_component --output ./node_all.wasm
 Change the name of the .wasm and put it on the sys_test folder
+# split(13) e concat(14) são kernels CPU puros (puro rearranjo de memória,
+# sem ganho em GPU) — ver Compilation_resnet_GPU.md pro --gpu equivalente e
+# pro build prévio das crates kernel/split e kernel/concat.
 
 #### Onnx to Json
 cd "$WOR/resnet/test_onnx/"

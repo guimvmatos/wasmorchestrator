@@ -4,7 +4,7 @@ use std::net::{TcpListener, TcpStream, Shutdown};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::env;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 
 type WitData = bindings::planner::concatworld::plan::Data;
@@ -35,9 +35,16 @@ struct RoutingTable {
 // número de ramos é variável (2, 3, 4+ — ver C2f/SPPF do YOLO). Por isso:
 // - chave (request_id, step): requests concorrentes e Concats diferentes
 //   no mesmo grafo não se cruzam;
-// - valor é from_step -> buffer (não um Vec posicional): a ordem final é
-//   remontada depois a partir de input_order, nunca da ordem de chegada.
-static PENDING_CONCAT: Mutex<Option<HashMap<(u32, u32), HashMap<u32, Vec<f32>>>>> = Mutex::new(None);
+// - valor é from_step -> fila (VecDeque, não um único Vec<f32>): o MESMO
+//   from_step pode aparecer 2x em input_order — ex. C2f, onde as duas
+//   metades de um Split alimentam o mesmo Concat. Um HashMap<u32, Vec<f32>>
+//   simples perderia a 1ª fatia quando a 2ª chegasse com a mesma chave
+//   (from_step idêntico pras duas, porque o Split marca from_step = seu
+//   próprio step pra TODAS as rotas, não por output_index). Com fila,
+//   cada chegada empilha no fim e a remontagem final consome em FIFO por
+//   from_step — ordem que corresponde à ordem crescente de output_index
+//   com que o Split despachou as rotas.
+static PENDING_CONCAT: Mutex<Option<HashMap<(u32, u32), HashMap<u32, VecDeque<Vec<f32>>>>>> = Mutex::new(None);
 
 // Espelha o formato emitido pelo onnx_to_dfg.py pro kernel_type 14 (Concat):
 // {"const": bool, "step": Option<u32>, "shape": [i64, ...]}.
@@ -146,15 +153,16 @@ fn handle_client(
         // 1. Join dos N ramos (igual em espírito ao Add/Mul, mas por
         // from_step em vez de "primeiro que chegar", porque a ordem importa).
         let t_join = Instant::now(); // [T]
-        let ready_inputs: Option<HashMap<u32, Vec<f32>>> = {
+        let ready_inputs: Option<HashMap<u32, VecDeque<Vec<f32>>>> = {
             let mut lock = PENDING_CONCAT.lock().unwrap();
             let outer = lock.get_or_insert_with(HashMap::new);
             let key = (request_id, current_step);
             let slot_map = outer.entry(key).or_insert_with(HashMap::new);
-            slot_map.insert(from_step, input_img.input.clone());
+            slot_map.entry(from_step).or_insert_with(VecDeque::new).push_back(input_img.input.clone());
 
             let expected = input_order.iter().filter(|e| !e.is_const).count();
-            if slot_map.len() >= expected {
+            let filled: usize = slot_map.values().map(|v| v.len()).sum();
+            if filled >= expected {
                 outer.remove(&key)
             } else {
                 None
@@ -162,7 +170,7 @@ fn handle_client(
         };
         let join_us = t_join.elapsed().as_micros() as u64; // [T]
 
-        let arrived = match ready_inputs {
+        let mut arrived = match ready_inputs {
             Some(map) => map,
             None => {
                 println!(
@@ -188,7 +196,7 @@ fn handle_client(
         let inputs: Vec<Vec<f32>> = input_order.iter()
             .map(|e| {
                 let src_step = e.step.unwrap_or_else(|| panic!("Concat step {}: entrada sem step de origem", current_step));
-                arrived.get(&src_step).cloned()
+                arrived.get_mut(&src_step).and_then(|dq| dq.pop_front())
                     .unwrap_or_else(|| panic!("Concat step {}: faltou o ramo do step {}", current_step, src_step))
             })
             .collect();
