@@ -31,8 +31,21 @@ struct RoutingTable {
 
 use std::sync::Mutex;
 
-// Buffer de junção para sincronizar os dois ramos por request_id
+// Caso tensor x tensor: buffer de junção para sincronizar os dois ramos por request_id
 static PENDING_BUFFERS: Mutex<Option<HashMap<u32, Vec<f32>>>> = Mutex::new(None);
+
+// Caso tensor x constante (ex: "/model.23/Add_1" no decode do YOLO, que soma
+// com o tensor anchor_points fixo — dist2bbox: x2y2 = anchor_points + rb):
+// cache do peso carregado do disco, igual ao Mul (kernel 11).
+static CONST_CACHE: Mutex<Option<HashMap<String, Vec<f32>>>> = Mutex::new(None);
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+struct AddParams {
+    #[serde(default)]
+    const_path: String,
+    #[serde(default)]
+    const_shape: Vec<u32>,
+}
 
 #[derive(Deserialize, Debug, Clone)]
 struct StepNode {
@@ -41,6 +54,8 @@ struct StepNode {
     name: String,
     kernel_type: u8,
     #[serde(default)]
+    params: AddParams,
+    #[serde(default)]
     next_steps: Vec<u32>,
 }
 
@@ -48,6 +63,25 @@ struct StepNode {
 struct ModelGraph {
     model: String,
     steps: Vec<StepNode>,
+}
+
+fn load_const(path: &str) -> Vec<f32> {
+    let mut lock = CONST_CACHE.lock().unwrap();
+    let cache = lock.get_or_insert_with(HashMap::new);
+
+    if let Some(cached) = cache.get(path) {
+        return cached.clone();
+    }
+
+    let bytes = std::fs::read(path)
+        .unwrap_or_else(|_| panic!("Erro ao abrir peso constante do Add: {}", path));
+    let floats: Vec<f32> = bytes
+        .chunks_exact(4)
+        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .collect();
+
+    cache.insert(path.to_string(), floats.clone());
+    floats
 }
 
 fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Result<()> {
@@ -84,27 +118,47 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
 
         let req_id = input_img.request;
 
-        // 1. Sincronização dos 2 ramos (Join)
-        let first_tensor = {
-            let mut lock = PENDING_BUFFERS.lock().unwrap();
-            let map = lock.get_or_insert_with(HashMap::new);
+        // Carrega o grafo ANTES de decidir join vs. constante — precisamos
+        // de params.const_path (quando presente) pra saber se este step tem
+        // um lado constante (ex: anchor_points do decode do YOLO) ou se é o
+        // caso de sempre (resíduo de bloco conv, dois ramos dinâmicos).
+        let graph_file = std::fs::File::open("resnet18DFG.json").expect("Erro ao abrir resnet18DFG.json");
+        let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no parser do resnet18DFG.json");
 
-            if let Some(other_tensor) = map.remove(&req_id) {
-                Some(other_tensor) // Segundo ramo chegou!
-            } else {
-                map.insert(req_id, input_img.input.clone()); // Primeiro ramo: guarda no buffer
-                None
+        let current_step = input_img.current_kernel;
+        let current_node = graph.steps.iter().find(|s| s.step == current_step)
+            .unwrap_or_else(|| panic!("Step {} não encontrado no resnet18DFG.json", current_step));
+        let p = &current_node.params;
+
+        // 1. Decide o caso: constante (params.const_path preenchido) ou
+        // tensor x tensor — join-buffer dos 2 ramos por request_id (padrão
+        // de sempre, usado por TODO Add residual em ResNet/VGG/YOLO).
+        let (tensor_a, tensor_b): (Vec<f32>, Vec<f32>) = if !p.const_path.is_empty() {
+            let const_vec = load_const(&p.const_path);
+            (input_img.input.clone(), const_vec)
+        } else {
+            let first_tensor = {
+                let mut lock = PENDING_BUFFERS.lock().unwrap();
+                let map = lock.get_or_insert_with(HashMap::new);
+
+                if let Some(other_tensor) = map.remove(&req_id) {
+                    Some(other_tensor) // Segundo ramo chegou!
+                } else {
+                    map.insert(req_id, input_img.input.clone()); // Primeiro ramo: guarda no buffer
+                    None
+                }
+            };
+
+            match first_tensor {
+                Some(a) => (a, input_img.input.clone()),
+                None => {
+                    println!("Request {}: 1º ramo recebido no Add. Aguardando 2º ramo...", req_id);
+                    break;
+                }
             }
         };
 
-        if first_tensor.is_none() {
-            println!("Request {}: 1º ramo recebido no Add. Aguardando 2º ramo...", req_id);
-            break;
-        }
-
-        println!("Request {}: Ambos os ramos recebidos no Add! Somando...", req_id);
-        let tensor_a = first_tensor.unwrap();
-        let tensor_b = input_img.input.clone();
+        println!("Request {}: Add pronto pra executar (len_a={}, len_b={}).", req_id, tensor_a.len(), tensor_b.len());
 
         // 2. Executa a soma C (A + B)
         let mut status = bindings::planner::addworld::plan::add(
@@ -114,14 +168,6 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         );
 
         let execduration = start_exec.elapsed().as_millis();
-
-        // 3. Carrega grafo
-        let graph_file = std::fs::File::open("resnet18DFG.json").expect("Erro ao abrir resnet18DFG.json");
-        let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no parser do resnet18DFG.json");
-
-        let current_step = input_img.current_kernel;
-        let current_node = graph.steps.iter().find(|s| s.step == current_step)
-            .unwrap_or_else(|| panic!("Step {} não encontrado no resnet18DFG.json", current_step));
 
         let file = std::fs::File::open("routing_table.json").expect("Erro ao abrir JSON");
         let routing: RoutingTable = serde_json::from_reader(file).expect("Erro no JSON");

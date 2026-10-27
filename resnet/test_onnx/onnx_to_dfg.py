@@ -343,6 +343,32 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
         elif kernel_type == 10:  # Sigmoid isolado (fallback quando não funde com Mul)
             params = {}
 
+        elif kernel_type == 5:  # Add
+            # Mesmo padrão do Mul (kernel 11): um dos dois inputs pode ser
+            # constante (initializer) — ex: "/model.23/Add_1" no decode do
+            # YOLO (x2y2 = anchor_points + rb, dist2bbox), onde um lado é o
+            # tensor anchor_points fixo (grid constante pra resolução de
+            # entrada fixa). Add é comutativo — diferente de Sub/Div (20/21)
+            # — então não precisa de const_is_first, ordem não muda o
+            # resultado. Quando os dois lados são dinâmicos (ex: resíduo de
+            # bloco conv/residual em ResNet/VGG/YOLO), continua join-buffer
+            # de 2 ramos por step, igual a sempre — nada muda pros modelos
+            # que só usam Add assim.
+            in0, in1 = node.input[0], node.input[1]
+            const_tensor = None
+            if in0 in initializers:
+                const_tensor = initializers[in0]
+            elif in1 in initializers:
+                const_tensor = initializers[in1]
+
+            if const_tensor is not None:
+                params = {
+                    "const_path": save_weight_bin(const_tensor, weights_dir),
+                    "const_shape": [int(d) for d in const_tensor.dims],
+                }
+            else:
+                params = {}
+
         elif kernel_type == 11:  # Mul
             in0, in1 = node.input[0], node.input[1]
             const_tensor = None

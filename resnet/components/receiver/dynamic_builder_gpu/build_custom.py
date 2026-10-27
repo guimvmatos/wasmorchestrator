@@ -139,8 +139,28 @@ KERNELS = {
     5: {
         "name": "add",
         "wit_import": "    import planner:addworld/plan;",
+        # Add tem dois casos, igual ao Mul (kernel 11): tensor x constante
+        # (params.const_path preenchido, ex: "/model.23/Add_1" do decode do
+        # YOLO — x2y2 = anchor_points + rb, dist2bbox) ou tensor x tensor
+        # (join-buffer por step, o caso de sempre: resíduo de bloco conv em
+        # ResNet/VGG/YOLO). Add é comutativo, então ao contrário de Sub/Div
+        # não precisa de const_is_first — a ordem dos operandos não muda o
+        # resultado.
         "rust_match": """                5 => {
-                    if let Some(first_branch) = add_branches.remove(&current_step) {
+                    if !p.const_path.is_empty() {
+                        let const_vec = load_weights_file_cached(&p.const_path);
+                        let data = bindings::planner::addworld::plan::Data {
+                            input: current_input.clone(),
+                            output: vec![],
+                            reply_to: reply_to.clone(),
+                            current_kernel: current_step,
+                            request: request_id,
+                            kernels: vec![],
+                            from_step: origin_step,
+                        };
+                        let res = bindings::planner::addworld::plan::add(&current_input, const_vec.as_slice(), &data);
+                        computed_output = res.output;
+                    } else if let Some(first_branch) = add_branches.remove(&current_step) {
                         println!("Step {}: 2º ramo recebido! Somando buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
                         let data = bindings::planner::addworld::plan::Data {
                             input: current_input.clone(),

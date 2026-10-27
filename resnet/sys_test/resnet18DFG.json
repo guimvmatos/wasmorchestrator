@@ -4849,7 +4849,14 @@
       "step": 271,
       "name": "/model.23/Add_1",
       "kernel_type": 5,
-      "params": {},
+      "params": {
+        "const_path": "../bin_weights/_model.23_Constant_13_output_0.bin",
+        "const_shape": [
+          1,
+          2,
+          8400
+        ]
+      },
       "next_steps": [
         272,
         273
