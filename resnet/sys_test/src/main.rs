@@ -175,6 +175,26 @@ fn build_and_launch(
 
     println!("[BUILD] Grupo {} compilado com sucesso.", group_id);
 
+    // Copia o registro central de modelos (resnet/models.json) pra dentro
+    // do cwd deste processo (sys_test/), FLAT, sem "..". O componente WASM
+    // roda sob o sandbox WASI do wasi-gfx-runtime, que proíbe o guest de
+    // escapar do diretório pré-aberto via ".." mesmo quando o arquivo real
+    // existe no disco (achado em 28/10, 1ª execução real pós-rebuild: panic
+    // "Erro ao abrir ../models.json ... PermissionDenied / Operation not
+    // permitted" — ver claude/project-state.md). Refeito a cada grupo pra
+    // sempre refletir o registro atual.
+    let models_registry_src = cwd.join("../models.json");
+    let models_registry_dst = cwd.join("models.json");
+    std::fs::copy(&models_registry_src, &models_registry_dst).map_err(|e| {
+        io::Error::new(
+            e.kind(),
+            format!(
+                "Erro copiando {:?} -> {:?} (registro de modelos pro cwd do grupo): {:?}",
+                models_registry_src, models_registry_dst, e
+            ),
+        )
+    })?;
+
     let child = Command::new(RUNTIME_BIN)
         .arg("--wasm")
         .arg(&output_path)

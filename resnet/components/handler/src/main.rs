@@ -26,6 +26,7 @@ struct Data {
     current_kernel: u32,
     request: u32,
     from_step: u32, // precisa bater com o record `data` dos .wit (campo novo, from-step)
+    model_id: u32,  // precisa bater com o record `data` dos .wit (campo novo, model-id)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -209,6 +210,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         current_kernel: first_step, // Carrega o step inicial (ex: 1)
         request: client_req.request_id,
         from_step: 0, // handler é a origem da requisição, não vem de nenhum step anterior
+        model_id: client_req.model_id, // propaga o modelo pedido pro resto do pipeline (Problema 1)
     };
 
     println!(
@@ -220,18 +222,23 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     let total_time_ms = start_total.elapsed().as_micros() as f64 / 1000.0;
     println!("Processamento da demanda concluído localmente em {:.3}ms\n", total_time_ms);
 
-    let route_file = std::fs::File::open("routing_table.json").expect("Erro ao abrir routing_table.json");
+    // Lê a routing_table.json VIVA do sys (resnet/sys_test/), não uma cópia
+    // local do handler — a antiga "routing_table.json" local em
+    // components/handler/ era um resíduo estático de um teste manual antigo
+    // (sempre continha {"table": {"0": "127.0.0.1:8080"}}), nunca atualizado
+    // pelo sys/orquestrador, e o "if let Some(addr) = routing.table.get(&0)"
+    // abaixo sempre achava essa entrada "0" primeiro e ignorava o
+    // first_kernel_type correto — raiz do bug em que toda requisição,
+    // pra qualquer model_id, era despachada pro mesmo endereço fixo
+    // (ver claude/project-state.md).
+    let route_file = std::fs::File::open("../../sys_test/routing_table.json")
+        .expect("Erro ao abrir ../../sys_test/routing_table.json (tabela viva do sys)");
     let routing: RoutingTable = serde_json::from_reader(route_file).expect("Erro no parser de routing_table.json");
 
-    // Se o Kernel 0 (All) estiver ativo, ele assume a execução completa; senão, despacha para o kernel individual
-    let (target_kernel_id, target_address) = if let Some(addr) = routing.table.get(&0) {
-        (0u8, addr.clone())
-    } else {
-        let addr = routing.table.get(&first_kernel_type)
-            .cloned()
-            .unwrap_or_else(|| panic!("Tipo de Kernel {} não encontrado na routing_table.json", first_kernel_type));
-        (first_kernel_type, addr)
-    };
+    let target_kernel_id = first_kernel_type;
+    let target_address = routing.table.get(&first_kernel_type)
+        .cloned()
+        .unwrap_or_else(|| panic!("Tipo de Kernel {} não encontrado na routing_table.json do sys", first_kernel_type));
 
     println!("Despachando demanda para o Kernel Tipo {} em {}...", target_kernel_id, target_address);
 

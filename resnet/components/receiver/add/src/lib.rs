@@ -65,6 +65,40 @@ struct ModelGraph {
     steps: Vec<StepNode>,
 }
 
+#[derive(Deserialize)]
+struct ModelEntry {
+    #[serde(default)]
+    name: String,
+    dfg_path: String,
+    #[serde(default)]
+    kernels: Vec<u8>,
+}
+
+// Lê o registro central de modelos (components/models.json) e devolve o
+// ModelGraph do model_id pedido pelo client — substitui o antigo hardcoded
+// "resnet18DFG.json" (Problema 2 / ver claude/project-state.md).
+fn load_model_graph(model_id: u32) -> ModelGraph {
+    let registry_file = std::fs::File::open("models.json")
+        .expect("Erro ao abrir models.json (registro de modelos)");
+    let registry: HashMap<String, ModelEntry> = serde_json::from_reader(registry_file)
+        .expect("Erro no parser do models.json");
+
+    let entry = registry
+        .iter()
+        .find(|(id_str, _)| id_str.parse::<u32>().map(|id| id == model_id).unwrap_or(false))
+        .map(|(_, entry)| entry)
+        .unwrap_or_else(|| panic!("model_id {} não encontrado no registro models.json", model_id));
+
+    let graph_filename = std::path::Path::new(&entry.dfg_path)
+        .file_name()
+        .unwrap_or_else(|| panic!("dfg_path {:?} sem nome de arquivo valido", entry.dfg_path));
+    let graph_path = std::path::Path::new(graph_filename);
+    let graph_file = std::fs::File::open(&graph_path)
+        .unwrap_or_else(|_| panic!("Erro ao abrir {:?} (dfg_path do model_id {})", graph_path, model_id));
+    serde_json::from_reader(graph_file)
+        .unwrap_or_else(|_| panic!("Erro no parser do grafo {:?}", graph_path))
+}
+
 fn load_const(path: &str) -> Vec<f32> {
     let mut lock = CONST_CACHE.lock().unwrap();
     let cache = lock.get_or_insert_with(HashMap::new);
@@ -122,12 +156,11 @@ fn handle_client(mut stream: TcpStream, initialized: &mut i32) -> std::io::Resul
         // de params.const_path (quando presente) pra saber se este step tem
         // um lado constante (ex: anchor_points do decode do YOLO) ou se é o
         // caso de sempre (resíduo de bloco conv, dois ramos dinâmicos).
-        let graph_file = std::fs::File::open("resnet18DFG.json").expect("Erro ao abrir resnet18DFG.json");
-        let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no parser do resnet18DFG.json");
+        let graph: ModelGraph = load_model_graph(input_img.model_id);
 
         let current_step = input_img.current_kernel;
         let current_node = graph.steps.iter().find(|s| s.step == current_step)
-            .unwrap_or_else(|| panic!("Step {} não encontrado no resnet18DFG.json", current_step));
+            .unwrap_or_else(|| panic!("Step {} não encontrado no grafo do modelo pedido", current_step));
         let p = &current_node.params;
 
         // 1. Decide o caso: constante (params.const_path preenchido) ou

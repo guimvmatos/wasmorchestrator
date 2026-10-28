@@ -51,7 +51,7 @@ void *cabi_realloc(void *ptr, size_t old_size, size_t align, size_t new_size) {
 }
 
 __attribute__((__aligned__(sizeof(void*))))
-static uint8_t RET_AREA[(8+9*sizeof(void*))];
+static uint8_t RET_AREA[(16+8*sizeof(void*))];
 
 // Helper Functions
 
@@ -133,6 +133,7 @@ uint8_t * __wasm_export_exports_planner_matmulworld_plan_matmul(uint8_t * arg) {
     (uint32_t) (uint32_t) (*((int32_t*) (arg + (16*sizeof(void*))))),
     (uint32_t) (uint32_t) (*((int32_t*) (arg + (4+16*sizeof(void*))))),
     (uint32_t) (uint32_t) (*((int32_t*) (arg + (8+16*sizeof(void*))))),
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (12+16*sizeof(void*))))),
   };
   exports_planner_matmulworld_plan_data_t ret;
   exports_planner_matmulworld_plan_matmul(&arg0, &arg1, &arg2, &arg3, &arg4, &ret);
@@ -149,6 +150,7 @@ uint8_t * __wasm_export_exports_planner_matmulworld_plan_matmul(uint8_t * arg) {
   *((int32_t*)(ptr + (8*sizeof(void*)))) = (int32_t) ((ret).current_kernel);
   *((int32_t*)(ptr + (4+8*sizeof(void*)))) = (int32_t) ((ret).request);
   *((int32_t*)(ptr + (8+8*sizeof(void*)))) = (int32_t) ((ret).from_step);
+  *((int32_t*)(ptr + (12+8*sizeof(void*)))) = (int32_t) ((ret).model_id);
   return ptr;
 }
 

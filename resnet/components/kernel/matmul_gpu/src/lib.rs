@@ -72,6 +72,7 @@ impl Guest for Component {
             current_kernel: result_container.current_kernel,
             request: result_container.request,
             from_step: result_container.from_step,
+            model_id: result_container.model_id,
         }
     }
 }

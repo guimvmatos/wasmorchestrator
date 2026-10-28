@@ -17,6 +17,7 @@ struct Data {
     current_kernel: u32,
     request: u32,
     from_step: u32, // precisa bater com o record `data` dos .wit (campo novo, from-step)
+    model_id: u32,  // precisa bater com o record `data` dos .wit (campo novo, model-id)
 }
 
 #[derive(Serialize, Deserialize, Debug)]

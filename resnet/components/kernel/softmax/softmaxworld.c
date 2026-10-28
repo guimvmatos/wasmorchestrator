@@ -51,7 +51,7 @@ void *cabi_realloc(void *ptr, size_t old_size, size_t align, size_t new_size) {
 }
 
 __attribute__((__aligned__(sizeof(void*))))
-static uint8_t RET_AREA[(8+9*sizeof(void*))];
+static uint8_t RET_AREA[(16+8*sizeof(void*))];
 
 // Helper Functions
 
@@ -120,20 +120,22 @@ void softmaxworld_string_free(softmaxworld_string_t *ret) {
 // Component Adapters
 
 __attribute__((__export_name__("planner:softmaxworld/plan#softmax")))
-uint8_t * __wasm_export_exports_planner_softmaxworld_plan_softmax(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, int32_t arg3, uint8_t * arg4, size_t arg5, uint8_t * arg6, size_t arg7, uint8_t * arg8, size_t arg9, uint8_t * arg10, size_t arg11, int32_t arg12, int32_t arg13, int32_t arg14) {
-  softmaxworld_list_f32_t arg15 = (softmaxworld_list_f32_t) { (float*)(arg), (arg0) };
-  softmaxworld_list_u32_t arg16 = (softmaxworld_list_u32_t) { (uint32_t*)(arg1), (arg2) };
-  exports_planner_softmaxworld_plan_data_t arg17 = (exports_planner_softmaxworld_plan_data_t) {
-    (softmaxworld_list_f32_t) (softmaxworld_list_f32_t) { (float*)(arg4), (arg5) },
-    (softmaxworld_list_f32_t) (softmaxworld_list_f32_t) { (float*)(arg6), (arg7) },
-    (softmaxworld_string_t) (softmaxworld_string_t) { (uint8_t*)(arg8), (arg9) },
-    (softmaxworld_list_u8_t) (softmaxworld_list_u8_t) { (uint8_t*)(arg10), (arg11) },
-    (uint32_t) (uint32_t) (arg12),
-    (uint32_t) (uint32_t) (arg13),
-    (uint32_t) (uint32_t) (arg14),
+uint8_t * __wasm_export_exports_planner_softmaxworld_plan_softmax(uint8_t * arg) {
+  softmaxworld_list_f32_t arg0 = (softmaxworld_list_f32_t) { (float*)(*((uint8_t **) (arg + 0))), (*((size_t*) (arg + sizeof(void*)))) };
+  softmaxworld_list_u32_t arg1 = (softmaxworld_list_u32_t) { (uint32_t*)(*((uint8_t **) (arg + (2*sizeof(void*))))), (*((size_t*) (arg + (3*sizeof(void*))))) };
+  exports_planner_softmaxworld_plan_data_t arg2 = (exports_planner_softmaxworld_plan_data_t) {
+    (softmaxworld_list_f32_t) (softmaxworld_list_f32_t) { (float*)(*((uint8_t **) (arg + (5*sizeof(void*))))), (*((size_t*) (arg + (6*sizeof(void*))))) },
+    (softmaxworld_list_f32_t) (softmaxworld_list_f32_t) { (float*)(*((uint8_t **) (arg + (7*sizeof(void*))))), (*((size_t*) (arg + (8*sizeof(void*))))) },
+    (softmaxworld_string_t) (softmaxworld_string_t) { (uint8_t*)(*((uint8_t **) (arg + (9*sizeof(void*))))), (*((size_t*) (arg + (10*sizeof(void*))))) },
+    (softmaxworld_list_u8_t) (softmaxworld_list_u8_t) { (uint8_t*)(*((uint8_t **) (arg + (11*sizeof(void*))))), (*((size_t*) (arg + (12*sizeof(void*))))) },
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (13*sizeof(void*))))),
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (4+13*sizeof(void*))))),
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (8+13*sizeof(void*))))),
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (12+13*sizeof(void*))))),
   };
   exports_planner_softmaxworld_plan_data_t ret;
-  exports_planner_softmaxworld_plan_softmax(&arg15, &arg16, (uint32_t) (arg3), &arg17, &ret);
+  exports_planner_softmaxworld_plan_softmax(&arg0, &arg1, (uint32_t) (*((int32_t*) (arg + (4*sizeof(void*))))), &arg2, &ret);
+  free(arg);
   uint8_t *ptr = (uint8_t *) &RET_AREA;
   *((size_t*)(ptr + sizeof(void*))) = ((ret).input).len;
   *((uint8_t **)(ptr + 0)) = (uint8_t *) ((ret).input).ptr;
@@ -146,6 +148,7 @@ uint8_t * __wasm_export_exports_planner_softmaxworld_plan_softmax(uint8_t * arg,
   *((int32_t*)(ptr + (8*sizeof(void*)))) = (int32_t) ((ret).current_kernel);
   *((int32_t*)(ptr + (4+8*sizeof(void*)))) = (int32_t) ((ret).request);
   *((int32_t*)(ptr + (8+8*sizeof(void*)))) = (int32_t) ((ret).from_step);
+  *((int32_t*)(ptr + (12+8*sizeof(void*)))) = (int32_t) ((ret).model_id);
   return ptr;
 }
 

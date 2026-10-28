@@ -10,7 +10,8 @@ interface plan {
         kernels: list<u8>,
         current-kernel: u32,
         request: u32,
-        from-step: u32
+        from-step: u32,
+    model-id: u32
     }
 
     // Upsample nearest-neighbor 2D, canal a canal, assumindo batch=1 e

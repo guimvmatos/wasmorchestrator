@@ -33,6 +33,7 @@ typedef struct exports_planner_softmaxworld_plan_data_t {
   uint32_t   current_kernel;
   uint32_t   request;
   uint32_t   from_step;
+  uint32_t   model_id;
 } exports_planner_softmaxworld_plan_data_t;
 
 typedef struct {

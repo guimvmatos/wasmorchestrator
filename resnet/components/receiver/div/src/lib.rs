@@ -70,6 +70,46 @@ struct ModelGraph {
     steps: Vec<StepNode>,
 }
 
+#[derive(Deserialize)]
+struct ModelEntry {
+    #[serde(default)]
+    name: String,
+    dfg_path: String,
+    #[serde(default)]
+    kernels: Vec<u8>,
+}
+
+// Lê o registro central de modelos (components/models.json) UMA VEZ no boot
+// e carrega o ModelGraph de cada model_id cadastrado — substitui o antigo
+// hardcoded "resnet18DFG.json" (Problema 2 / ver claude/project-state.md).
+fn load_all_model_graphs() -> HashMap<u32, ModelGraph> {
+    let registry_file = std::fs::File::open("models.json")
+        .expect("Erro ao abrir models.json (registro de modelos)");
+    let registry: HashMap<String, ModelEntry> = serde_json::from_reader(registry_file)
+        .expect("Erro no parser do models.json");
+
+    let mut graphs: HashMap<u32, ModelGraph> = HashMap::new();
+    for (id_str, entry) in registry.iter() {
+        let id: u32 = match id_str.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                eprintln!("[AVISO] chave de modelo invalida em models.json: {}", id_str);
+                continue;
+            }
+        };
+        let graph_filename = std::path::Path::new(&entry.dfg_path)
+        .file_name()
+        .unwrap_or_else(|| panic!("dfg_path {:?} sem nome de arquivo valido", entry.dfg_path));
+    let graph_path = std::path::Path::new(graph_filename);
+        let graph_file = std::fs::File::open(&graph_path)
+            .unwrap_or_else(|_| panic!("Erro ao abrir {:?} (dfg_path do model_id {})", graph_path, id));
+        let graph: ModelGraph = serde_json::from_reader(graph_file)
+            .unwrap_or_else(|_| panic!("Erro no parser do grafo {:?}", graph_path));
+        graphs.insert(id, graph);
+    }
+    graphs
+}
+
 fn load_const(path: &str) -> Vec<f32> {
     let mut lock = CONST_CACHE.lock().unwrap();
     let cache = lock.get_or_insert_with(HashMap::new);
@@ -92,7 +132,7 @@ fn load_const(path: &str) -> Vec<f32> {
 fn handle_client(
     mut stream: TcpStream,
     initialized: &mut i32,
-    graph: &ModelGraph,
+    graphs: &HashMap<u32, ModelGraph>,
     routing: &RoutingTable,
 ) -> std::io::Result<()> {
 
@@ -121,6 +161,9 @@ fn handle_client(
 
         let t_de = Instant::now(); // [T]
         let input_img: WitData = rmp_serde::from_slice(&buffer).expect("Failed to deserialize MessagePack response");
+        let graph: &ModelGraph = graphs.get(&input_img.model_id).unwrap_or_else(|| {
+            panic!("model_id {} nao encontrado no registro de grafos (models.json)", input_img.model_id)
+        });
         let deserialize_us = t_de.elapsed().as_micros() as u64; // [T]
 
         let receiveduration = start_receive.elapsed().as_millis();
@@ -348,10 +391,7 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
         let listener = TcpListener::bind(&bind_addr).expect(&format!("Não conseguiu abrir a porta {}", port));
 
         let t_boot = Instant::now();
-        let graph_file = std::fs::File::open("resnet18DFG.json")
-            .expect("Erro ao abrir resnet18DFG.json");
-        let graph: ModelGraph = serde_json::from_reader(graph_file)
-            .expect("Erro no parser do resnet18DFG.json");
+        let graphs: HashMap<u32, ModelGraph> = load_all_model_graphs();
 
         let routing_file = std::fs::File::open("routing_table.json")
             .expect("Erro ao abrir routing_table.json");
@@ -371,7 +411,7 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
                 Ok(stream) => {
                     println!("entrei!!");
 
-                    if let Err(e) = handle_client(stream, &mut init, &graph, &routing) {
+                    if let Err(e) = handle_client(stream, &mut init, &graphs, &routing) {
                         eprintln!("Error handling client: {:?}", e);
                     }
                 }

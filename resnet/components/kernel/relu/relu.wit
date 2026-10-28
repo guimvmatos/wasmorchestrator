@@ -9,7 +9,8 @@ interface plan {
         kernels: list<u8>,
         current-kernel: u32,
         request: u32,
-        from-step: u32
+        from-step: u32,
+    model-id: u32
     }
   
     relu: func(img: data) -> data;

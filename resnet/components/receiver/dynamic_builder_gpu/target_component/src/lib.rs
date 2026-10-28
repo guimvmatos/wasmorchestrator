@@ -210,13 +210,81 @@ struct ModelGraph {
     steps: Vec<StepNode>,
 }
 
+/// Entrada do registro central de modelos (resnet/models.json, gerado e
+/// mantido pelo onnx_to_dfg.py — ver claude/project-state.md). Mesmo schema
+/// usado pelo handler/orquestrador.
+#[derive(Deserialize, Debug, Clone)]
+struct ModelEntry {
+    name: String,
+    dfg_path: String,
+    #[allow(dead_code)]
+    kernels: Vec<u8>,
+}
+
+type ModelsRegistry = HashMap<String, ModelEntry>;
+
+/// Caminho do registro central, FLAT dentro do cwd deste processo composto
+/// (herda o cwd de quem o spawna — o sys, em sys_test/). NÃO usar "../" aqui:
+/// o wasi-gfx-runtime roda o componente sob um sandbox WASI que proíbe
+/// escapar do diretório pré-aberto via ".." mesmo quando o arquivo real
+/// existe (erro observado: PermissionDenied / "Operation not permitted" ao
+/// tentar abrir "../models.json" — ver claude/project-state.md, 28/10). O
+/// sys agora copia resnet/models.json pra dentro de sys_test/models.json
+/// antes de cada spawn (ver build_and_launch em sys_test/src/main.rs).
+const MODELS_JSON_PATH: &str = "models.json";
+
+/// Carrega TODOS os modelos cadastrados em models.json de uma vez, no boot
+/// do processo — substitui o antigo "resnet18DFG.json" fixo, que era
+/// compartilhado por qualquer request/modelo (ver claude/project-state.md).
+/// Cada request escolhe o grafo certo via input_img.model_id em
+/// handle_client, sem reabrir arquivo por request.
+fn load_all_model_graphs() -> HashMap<u32, ModelGraph> {
+    let registry: ModelsRegistry = {
+        let f = std::fs::File::open(MODELS_JSON_PATH).unwrap_or_else(|e| {
+            panic!("Erro ao abrir {} (registro central de modelos): {:?}", MODELS_JSON_PATH, e)
+        });
+        serde_json::from_reader(f).unwrap_or_else(|e| {
+            panic!("Erro no parser de {}: {:?}", MODELS_JSON_PATH, e)
+        })
+    };
+
+    let mut graphs: HashMap<u32, ModelGraph> = HashMap::new();
+    for (id_str, entry) in registry.iter() {
+        let id: u32 = match id_str.parse() {
+            Ok(v) => v,
+            Err(_) => {
+                eprintln!("[AVISO] model_id '{}' em {} não é um u32 válido, ignorando.", id_str, MODELS_JSON_PATH);
+                continue;
+            }
+        };
+        // dfg_path no models.json é tipo "sys_test/resnet50.json" (relativo
+        // a resnet/), mas o DFG real já está FLAT no cwd deste processo
+        // (sys_test/ é o próprio cwd) — então usamos só o nome do arquivo,
+        // sem nenhum componente de diretório, pelo mesmo motivo do
+        // MODELS_JSON_PATH acima (sandbox WASI não deixa escapar via "..",
+        // e aqui nem precisaria: o arquivo já está no mesmo diretório).
+        let graph_filename = std::path::Path::new(&entry.dfg_path)
+            .file_name()
+            .unwrap_or_else(|| panic!("dfg_path '{}' do modelo '{}' (id {}) sem nome de arquivo válido", entry.dfg_path, entry.name, id));
+        let graph_path = std::path::Path::new(graph_filename);
+        let graph_file = std::fs::File::open(&graph_path).unwrap_or_else(|e| {
+            panic!("Erro ao abrir grafo '{}' do modelo '{}' (id {}): {:?}", graph_path.display(), entry.name, id, e)
+        });
+        let graph: ModelGraph = serde_json::from_reader(graph_file).unwrap_or_else(|e| {
+            panic!("Erro no parser do grafo '{}': {:?}", graph_path.display(), e)
+        });
+        graphs.insert(id, graph);
+    }
+    graphs
+}
+
 // Kernels não presentes neste binário caem no braço `_` do match abaixo e
 // são despachados via TCP para o endereço indicado na routing_table para
 // aquele kernel_type. Kernels presentes rodam direto, sem rede.
 fn handle_client(
     mut stream: TcpStream,
     initialized: &mut i32,
-    graph: &ModelGraph,
+    graphs: &HashMap<u32, ModelGraph>,
     routing: &RoutingTable,
 ) -> std::io::Result<()> {
     let mut len_buf = [0u8; 4];
@@ -241,6 +309,12 @@ fn handle_client(
         let t_de = Instant::now(); // [T]
         let input_img: WitData = rmp_serde::from_slice(&buffer).expect("Failed to deserialize MessagePack response");
         let deserialize_us = t_de.elapsed().as_micros() as u64; // [T]
+
+        // Seleciona o grafo do modelo pedido por esta request (antes: um
+        // único grafo fixo pra qualquer model_id — ver claude/project-state.md).
+        let graph = graphs.get(&input_img.model_id).unwrap_or_else(|| {
+            panic!("model_id {} não encontrado no registro de grafos (models.json)", input_img.model_id)
+        });
 
         *initialized += 1; // [T] contador de requisições atendidas por este processo
         let call_idx = *initialized; // [T]
@@ -310,6 +384,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::convworld::plan::conv(
                         p.cout, p.cin, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, conv_groups,
@@ -330,6 +405,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::bnworld::plan::bn(
                         p.channels, p.h_in, p.w_in, p.epsilon,
@@ -346,6 +422,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::reluworld::plan::relu(&data);
                     computed_output = res.output;
@@ -362,6 +439,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::maxpoolworld::plan::maxpool(
                         p.channels, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, &data,
@@ -379,6 +457,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::addworld::plan::add(&current_input, const_vec.as_slice(), &data);
                         computed_output = res.output;
@@ -392,6 +471,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::addworld::plan::add(&first_branch, &current_input, &data);
                         computed_output = res.output;
@@ -410,6 +490,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::gapworld::plan::gap(p.channels, &data);
                     computed_output = res.output;
@@ -423,6 +504,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::flattenworld::plan::flatten(&current_input, &data);
                     computed_output = res.output;
@@ -445,6 +527,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::gemmworld::plan::gemm(
                         &weight_id, p.in_features, p.out_features, &data,
@@ -460,6 +543,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::dropoutworld::plan::dropout(&current_input, &data);
                     computed_output = res.output;
@@ -473,6 +557,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::sigmoidworld::plan::sigmoid(&data);
                     computed_output = res.output;
@@ -488,6 +573,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::mulworld::plan::mul(&current_input, const_vec.as_slice(), &data);
                         computed_output = res.output;
@@ -501,6 +587,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::mulworld::plan::mul(&first_branch, &current_input, &data);
                         computed_output = res.output;
@@ -519,6 +606,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::siluworld::plan::silu(&data);
                     computed_output = res.output;
@@ -545,6 +633,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let outputs = bindings::planner::splitworld::plan::split(&current_input, &shape, p.axis, &sizes, &data);
                     let out_len: usize = outputs.iter().map(|o| o.len()).sum();
@@ -603,6 +692,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::concatworld::plan::concat(&inputs, &shapes, p.axis, &data);
                     computed_output = res.output;
@@ -616,6 +706,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::reshapeworld::plan::reshape(&current_input, &data);
                     computed_output = res.output;
@@ -630,6 +721,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::transposeworld::plan::transpose(&current_input, &shape, &p.perm, &data);
                     computed_output = res.output;
@@ -647,6 +739,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::matmulworld::plan::matmul(lhs_const.as_slice(), &current_input, &lhs_shape, &rhs_shape, &data);
                         computed_output = res.output;
@@ -662,6 +755,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::matmulworld::plan::matmul(&current_input, rhs_const.as_slice(), &lhs_shape, &rhs_shape, &data);
                         computed_output = res.output;
@@ -700,6 +794,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::matmulworld::plan::matmul(&lhs_vec, &rhs_vec, &lhs_shape, &rhs_shape, &data);
                         computed_output = res.output;
@@ -714,6 +809,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::resizeworld::plan::resize(
                         &current_input, p.channels, p.h_in, p.w_in, p.scale_h, p.scale_w, &data,
@@ -733,6 +829,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::sliceworld::plan::slice(&current_input, &shape, &starts, &ends, &p.axes, &steps, &data);
                     computed_output = res.output;
@@ -753,6 +850,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::subworld::plan::sub(a, b, &data);
                         computed_output = res.output;
@@ -766,6 +864,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::subworld::plan::sub(&first_branch, &current_input, &data);
                         computed_output = res.output;
@@ -791,6 +890,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::divworld::plan::div(a, b, &data);
                         computed_output = res.output;
@@ -804,6 +904,7 @@ fn handle_client(
                             request: request_id,
                             kernels: vec![],
                             from_step: origin_step,
+                        model_id: input_img.model_id,
                         };
                         let res = bindings::planner::divworld::plan::div(&first_branch, &current_input, &data);
                         computed_output = res.output;
@@ -823,6 +924,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                    model_id: input_img.model_id,
                     };
                     let res = bindings::planner::softmaxworld::plan::softmax(&current_input, &shape, p.axis, &data);
                     computed_output = res.output;
@@ -850,6 +952,7 @@ fn handle_client(
                         request: request_id,
                         kernels: vec![],
                         from_step: origin_step,
+                        model_id: input_img.model_id,
                     };
 
                     let t_ser = Instant::now(); // [T]
@@ -956,6 +1059,7 @@ fn handle_client(
                 request: request_id,
                 kernels: vec![],
                 from_step: final_from_step,
+                model_id: input_img.model_id,
             };
 
             let mut next_stream = TcpStream::connect(&reply_to)?;
@@ -981,9 +1085,12 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
         let bind_addr = format!("{}:{}", ip, port);
         let listener = TcpListener::bind(&bind_addr).expect(&format!("Não conseguiu abrir a porta {}", port));
 
-        // Grafo e routing table carregados uma vez, no boot do processo.
-        let graph_file = std::fs::File::open("resnet18DFG.json").expect("Erro ao abrir resnet18DFG.json");
-        let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no parser do resnet18DFG.json");
+        // Grafos de TODOS os modelos cadastrados em models.json, carregados
+        // uma vez no boot do processo (antes: um único "resnet18DFG.json"
+        // fixo, compartilhado por qualquer request/modelo — ver
+        // claude/project-state.md). Cada request escolhe o grafo certo via
+        // input_img.model_id dentro de handle_client.
+        let graphs: HashMap<u32, ModelGraph> = load_all_model_graphs();
 
         let routing_file = std::fs::File::open("routing_table.json").expect("Erro ao abrir routing_table.json");
         let routing: RoutingTable = serde_json::from_reader(routing_file).expect("Erro no parser do routing_table.json");
@@ -995,7 +1102,7 @@ impl bindings::exports::wasi::cli::run::Guest for Component {
             match stream {
                 Ok(stream) => {
                     println!("Nova conexão recebida!");
-                    if let Err(e) = handle_client(stream, &mut init, &graph, &routing) {
+                    if let Err(e) = handle_client(stream, &mut init, &graphs, &routing) {
                         eprintln!("Error handling client: {:?}", e);
                     }
                 }

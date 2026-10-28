@@ -131,6 +131,7 @@ uint8_t * __wasm_export_exports_planner_splitworld_plan_split(uint8_t * arg) {
     (uint32_t) (uint32_t) (*((int32_t*) (arg + (15*sizeof(void*))))),
     (uint32_t) (uint32_t) (*((int32_t*) (arg + (4+15*sizeof(void*))))),
     (uint32_t) (uint32_t) (*((int32_t*) (arg + (8+15*sizeof(void*))))),
+    (uint32_t) (uint32_t) (*((int32_t*) (arg + (12+15*sizeof(void*))))),
   };
   splitworld_list_list_f32_t ret;
   exports_planner_splitworld_plan_split(&arg0, &arg1, (uint32_t) (*((int32_t*) (arg + (4*sizeof(void*))))), &arg2, &arg3, &ret);

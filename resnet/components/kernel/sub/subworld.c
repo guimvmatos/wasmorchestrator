@@ -51,7 +51,7 @@ void *cabi_realloc(void *ptr, size_t old_size, size_t align, size_t new_size) {
 }
 
 __attribute__((__aligned__(sizeof(void*))))
-static uint8_t RET_AREA[(8+9*sizeof(void*))];
+static uint8_t RET_AREA[(16+8*sizeof(void*))];
 
 // Helper Functions
 
@@ -110,10 +110,10 @@ void subworld_string_free(subworld_string_t *ret) {
 // Component Adapters
 
 __attribute__((__export_name__("planner:subworld/plan#sub")))
-uint8_t * __wasm_export_exports_planner_subworld_plan_sub(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, uint8_t * arg3, size_t arg4, uint8_t * arg5, size_t arg6, uint8_t * arg7, size_t arg8, uint8_t * arg9, size_t arg10, int32_t arg11, int32_t arg12, int32_t arg13) {
-  subworld_list_f32_t arg14 = (subworld_list_f32_t) { (float*)(arg), (arg0) };
-  subworld_list_f32_t arg15 = (subworld_list_f32_t) { (float*)(arg1), (arg2) };
-  exports_planner_subworld_plan_data_t arg16 = (exports_planner_subworld_plan_data_t) {
+uint8_t * __wasm_export_exports_planner_subworld_plan_sub(uint8_t * arg, size_t arg0, uint8_t * arg1, size_t arg2, uint8_t * arg3, size_t arg4, uint8_t * arg5, size_t arg6, uint8_t * arg7, size_t arg8, uint8_t * arg9, size_t arg10, int32_t arg11, int32_t arg12, int32_t arg13, int32_t arg14) {
+  subworld_list_f32_t arg15 = (subworld_list_f32_t) { (float*)(arg), (arg0) };
+  subworld_list_f32_t arg16 = (subworld_list_f32_t) { (float*)(arg1), (arg2) };
+  exports_planner_subworld_plan_data_t arg17 = (exports_planner_subworld_plan_data_t) {
     (subworld_list_f32_t) (subworld_list_f32_t) { (float*)(arg3), (arg4) },
     (subworld_list_f32_t) (subworld_list_f32_t) { (float*)(arg5), (arg6) },
     (subworld_string_t) (subworld_string_t) { (uint8_t*)(arg7), (arg8) },
@@ -121,9 +121,10 @@ uint8_t * __wasm_export_exports_planner_subworld_plan_sub(uint8_t * arg, size_t 
     (uint32_t) (uint32_t) (arg11),
     (uint32_t) (uint32_t) (arg12),
     (uint32_t) (uint32_t) (arg13),
+    (uint32_t) (uint32_t) (arg14),
   };
   exports_planner_subworld_plan_data_t ret;
-  exports_planner_subworld_plan_sub(&arg14, &arg15, &arg16, &ret);
+  exports_planner_subworld_plan_sub(&arg15, &arg16, &arg17, &ret);
   uint8_t *ptr = (uint8_t *) &RET_AREA;
   *((size_t*)(ptr + sizeof(void*))) = ((ret).input).len;
   *((uint8_t **)(ptr + 0)) = (uint8_t *) ((ret).input).ptr;
@@ -136,6 +137,7 @@ uint8_t * __wasm_export_exports_planner_subworld_plan_sub(uint8_t * arg, size_t 
   *((int32_t*)(ptr + (8*sizeof(void*)))) = (int32_t) ((ret).current_kernel);
   *((int32_t*)(ptr + (4+8*sizeof(void*)))) = (int32_t) ((ret).request);
   *((int32_t*)(ptr + (8+8*sizeof(void*)))) = (int32_t) ((ret).from_step);
+  *((int32_t*)(ptr + (12+8*sizeof(void*)))) = (int32_t) ((ret).model_id);
   return ptr;
 }
 

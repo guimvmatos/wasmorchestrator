@@ -30,6 +30,7 @@ void exports_planner_mulworld_plan_mul(
     ret->current_kernel = result_container->current_kernel;
     ret->request = result_container->request;
     ret->from_step = result_container->from_step;
+    ret->model_id = result_container->model_id;
 
     // Inicializa listas auxiliares (evita ponteiros stale no retorno)
     ret->input.ptr = NULL;

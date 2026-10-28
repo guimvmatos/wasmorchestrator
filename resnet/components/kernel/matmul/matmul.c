@@ -126,6 +126,7 @@ void exports_planner_matmulworld_plan_matmul(
     ret->current_kernel = result_container->current_kernel;
     ret->request = result_container->request;
     ret->from_step = result_container->from_step;
+    ret->model_id = result_container->model_id;
 
     ret->input.ptr = NULL;
     ret->input.len = 0;
