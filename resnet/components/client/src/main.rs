@@ -66,9 +66,11 @@ fn main() -> std::io::Result<()> {
     let listen_address = "0.0.0.0:9000"; // Porta onde o cliente aguarda o retorno final
     
     let start_read = Instant::now(); // Time counter 2 measures time to reads the input
-    
+
     //LOADING IMAGE
-    let path = "input_image.bin"; // needs to be removed in the future
+    // Antes sobrescrevia `path` com "input_image.bin" fixo aqui, ignorando
+    // o argumento <input_image.bin> recebido de verdade na CLI (linha 63)
+    // — bug corrigido em 27/10, ver claude/project-state.md.
     println!("Loading {}...", path);
 
     let mut file = std::fs::File::open(path)?;

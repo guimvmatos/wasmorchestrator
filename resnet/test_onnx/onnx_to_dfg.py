@@ -32,6 +32,70 @@ OP_TO_KERNEL = {
 
 SILU_KERNEL_TYPE = 12  # produzido pela fusão Sigmoid+Mul, não é op_type direto
 
+# Registro central de modelos — mora em resnet/models.json (um nível acima
+# de test_onnx/), pra handler e orchestrator acharem independente de onde
+# rodam. Calculado a partir do caminho deste próprio script, não do cwd,
+# pra funcionar não importa de onde o onnx_to_dfg.py é chamado.
+MODELS_JSON_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "models.json"
+)
+
+
+def update_models_registry(model_name, steps, output_json_path):
+    """
+    Cria/atualiza uma entrada em models.json com base no modelo que acabou
+    de ser exportado:
+      - "name": o mesmo nome já usado no campo "model" do DFG (derivado
+        do nome do .onnx passado em --onnx — não é um parâmetro novo).
+      - "kernels": lista ordenada e sem repetição de todos os kernel_type
+        usados pelo grafo (já pós-fusão de SiLU) — é a demanda real desse
+        modelo, pro orquestrador consumir no lugar do vec![1,...,9] fixo.
+      - "dfg_path": caminho do JSON recém-gerado, relativo ao diretório
+        onde este models.json mora (resnet/), pra funcionar não importa de
+        onde o DFG físico esteja.
+    Reexecutar pro mesmo modelo (mesmo "model_name") atualiza a entrada
+    existente no lugar — acha pelo nome, nunca duplica nem muda o
+    model_id já atribuído antes.
+    """
+    registry_path = os.path.abspath(MODELS_JSON_PATH)
+    registry_dir = os.path.dirname(registry_path)
+
+    if os.path.isfile(registry_path):
+        with open(registry_path, "r") as f:
+            registry = json.load(f)
+    else:
+        registry = {}
+
+    kernels = sorted(set(s["kernel_type"] for s in steps))
+    dfg_abs_path = os.path.abspath(output_json_path)
+    dfg_rel_path = os.path.relpath(dfg_abs_path, start=registry_dir)
+
+    existing_id = None
+    for mid, entry in registry.items():
+        if entry.get("name") == model_name:
+            existing_id = mid
+            break
+
+    if existing_id is None:
+        existing_ids = [int(k) for k in registry.keys() if k.isdigit()]
+        new_id = str(max(existing_ids, default=0) + 1)
+    else:
+        new_id = existing_id
+
+    registry[new_id] = {
+        "name": model_name,
+        "dfg_path": dfg_rel_path,
+        "kernels": kernels,
+    }
+
+    with open(registry_path, "w") as f:
+        json.dump(registry, f, indent=2)
+
+    print(
+        f"[SUCESSO] models.json atualizado: id {new_id} -> '{model_name}' "
+        f"({len(kernels)} kernel_types, dfg_path='{dfg_rel_path}')"
+    )
+
 def save_weight_bin(tensor_proto, output_dir):
     if tensor_proto is None:
         return ""
@@ -622,6 +686,8 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
 
     print(f"[SUCESSO] DFG exportado para '{output_json}' com {len(steps)} etapas.")
     print(f"[SUCESSO] Pesos binários gravados na pasta '{weights_dir}/'.")
+
+    update_models_registry(model_dfg["model"], steps, output_json)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Conversor de Modelo ONNX para JSON DFG")

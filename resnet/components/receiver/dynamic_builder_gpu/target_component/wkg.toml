@@ -1,5 +1,24 @@
 [overrides]
+"planner:convworld" = { path = "../../../kernel/conv_gpu/wit" }
+"planner:bnworld" = { path = "../../../kernel/bn_gpu/wit" }
+"planner:reluworld" = { path = "../../../kernel/relu/" }
+"planner:maxpoolworld" = { path = "../../../kernel/maxpool_gpu/wit" }
+"planner:addworld" = { path = "../../../kernel/add/" }
+"planner:gapworld" = { path = "../../../kernel/gap_gpu/wit" }
+"planner:flattenworld" = { path = "../../../kernel/flatten/" }
+"planner:gemmworld" = { path = "../../../kernel/gemm_gpu/wit" }
 "planner:dropoutworld" = { path = "../../../kernel/dropout/" }
 "planner:sigmoidworld" = { path = "../../../kernel/sigmoid_gpu/wit" }
 "planner:mulworld" = { path = "../../../kernel/mul_gpu/wit" }
+"planner:siluworld" = { path = "../../../kernel/silu_gpu/wit" }
+"planner:splitworld" = { path = "../../../kernel/split/" }
+"planner:concatworld" = { path = "../../../kernel/concat/" }
+"planner:reshapeworld" = { path = "../../../kernel/reshape/" }
+"planner:transposeworld" = { path = "../../../kernel/transpose/" }
+"planner:matmulworld" = { path = "../../../kernel/matmul_gpu/wit" }
+"planner:resizeworld" = { path = "../../../kernel/resize/" }
+"planner:sliceworld" = { path = "../../../kernel/slice/" }
+"planner:subworld" = { path = "../../../kernel/sub/" }
+"planner:divworld" = { path = "../../../kernel/div/" }
+"planner:softmaxworld" = { path = "../../../kernel/softmax/" }
 "wasi-gfx-runtime:wasi-webgpu" = { path = "../../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }

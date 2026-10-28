@@ -35,6 +35,69 @@ struct NodeStatus {
     last_seen: std::time::Instant,
 }
 
+/// Entrada do registro central de modelos (resnet/models.json, gerado e
+/// mantido pelo onnx_to_dfg.py — ver claude/project-state.md). `name` e
+/// `dfg_path` não são usados aqui (quem usa é o handler), mas fazem parte
+/// do schema do arquivo.
+#[derive(Deserialize, Debug, Clone)]
+struct ModelEntry {
+    #[allow(dead_code)]
+    name: String,
+    #[allow(dead_code)]
+    dfg_path: String,
+    kernels: Vec<u8>,
+}
+
+type ModelsRegistry = HashMap<String, ModelEntry>;
+
+/// Caminho do registro central, relativo ao cwd do orquestrador
+/// (resnet/orchestrator/) — um nível acima, em resnet/models.json.
+/// #### TODO: ajustar se a árvore de pastas mudar.
+const MODELS_JSON_PATH: &str = "../models.json";
+
+/// Calcula a demanda real a partir do catálogo de modelos: união, ordenada
+/// e sem repetição, de todos os kernel_types usados por QUALQUER modelo
+/// cadastrado em `models.json`. Substitui o antigo `vec![1,...,9]` fixo —
+/// sempre lido de novo a cada ciclo, então reflete o catálogo atual sem
+/// precisar reiniciar o orquestrador.
+///
+/// #### LIMITAÇÃO CONHECIDA: ainda não diferencia "modelo sendo pedido
+/// agora de verdade" de "modelo cadastrado no catálogo" — isso depende do
+/// sinal de demanda viva (telemetria de execução / receiver_logs.jsonl →
+/// orquestrador), que é item em aberto separado no backlog. Por ora, a
+/// demanda é sempre a união de tudo que já foi exportado, não só o que
+/// está em uso neste instante.
+fn compute_demand_from_registry() -> Vec<u8> {
+    let registry: ModelsRegistry = match std::fs::File::open(MODELS_JSON_PATH) {
+        Ok(f) => match serde_json::from_reader(f) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!(
+                    "[AVISO] Falha ao parsear {}: {} — mantendo demanda vazia neste ciclo.",
+                    MODELS_JSON_PATH, e
+                );
+                return Vec::new();
+            }
+        },
+        Err(e) => {
+            eprintln!(
+                "[AVISO] Não encontrei {} ({}) — mantendo demanda vazia neste ciclo.",
+                MODELS_JSON_PATH, e
+            );
+            return Vec::new();
+        }
+    };
+
+    let mut demand: Vec<u8> = registry
+        .values()
+        .flat_map(|entry| entry.kernels.iter().cloned())
+        .collect::<std::collections::HashSet<u8>>()
+        .into_iter()
+        .collect();
+    demand.sort_unstable();
+    demand
+}
+
 fn deploy_demand(
     nodes_health: &HashMap<String, NodeStatus>, 
     demand: &Vec<u8> 
@@ -194,8 +257,9 @@ fn main() -> std::io::Result<()> {
                 }
             });
 
-            let current_demand = vec![1,2,3,4,5,6,7,8,9]; 
-            //let current_demand = vec![0]; 
+            // Antes era fixo (vec![1,...,9]); agora vem do catálogo real de
+            // modelos exportados — ver compute_demand_from_registry acima.
+            let current_demand = compute_demand_from_registry();
 
             let (new_table, scores, new_assignments) = decide_routing(&nodes_health, &current_demand);
 

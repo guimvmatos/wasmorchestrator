@@ -56,6 +56,25 @@ struct ModelGraph {
     steps: Vec<StepNode>,
 }
 
+/// Entrada do registro central de modelos (resnet/models.json, gerado e
+/// mantido pelo onnx_to_dfg.py — ver claude/project-state.md). `kernels`
+/// não é usado aqui (é consumido pelo orquestrador como demanda real),
+/// mas faz parte do schema do arquivo.
+#[derive(Deserialize, Debug, Clone)]
+struct ModelEntry {
+    name: String,
+    dfg_path: String,
+    #[allow(dead_code)]
+    kernels: Vec<u8>,
+}
+
+type ModelsRegistry = HashMap<String, ModelEntry>;
+
+/// Caminho do registro central, relativo ao cwd do handler
+/// (resnet/components/handler/) — dois níveis acima, em resnet/models.json.
+/// #### TODO: ajustar se a árvore de pastas mudar.
+const MODELS_JSON_PATH: &str = "../../models.json";
+
 //fn main() -> std::io::Result<()> {
 fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     let start_total = Instant::now(); // Time counter 1 measures 
@@ -111,9 +130,65 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         readduration_millis
     );
 
-    // 4. CONSULTAR O MODEL_GRAPH.JSON PARA OBTER O GRAFO DO MODELO
-    let graph_file = std::fs::File::open("resnet18DFG.json").expect("Erro ao abrir resnet18DFG.json");
-let graph: ModelGraph = serde_json::from_reader(graph_file).expect("Erro no parser do resnet18DFG.json");
+    // 4. CONSULTAR O models.json PRA SABER QUAL GRAFO ABRIR PRO MODELO PEDIDO
+    // (antes abria "resnet18DFG.json" fixo, ignorando client_req.model_id —
+    // ver claude/project-state.md, item corrigido em 27/10).
+    let models_registry: ModelsRegistry = {
+        let f = std::fs::File::open(MODELS_JSON_PATH).unwrap_or_else(|e| {
+            panic!(
+                "Erro ao abrir {} (registro central de modelos): {}",
+                MODELS_JSON_PATH, e
+            )
+        });
+        serde_json::from_reader(f)
+            .unwrap_or_else(|e| panic!("Erro no parser de {}: {}", MODELS_JSON_PATH, e))
+    };
+
+    let model_key = client_req.model_id.to_string();
+    let model_entry = match models_registry.get(&model_key) {
+        Some(entry) => entry,
+        None => {
+            eprintln!(
+                "[ERRO] model_id {} não encontrado em {} — requisição {} descartada.",
+                client_req.model_id, MODELS_JSON_PATH, client_req.request_id
+            );
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!(
+                    "model_id {} não cadastrado em models.json",
+                    client_req.model_id
+                ),
+            ));
+        }
+    };
+
+    // dfg_path no models.json é relativo a resnet/ (onde o arquivo mora); o
+    // handler roda com cwd em resnet/components/handler/, dois níveis
+    // abaixo — por isso o prefixo "../../" na frente.
+    let graph_path = std::path::Path::new("../../").join(&model_entry.dfg_path);
+
+    println!(
+        "Modelo '{}' (id {}) -> grafo em {}",
+        model_entry.name,
+        client_req.model_id,
+        graph_path.display()
+    );
+
+    let graph_file = std::fs::File::open(&graph_path).unwrap_or_else(|e| {
+        panic!(
+            "Erro ao abrir {} (grafo do modelo '{}'): {}",
+            graph_path.display(),
+            model_entry.name,
+            e
+        )
+    });
+    let graph: ModelGraph = serde_json::from_reader(graph_file).unwrap_or_else(|e| {
+        panic!(
+            "Erro no parser do grafo '{}': {}",
+            graph_path.display(),
+            e
+        )
+    });
 
     let first_step_node = graph.steps.first()
         .expect("Erro: Grafo do modelo está vazio sem steps");

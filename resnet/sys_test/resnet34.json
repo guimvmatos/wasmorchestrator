@@ -1,0 +1,1917 @@
+{
+  "model": "resnet34-v1-7",
+  "steps": [
+    {
+      "step": 1,
+      "name": "resnetv16_conv0_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_conv0_weight.bin",
+        "bias_path": "",
+        "cout": 64,
+        "cin": 3,
+        "groups": 1,
+        "h_in": 224,
+        "w_in": 224,
+        "kh": 7,
+        "kw": 7,
+        "stride": 2,
+        "padding": 3
+      },
+      "next_steps": [
+        2
+      ]
+    },
+    {
+      "step": 2,
+      "name": "resnetv16_batchnorm0_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_batchnorm0_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_batchnorm0_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_batchnorm0_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_batchnorm0_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 64,
+        "h_in": 112,
+        "w_in": 112
+      },
+      "next_steps": [
+        3
+      ]
+    },
+    {
+      "step": 3,
+      "name": "resnetv16_relu0_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        4
+      ]
+    },
+    {
+      "step": 4,
+      "name": "resnetv16_pool0_fwd",
+      "kernel_type": 4,
+      "params": {
+        "channels": 64,
+        "h_in": 112,
+        "w_in": 112,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
+      "next_steps": [
+        5,
+        10
+      ]
+    },
+    {
+      "step": 5,
+      "name": "resnetv16_stage1_conv0_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage1_conv0_weight.bin",
+        "bias_path": "",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        6
+      ]
+    },
+    {
+      "step": 6,
+      "name": "resnetv16_stage1_batchnorm0_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage1_batchnorm0_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage1_batchnorm0_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage1_batchnorm0_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage1_batchnorm0_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 64,
+        "h_in": 56,
+        "w_in": 56
+      },
+      "next_steps": [
+        7
+      ]
+    },
+    {
+      "step": 7,
+      "name": "resnetv16_stage1_relu0_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        8
+      ]
+    },
+    {
+      "step": 8,
+      "name": "resnetv16_stage1_conv1_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage1_conv1_weight.bin",
+        "bias_path": "",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        9
+      ]
+    },
+    {
+      "step": 9,
+      "name": "resnetv16_stage1_batchnorm1_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage1_batchnorm1_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage1_batchnorm1_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage1_batchnorm1_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage1_batchnorm1_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 64,
+        "h_in": 56,
+        "w_in": 56
+      },
+      "next_steps": [
+        10
+      ]
+    },
+    {
+      "step": 10,
+      "name": "resnetv16_stage1__plus0",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        11
+      ]
+    },
+    {
+      "step": 11,
+      "name": "resnetv16_stage1_activation0",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        12,
+        17
+      ]
+    },
+    {
+      "step": 12,
+      "name": "resnetv16_stage1_conv2_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage1_conv2_weight.bin",
+        "bias_path": "",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        13
+      ]
+    },
+    {
+      "step": 13,
+      "name": "resnetv16_stage1_batchnorm2_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage1_batchnorm2_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage1_batchnorm2_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage1_batchnorm2_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage1_batchnorm2_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 64,
+        "h_in": 56,
+        "w_in": 56
+      },
+      "next_steps": [
+        14
+      ]
+    },
+    {
+      "step": 14,
+      "name": "resnetv16_stage1_relu1_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        15
+      ]
+    },
+    {
+      "step": 15,
+      "name": "resnetv16_stage1_conv3_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage1_conv3_weight.bin",
+        "bias_path": "",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        16
+      ]
+    },
+    {
+      "step": 16,
+      "name": "resnetv16_stage1_batchnorm3_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage1_batchnorm3_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage1_batchnorm3_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage1_batchnorm3_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage1_batchnorm3_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 64,
+        "h_in": 56,
+        "w_in": 56
+      },
+      "next_steps": [
+        17
+      ]
+    },
+    {
+      "step": 17,
+      "name": "resnetv16_stage1__plus1",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        18
+      ]
+    },
+    {
+      "step": 18,
+      "name": "resnetv16_stage1_activation1",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        19,
+        24
+      ]
+    },
+    {
+      "step": 19,
+      "name": "resnetv16_stage1_conv4_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage1_conv4_weight.bin",
+        "bias_path": "",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        20
+      ]
+    },
+    {
+      "step": 20,
+      "name": "resnetv16_stage1_batchnorm4_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage1_batchnorm4_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage1_batchnorm4_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage1_batchnorm4_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage1_batchnorm4_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 64,
+        "h_in": 56,
+        "w_in": 56
+      },
+      "next_steps": [
+        21
+      ]
+    },
+    {
+      "step": 21,
+      "name": "resnetv16_stage1_relu2_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        22
+      ]
+    },
+    {
+      "step": 22,
+      "name": "resnetv16_stage1_conv5_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage1_conv5_weight.bin",
+        "bias_path": "",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        23
+      ]
+    },
+    {
+      "step": 23,
+      "name": "resnetv16_stage1_batchnorm5_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage1_batchnorm5_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage1_batchnorm5_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage1_batchnorm5_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage1_batchnorm5_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 64,
+        "h_in": 56,
+        "w_in": 56
+      },
+      "next_steps": [
+        24
+      ]
+    },
+    {
+      "step": 24,
+      "name": "resnetv16_stage1__plus2",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        25
+      ]
+    },
+    {
+      "step": 25,
+      "name": "resnetv16_stage1_activation2",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        26,
+        28
+      ]
+    },
+    {
+      "step": 26,
+      "name": "resnetv16_stage2_conv2_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv2_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 1,
+        "kw": 1,
+        "stride": 2,
+        "padding": 0
+      },
+      "next_steps": [
+        27
+      ]
+    },
+    {
+      "step": 27,
+      "name": "resnetv16_stage2_batchnorm2_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm2_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm2_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm2_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm2_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        33
+      ]
+    },
+    {
+      "step": 28,
+      "name": "resnetv16_stage2_conv0_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv0_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
+      "next_steps": [
+        29
+      ]
+    },
+    {
+      "step": 29,
+      "name": "resnetv16_stage2_batchnorm0_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm0_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm0_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm0_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm0_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        30
+      ]
+    },
+    {
+      "step": 30,
+      "name": "resnetv16_stage2_relu0_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        31
+      ]
+    },
+    {
+      "step": 31,
+      "name": "resnetv16_stage2_conv1_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv1_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        32
+      ]
+    },
+    {
+      "step": 32,
+      "name": "resnetv16_stage2_batchnorm1_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm1_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm1_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm1_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm1_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        33
+      ]
+    },
+    {
+      "step": 33,
+      "name": "resnetv16_stage2__plus0",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        34
+      ]
+    },
+    {
+      "step": 34,
+      "name": "resnetv16_stage2_activation0",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        35,
+        40
+      ]
+    },
+    {
+      "step": 35,
+      "name": "resnetv16_stage2_conv3_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv3_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        36
+      ]
+    },
+    {
+      "step": 36,
+      "name": "resnetv16_stage2_batchnorm3_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm3_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm3_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm3_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm3_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        37
+      ]
+    },
+    {
+      "step": 37,
+      "name": "resnetv16_stage2_relu1_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        38
+      ]
+    },
+    {
+      "step": 38,
+      "name": "resnetv16_stage2_conv4_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv4_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        39
+      ]
+    },
+    {
+      "step": 39,
+      "name": "resnetv16_stage2_batchnorm4_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm4_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm4_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm4_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm4_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        40
+      ]
+    },
+    {
+      "step": 40,
+      "name": "resnetv16_stage2__plus1",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        41
+      ]
+    },
+    {
+      "step": 41,
+      "name": "resnetv16_stage2_activation1",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        42,
+        47
+      ]
+    },
+    {
+      "step": 42,
+      "name": "resnetv16_stage2_conv5_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv5_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        43
+      ]
+    },
+    {
+      "step": 43,
+      "name": "resnetv16_stage2_batchnorm5_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm5_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm5_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm5_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm5_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        44
+      ]
+    },
+    {
+      "step": 44,
+      "name": "resnetv16_stage2_relu2_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        45
+      ]
+    },
+    {
+      "step": 45,
+      "name": "resnetv16_stage2_conv6_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv6_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        46
+      ]
+    },
+    {
+      "step": 46,
+      "name": "resnetv16_stage2_batchnorm6_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm6_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm6_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm6_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm6_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        47
+      ]
+    },
+    {
+      "step": 47,
+      "name": "resnetv16_stage2__plus2",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        48
+      ]
+    },
+    {
+      "step": 48,
+      "name": "resnetv16_stage2_activation2",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        49,
+        54
+      ]
+    },
+    {
+      "step": 49,
+      "name": "resnetv16_stage2_conv7_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv7_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        50
+      ]
+    },
+    {
+      "step": 50,
+      "name": "resnetv16_stage2_batchnorm7_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm7_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm7_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm7_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm7_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        51
+      ]
+    },
+    {
+      "step": 51,
+      "name": "resnetv16_stage2_relu3_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        52
+      ]
+    },
+    {
+      "step": 52,
+      "name": "resnetv16_stage2_conv8_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage2_conv8_weight.bin",
+        "bias_path": "",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        53
+      ]
+    },
+    {
+      "step": 53,
+      "name": "resnetv16_stage2_batchnorm8_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage2_batchnorm8_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage2_batchnorm8_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage2_batchnorm8_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage2_batchnorm8_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 128,
+        "h_in": 28,
+        "w_in": 28
+      },
+      "next_steps": [
+        54
+      ]
+    },
+    {
+      "step": 54,
+      "name": "resnetv16_stage2__plus3",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        55
+      ]
+    },
+    {
+      "step": 55,
+      "name": "resnetv16_stage2_activation3",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        56,
+        58
+      ]
+    },
+    {
+      "step": 56,
+      "name": "resnetv16_stage3_conv2_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv2_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 1,
+        "kw": 1,
+        "stride": 2,
+        "padding": 0
+      },
+      "next_steps": [
+        57
+      ]
+    },
+    {
+      "step": 57,
+      "name": "resnetv16_stage3_batchnorm2_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm2_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm2_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm2_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm2_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        63
+      ]
+    },
+    {
+      "step": 58,
+      "name": "resnetv16_stage3_conv0_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv0_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
+      "next_steps": [
+        59
+      ]
+    },
+    {
+      "step": 59,
+      "name": "resnetv16_stage3_batchnorm0_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm0_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm0_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm0_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm0_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        60
+      ]
+    },
+    {
+      "step": 60,
+      "name": "resnetv16_stage3_relu0_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        61
+      ]
+    },
+    {
+      "step": 61,
+      "name": "resnetv16_stage3_conv1_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv1_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        62
+      ]
+    },
+    {
+      "step": 62,
+      "name": "resnetv16_stage3_batchnorm1_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm1_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm1_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm1_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm1_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        63
+      ]
+    },
+    {
+      "step": 63,
+      "name": "resnetv16_stage3__plus0",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        64
+      ]
+    },
+    {
+      "step": 64,
+      "name": "resnetv16_stage3_activation0",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        65,
+        70
+      ]
+    },
+    {
+      "step": 65,
+      "name": "resnetv16_stage3_conv3_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv3_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        66
+      ]
+    },
+    {
+      "step": 66,
+      "name": "resnetv16_stage3_batchnorm3_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm3_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm3_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm3_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm3_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        67
+      ]
+    },
+    {
+      "step": 67,
+      "name": "resnetv16_stage3_relu1_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        68
+      ]
+    },
+    {
+      "step": 68,
+      "name": "resnetv16_stage3_conv4_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv4_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        69
+      ]
+    },
+    {
+      "step": 69,
+      "name": "resnetv16_stage3_batchnorm4_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm4_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm4_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm4_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm4_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        70
+      ]
+    },
+    {
+      "step": 70,
+      "name": "resnetv16_stage3__plus1",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        71
+      ]
+    },
+    {
+      "step": 71,
+      "name": "resnetv16_stage3_activation1",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        72,
+        77
+      ]
+    },
+    {
+      "step": 72,
+      "name": "resnetv16_stage3_conv5_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv5_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        73
+      ]
+    },
+    {
+      "step": 73,
+      "name": "resnetv16_stage3_batchnorm5_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm5_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm5_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm5_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm5_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        74
+      ]
+    },
+    {
+      "step": 74,
+      "name": "resnetv16_stage3_relu2_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        75
+      ]
+    },
+    {
+      "step": 75,
+      "name": "resnetv16_stage3_conv6_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv6_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        76
+      ]
+    },
+    {
+      "step": 76,
+      "name": "resnetv16_stage3_batchnorm6_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm6_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm6_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm6_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm6_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        77
+      ]
+    },
+    {
+      "step": 77,
+      "name": "resnetv16_stage3__plus2",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        78
+      ]
+    },
+    {
+      "step": 78,
+      "name": "resnetv16_stage3_activation2",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        79,
+        84
+      ]
+    },
+    {
+      "step": 79,
+      "name": "resnetv16_stage3_conv7_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv7_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        80
+      ]
+    },
+    {
+      "step": 80,
+      "name": "resnetv16_stage3_batchnorm7_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm7_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm7_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm7_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm7_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        81
+      ]
+    },
+    {
+      "step": 81,
+      "name": "resnetv16_stage3_relu3_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        82
+      ]
+    },
+    {
+      "step": 82,
+      "name": "resnetv16_stage3_conv8_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv8_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        83
+      ]
+    },
+    {
+      "step": 83,
+      "name": "resnetv16_stage3_batchnorm8_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm8_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm8_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm8_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm8_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        84
+      ]
+    },
+    {
+      "step": 84,
+      "name": "resnetv16_stage3__plus3",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        85
+      ]
+    },
+    {
+      "step": 85,
+      "name": "resnetv16_stage3_activation3",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        86,
+        91
+      ]
+    },
+    {
+      "step": 86,
+      "name": "resnetv16_stage3_conv9_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv9_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        87
+      ]
+    },
+    {
+      "step": 87,
+      "name": "resnetv16_stage3_batchnorm9_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm9_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm9_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm9_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm9_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        88
+      ]
+    },
+    {
+      "step": 88,
+      "name": "resnetv16_stage3_relu4_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        89
+      ]
+    },
+    {
+      "step": 89,
+      "name": "resnetv16_stage3_conv10_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv10_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        90
+      ]
+    },
+    {
+      "step": 90,
+      "name": "resnetv16_stage3_batchnorm10_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm10_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm10_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm10_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm10_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        91
+      ]
+    },
+    {
+      "step": 91,
+      "name": "resnetv16_stage3__plus4",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        92
+      ]
+    },
+    {
+      "step": 92,
+      "name": "resnetv16_stage3_activation4",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        93,
+        98
+      ]
+    },
+    {
+      "step": 93,
+      "name": "resnetv16_stage3_conv11_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv11_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        94
+      ]
+    },
+    {
+      "step": 94,
+      "name": "resnetv16_stage3_batchnorm11_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm11_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm11_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm11_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm11_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        95
+      ]
+    },
+    {
+      "step": 95,
+      "name": "resnetv16_stage3_relu5_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        96
+      ]
+    },
+    {
+      "step": 96,
+      "name": "resnetv16_stage3_conv12_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage3_conv12_weight.bin",
+        "bias_path": "",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        97
+      ]
+    },
+    {
+      "step": 97,
+      "name": "resnetv16_stage3_batchnorm12_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage3_batchnorm12_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage3_batchnorm12_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage3_batchnorm12_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage3_batchnorm12_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 256,
+        "h_in": 14,
+        "w_in": 14
+      },
+      "next_steps": [
+        98
+      ]
+    },
+    {
+      "step": 98,
+      "name": "resnetv16_stage3__plus5",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        99
+      ]
+    },
+    {
+      "step": 99,
+      "name": "resnetv16_stage3_activation5",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        100,
+        102
+      ]
+    },
+    {
+      "step": 100,
+      "name": "resnetv16_stage4_conv2_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage4_conv2_weight.bin",
+        "bias_path": "",
+        "cout": 512,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 1,
+        "kw": 1,
+        "stride": 2,
+        "padding": 0
+      },
+      "next_steps": [
+        101
+      ]
+    },
+    {
+      "step": 101,
+      "name": "resnetv16_stage4_batchnorm2_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage4_batchnorm2_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage4_batchnorm2_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage4_batchnorm2_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage4_batchnorm2_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 512,
+        "h_in": 7,
+        "w_in": 7
+      },
+      "next_steps": [
+        107
+      ]
+    },
+    {
+      "step": 102,
+      "name": "resnetv16_stage4_conv0_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage4_conv0_weight.bin",
+        "bias_path": "",
+        "cout": 512,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 2,
+        "padding": 1
+      },
+      "next_steps": [
+        103
+      ]
+    },
+    {
+      "step": 103,
+      "name": "resnetv16_stage4_batchnorm0_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage4_batchnorm0_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage4_batchnorm0_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage4_batchnorm0_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage4_batchnorm0_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 512,
+        "h_in": 7,
+        "w_in": 7
+      },
+      "next_steps": [
+        104
+      ]
+    },
+    {
+      "step": 104,
+      "name": "resnetv16_stage4_relu0_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        105
+      ]
+    },
+    {
+      "step": 105,
+      "name": "resnetv16_stage4_conv1_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage4_conv1_weight.bin",
+        "bias_path": "",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 7,
+        "w_in": 7,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        106
+      ]
+    },
+    {
+      "step": 106,
+      "name": "resnetv16_stage4_batchnorm1_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage4_batchnorm1_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage4_batchnorm1_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage4_batchnorm1_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage4_batchnorm1_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 512,
+        "h_in": 7,
+        "w_in": 7
+      },
+      "next_steps": [
+        107
+      ]
+    },
+    {
+      "step": 107,
+      "name": "resnetv16_stage4__plus0",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        108
+      ]
+    },
+    {
+      "step": 108,
+      "name": "resnetv16_stage4_activation0",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        109,
+        114
+      ]
+    },
+    {
+      "step": 109,
+      "name": "resnetv16_stage4_conv3_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage4_conv3_weight.bin",
+        "bias_path": "",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 7,
+        "w_in": 7,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        110
+      ]
+    },
+    {
+      "step": 110,
+      "name": "resnetv16_stage4_batchnorm3_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage4_batchnorm3_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage4_batchnorm3_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage4_batchnorm3_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage4_batchnorm3_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 512,
+        "h_in": 7,
+        "w_in": 7
+      },
+      "next_steps": [
+        111
+      ]
+    },
+    {
+      "step": 111,
+      "name": "resnetv16_stage4_relu1_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        112
+      ]
+    },
+    {
+      "step": 112,
+      "name": "resnetv16_stage4_conv4_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage4_conv4_weight.bin",
+        "bias_path": "",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 7,
+        "w_in": 7,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        113
+      ]
+    },
+    {
+      "step": 113,
+      "name": "resnetv16_stage4_batchnorm4_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage4_batchnorm4_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage4_batchnorm4_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage4_batchnorm4_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage4_batchnorm4_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 512,
+        "h_in": 7,
+        "w_in": 7
+      },
+      "next_steps": [
+        114
+      ]
+    },
+    {
+      "step": 114,
+      "name": "resnetv16_stage4__plus1",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        115
+      ]
+    },
+    {
+      "step": 115,
+      "name": "resnetv16_stage4_activation1",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        116,
+        121
+      ]
+    },
+    {
+      "step": 116,
+      "name": "resnetv16_stage4_conv5_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage4_conv5_weight.bin",
+        "bias_path": "",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 7,
+        "w_in": 7,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        117
+      ]
+    },
+    {
+      "step": 117,
+      "name": "resnetv16_stage4_batchnorm5_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage4_batchnorm5_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage4_batchnorm5_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage4_batchnorm5_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage4_batchnorm5_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 512,
+        "h_in": 7,
+        "w_in": 7
+      },
+      "next_steps": [
+        118
+      ]
+    },
+    {
+      "step": 118,
+      "name": "resnetv16_stage4_relu2_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        119
+      ]
+    },
+    {
+      "step": 119,
+      "name": "resnetv16_stage4_conv6_fwd",
+      "kernel_type": 1,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_stage4_conv6_weight.bin",
+        "bias_path": "",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 7,
+        "w_in": 7,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1
+      },
+      "next_steps": [
+        120
+      ]
+    },
+    {
+      "step": 120,
+      "name": "resnetv16_stage4_batchnorm6_fwd",
+      "kernel_type": 2,
+      "params": {
+        "scale_path": "../bin_weights/resnetv16_stage4_batchnorm6_gamma.bin",
+        "beta_path": "../bin_weights/resnetv16_stage4_batchnorm6_beta.bin",
+        "mean_path": "../bin_weights/resnetv16_stage4_batchnorm6_running_mean.bin",
+        "var_path": "../bin_weights/resnetv16_stage4_batchnorm6_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "channels": 512,
+        "h_in": 7,
+        "w_in": 7
+      },
+      "next_steps": [
+        121
+      ]
+    },
+    {
+      "step": 121,
+      "name": "resnetv16_stage4__plus2",
+      "kernel_type": 5,
+      "params": {},
+      "next_steps": [
+        122
+      ]
+    },
+    {
+      "step": 122,
+      "name": "resnetv16_stage4_activation2",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        123
+      ]
+    },
+    {
+      "step": 123,
+      "name": "resnetv16_pool1_fwd",
+      "kernel_type": 6,
+      "params": {
+        "channels": 512,
+        "h_in": 7,
+        "w_in": 7
+      },
+      "next_steps": [
+        124
+      ]
+    },
+    {
+      "step": 124,
+      "name": "flatten_306",
+      "kernel_type": 7,
+      "params": {},
+      "next_steps": [
+        125
+      ]
+    },
+    {
+      "step": 125,
+      "name": "resnetv16_dense0_fwd",
+      "kernel_type": 8,
+      "params": {
+        "weight_path": "../bin_weights/resnetv16_dense0_weight.bin",
+        "bias_path": "../bin_weights/resnetv16_dense0_bias.bin",
+        "in_features": 512,
+        "out_features": 1000
+      },
+      "next_steps": []
+    }
+  ]
+}

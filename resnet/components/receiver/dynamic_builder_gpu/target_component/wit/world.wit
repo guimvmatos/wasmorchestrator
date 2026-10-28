@@ -1,8 +1,27 @@
 package example:server;
 
 world runner {
+    import planner:convworld/plan;
+    import planner:bnworld/plan;
+    import planner:reluworld/plan;
+    import planner:maxpoolworld/plan;
+    import planner:addworld/plan;
+    import planner:gapworld/plan;
+    import planner:flattenworld/plan;
+    import planner:gemmworld/plan;
     import planner:dropoutworld/plan;
     import planner:sigmoidworld/plan;
     import planner:mulworld/plan;
+    import planner:siluworld/plan;
+    import planner:splitworld/plan;
+    import planner:concatworld/plan;
+    import planner:reshapeworld/plan;
+    import planner:transposeworld/plan;
+    import planner:matmulworld/plan;
+    import planner:resizeworld/plan;
+    import planner:sliceworld/plan;
+    import planner:subworld/plan;
+    import planner:divworld/plan;
+    import planner:softmaxworld/plan;
     export wasi:cli/run@0.2.7;
 }
