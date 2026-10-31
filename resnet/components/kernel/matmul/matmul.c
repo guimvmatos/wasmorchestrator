@@ -132,4 +132,18 @@ void exports_planner_matmulworld_plan_matmul(
     ret->input.len = 0;
     ret->kernels.ptr = NULL;
     ret->kernels.len = 0;
+
+    // --- 30/10: libera os argumentos recebidos (fix de vazamento de memória) ---
+    // No ABI de componentes, a função exportada é DONA dos argumentos: o
+    // adapter gerado pelo wit-bindgen não os libera, e o post-return só libera
+    // o valor de RETORNO. Sem isso, cada chamada vazava os buffers de entrada
+    // na memória linear do kernel até estourar os 4 GiB do wasm32
+    // (cabi_realloc -> abort). Não liberado aqui: reply_to vai no retorno.
+    matmulworld_list_f32_free(lhs);
+    matmulworld_list_f32_free(rhs);
+    matmulworld_list_u32_free(lhs_shape);
+    matmulworld_list_u32_free(rhs_shape);
+    matmulworld_list_f32_free(&result_container->input);
+    matmulworld_list_f32_free(&result_container->output);
+    matmulworld_list_u8_free(&result_container->kernels);
 }

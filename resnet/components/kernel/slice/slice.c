@@ -129,4 +129,20 @@ void exports_planner_sliceworld_plan_slice(
     ret->input.len = 0;
     ret->kernels.ptr = NULL;
     ret->kernels.len = 0;
+
+    // --- 30/10: libera os argumentos recebidos (fix de vazamento de memória) ---
+    // No ABI de componentes, a função exportada é DONA dos argumentos: o
+    // adapter gerado pelo wit-bindgen não os libera, e o post-return só libera
+    // o valor de RETORNO. Sem isso, cada chamada vazava os buffers de entrada
+    // na memória linear do kernel até estourar os 4 GiB do wasm32
+    // (cabi_realloc -> abort). Não liberado aqui: reply_to vai no retorno.
+    sliceworld_list_f32_free(input);
+    sliceworld_list_u32_free(shape);
+    sliceworld_list_s32_free(starts);
+    sliceworld_list_s32_free(ends);
+    sliceworld_list_u32_free(axes);
+    sliceworld_list_s32_free(steps);
+    sliceworld_list_f32_free(&result_container->input);
+    sliceworld_list_f32_free(&result_container->output);
+    sliceworld_list_u8_free(&result_container->kernels);
 }

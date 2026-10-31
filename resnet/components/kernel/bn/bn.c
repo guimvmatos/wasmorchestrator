@@ -50,4 +50,15 @@ for (int b = 0; b < B; b++) {
     }
 
     *ret = *img;
+
+    // --- 30/10: libera os argumentos recebidos (fix de vazamento de memória) ---
+    // No ABI de componentes, a função exportada é DONA dos argumentos: o
+    // adapter gerado pelo wit-bindgen não os libera, e o post-return só libera
+    // o valor de RETORNO. Sem isso, cada chamada vazava os buffers de entrada
+    // na memória linear do kernel até estourar os 4 GiB do wasm32
+    // (cabi_realloc -> abort). Não liberado aqui: *ret = *img: o record inteiro vai no retorno.
+    bnworld_list_f32_free(scale);
+    bnworld_list_f32_free(beta);
+    bnworld_list_f32_free(mean);
+    bnworld_list_f32_free(var);
 }

@@ -81,4 +81,17 @@ void exports_planner_transposeworld_plan_transpose(
     ret->input.len = 0;
     ret->kernels.ptr = NULL;
     ret->kernels.len = 0;
+
+    // --- 30/10: libera os argumentos recebidos (fix de vazamento de memória) ---
+    // No ABI de componentes, a função exportada é DONA dos argumentos: o
+    // adapter gerado pelo wit-bindgen não os libera, e o post-return só libera
+    // o valor de RETORNO. Sem isso, cada chamada vazava os buffers de entrada
+    // na memória linear do kernel até estourar os 4 GiB do wasm32
+    // (cabi_realloc -> abort). Não liberado aqui: reply_to vai no retorno.
+    transposeworld_list_f32_free(input);
+    transposeworld_list_u32_free(shape);
+    transposeworld_list_u32_free(perm);
+    transposeworld_list_f32_free(&result_container->input);
+    transposeworld_list_f32_free(&result_container->output);
+    transposeworld_list_u8_free(&result_container->kernels);
 }

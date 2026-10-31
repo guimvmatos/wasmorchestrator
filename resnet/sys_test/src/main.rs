@@ -7,6 +7,27 @@ use chrono::Local;
 use sysinfo::{System, Cpu};
 use std::process::{Child, Command};
 use std::time::Instant;
+use std::sync::OnceLock;
+
+// 31/10: configuração por máquina sem recompilar (Fase 3, vários nós).
+//   cargo run --release -- <node_id> <ip_da_maquina> [--no-gpu]
+// Sem argumentos: node_id 1, ip 127.0.0.1, GPU ligada (comportamento antigo).
+// --no-gpu (ou SYS_NO_GPU=1): monta os grupos só com as variantes CPU dos
+// kernels — para servidores sem GPU utilizável.
+static NO_GPU: OnceLock<bool> = OnceLock::new();
+
+fn gpu_disabled() -> bool {
+    *NO_GPU.get().unwrap_or(&false)
+}
+
+// 31/10: grava a routing_table.json de forma atômica (arquivo temporário +
+// rename). Os grupos releem a tabela a cada conexão; com escrita direta, um
+// grupo podia ler o arquivo pela metade.
+fn write_table_atomic(json_data: &str) -> io::Result<()> {
+    let tmp = "routing_table.json.tmp";
+    std::fs::write(tmp, json_data)?;
+    std::fs::rename(tmp, "routing_table.json")
+}
 
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -135,7 +156,7 @@ fn build_and_launch(
         .join(",");
     let gpu_csv = sorted_kernels
         .iter()
-        .filter(|k| GPU_CAPABLE_KERNELS.contains(k))
+        .filter(|k| !gpu_disabled() && GPU_CAPABLE_KERNELS.contains(k))
         .map(|k| k.to_string())
         .collect::<Vec<_>>()
         .join(",");
@@ -411,7 +432,7 @@ fn reconcile_groups(
     // gravação aqui é só pro caso de Regra 2.
     if changed && !groups_to_drain.is_empty() {
         if let Ok(json_data) = serde_json::to_string_pretty(&routing_data) {
-            let _ = std::fs::write("routing_table.json", json_data);
+            let _ = write_table_atomic(&json_data);
             println!(
                 "[GROUPS] Tabela persistida antes do dreno — tráfego novo já roteado pro grupo novo."
             );
@@ -499,8 +520,7 @@ fn handle_orchestrator(mut stream: TcpStream, state: &mut SysRuntime, node_id: u
     // (que pode trazer os mesmos assignments de antes).
     if changed {
         let json_data = serde_json::to_string_pretty(&routing_data).unwrap();
-        let mut file = File::create("routing_table.json")?;
-        file.write_all(json_data.as_bytes())?;
+        write_table_atomic(&json_data)?;
         println!("[{}] Tabela recebida via rede, atualizada e salva.", Local::now().format("%H:%M:%S"));
     } else {
         println!("[{}] Tabela recebida via rede — sem mudança nos grupos deste nó, nada a escrever.", Local::now().format("%H:%M:%S"));
@@ -511,8 +531,15 @@ fn handle_orchestrator(mut stream: TcpStream, state: &mut SysRuntime, node_id: u
 
 fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind("0.0.0.0:9999")?; //#### TODO: colocar o ip da maquina local ou 0.0.0.0. é por onde o seu sys vai ouvir
-    let my_node_id = 1; //#### TODO: Trocar o numero do nó
-    let my_ip = "127.0.0.1"; //#### TODO: Colocar o numero do ip da maquina onde esta nó esta.
+    let args: Vec<String> = std::env::args().collect();
+    let positional: Vec<&String> = args.iter().skip(1).filter(|a| !a.starts_with("--")).collect();
+    let my_node_id: u8 = positional.first().and_then(|s| s.parse().ok()).unwrap_or(1);
+    let my_ip_owned: String = positional.get(1).map(|s| s.to_string()).unwrap_or_else(|| "127.0.0.1".to_string());
+    let my_ip: &str = &my_ip_owned;
+    let no_gpu = args.iter().any(|a| a == "--no-gpu")
+        || std::env::var("SYS_NO_GPU").map(|v| v == "1").unwrap_or(false);
+    let _ = NO_GPU.set(no_gpu);
+    println!("[CONFIG] node_id={} ip={} gpu={}", my_node_id, my_ip, if no_gpu { "desligada" } else { "ligada" });
 
     let mut my_functions: Vec<FunctionInfo> = Vec::new();
     let mut state = SysRuntime::new();
@@ -547,7 +574,7 @@ fn main() -> std::io::Result<()> {
                             // parar mesmo parado/estável.
                             if changed {
                                 if let Ok(json_data) = serde_json::to_string_pretty(&routing_data) {
-                                    let _ = std::fs::write("routing_table.json", json_data);
+                                    let _ = write_table_atomic(&json_data);
                                 }
                             }
                         }

@@ -830,10 +830,10 @@ KERNELS = {
         # e ao padrão já usado pelo Mul: tensor x constante (ex: anchor_points
         # fixo no decode do YOLO) ou tensor x tensor (join-buffer por step).
         # Sub NÃO é comutativo (a - b != b - a) — const_is_first decide a
-        # ordem quando um lado é constante; no caso tensor x tensor, "1º a
-        # chegar" vira `a` (mesma limitação aceita do Mul/onnx_to_dfg.py, não
-        # esperado ocorrer no decode do YOLO onde Sub/Div sempre têm um lado
-        # constante).
+        # ordem quando um lado é constante; no caso tensor x tensor, usa
+        # lhs_step/rhs_step como o MatMul (30/10: o decode do YOLO26n TEM um
+        # Sub tensor x tensor — /model.23/Sub_1, wh = x2y2 - x1y1 — e a ordem
+        # de chegada invertia o sinal de w/h).
         "rust_match": """                20 => {
                     if !p.const_path.is_empty() {
                         let const_vec = load_weights_file_cached(&p.const_path);
@@ -854,8 +854,51 @@ KERNELS = {
                         };
                         let res = bindings::planner::subworld::plan::sub(a, b, &data);
                         computed_output = res.output;
-                    } else if let Some(first_branch) = sub_branches.remove(&current_step) {
-                        println!("Step {}: 2º ramo recebido! Subtraindo buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                    } else {
+                        // tensor x tensor. Sub NÃO é comutativo: lhs_step/rhs_step
+                        // (gravados pelo onnx_to_dfg.py a partir do producer real de
+                        // node.input[0]/node.input[1]) dizem qual ramo é `a` e qual é `b`
+                        // — join por (step, origin_step), igual ao MatMul (17), não por
+                        // ordem de chegada. Sem esses campos (DFG antigo) cai no
+                        // comportamento anterior (1º a chegar = `a`) com aviso.
+                        let pair: Option<(Vec<f32>, Vec<f32>)> = match (p.lhs_step, p.rhs_step) {
+                            (Some(lhs_step), Some(rhs_step)) if lhs_step == rhs_step => {
+                                Some((current_input.clone(), current_input.clone()))
+                            }
+                            (Some(lhs_step), Some(rhs_step)) => {
+                                let ready = {
+                                    let slots = sub_slots.entry(current_step).or_insert_with(HashMap::new);
+                                    slots.insert(origin_step, current_input.clone());
+                                    slots.contains_key(&lhs_step) && slots.contains_key(&rhs_step)
+                                };
+                                if ready {
+                                    let mut slots = sub_slots.remove(&current_step).unwrap();
+                                    let a = slots.remove(&lhs_step).unwrap();
+                                    let b = slots.remove(&rhs_step).unwrap();
+                                    Some((a, b))
+                                } else {
+                                    println!("Step {}: ramo from_step={} guardado no Sub (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
+                                    None
+                                }
+                            }
+                            _ => {
+                                if let Some(first_branch) = sub_branches.remove(&current_step) {
+                                    println!("[AVISO] Step {}: Sub tensor x tensor sem lhs_step/rhs_step no DFG — usando ordem de chegada (pode inverter o sinal/razão). Regere o DFG com o onnx_to_dfg.py atual.", current_step);
+                                    Some((first_branch, current_input.clone()))
+                                } else {
+                                    sub_branches.insert(current_step, current_input.clone());
+                                    None
+                                }
+                            }
+                        };
+                        let (a, b) = match pair {
+                            Some(ab) => ab,
+                            None => {
+                                println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                                continue;
+                            }
+                        };
+                        println!("Step {}: Subtraindo buffers de tamanhos {} e {}...", current_step, a.len(), b.len());
                         let data = bindings::planner::subworld::plan::Data {
                             input: current_input.clone(),
                             output: vec![],
@@ -866,12 +909,8 @@ KERNELS = {
                             from_step: origin_step,
                         model_id: input_img.model_id,
                         };
-                        let res = bindings::planner::subworld::plan::sub(&first_branch, &current_input, &data);
+                        let res = bindings::planner::subworld::plan::sub(&a, &b, &data);
                         computed_output = res.output;
-                    } else {
-                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
-                        sub_branches.insert(current_step, current_input);
-                        continue;
                     }
                 },""",
         "variants": {
@@ -906,8 +945,51 @@ KERNELS = {
                         };
                         let res = bindings::planner::divworld::plan::div(a, b, &data);
                         computed_output = res.output;
-                    } else if let Some(first_branch) = div_branches.remove(&current_step) {
-                        println!("Step {}: 2º ramo recebido! Dividindo buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                    } else {
+                        // tensor x tensor. Div NÃO é comutativo: lhs_step/rhs_step
+                        // (gravados pelo onnx_to_dfg.py a partir do producer real de
+                        // node.input[0]/node.input[1]) dizem qual ramo é `a` e qual é `b`
+                        // — join por (step, origin_step), igual ao MatMul (17), não por
+                        // ordem de chegada. Sem esses campos (DFG antigo) cai no
+                        // comportamento anterior (1º a chegar = `a`) com aviso.
+                        let pair: Option<(Vec<f32>, Vec<f32>)> = match (p.lhs_step, p.rhs_step) {
+                            (Some(lhs_step), Some(rhs_step)) if lhs_step == rhs_step => {
+                                Some((current_input.clone(), current_input.clone()))
+                            }
+                            (Some(lhs_step), Some(rhs_step)) => {
+                                let ready = {
+                                    let slots = div_slots.entry(current_step).or_insert_with(HashMap::new);
+                                    slots.insert(origin_step, current_input.clone());
+                                    slots.contains_key(&lhs_step) && slots.contains_key(&rhs_step)
+                                };
+                                if ready {
+                                    let mut slots = div_slots.remove(&current_step).unwrap();
+                                    let a = slots.remove(&lhs_step).unwrap();
+                                    let b = slots.remove(&rhs_step).unwrap();
+                                    Some((a, b))
+                                } else {
+                                    println!("Step {}: ramo from_step={} guardado no Div (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
+                                    None
+                                }
+                            }
+                            _ => {
+                                if let Some(first_branch) = div_branches.remove(&current_step) {
+                                    println!("[AVISO] Step {}: Div tensor x tensor sem lhs_step/rhs_step no DFG — usando ordem de chegada (pode inverter o sinal/razão). Regere o DFG com o onnx_to_dfg.py atual.", current_step);
+                                    Some((first_branch, current_input.clone()))
+                                } else {
+                                    div_branches.insert(current_step, current_input.clone());
+                                    None
+                                }
+                            }
+                        };
+                        let (a, b) = match pair {
+                            Some(ab) => ab,
+                            None => {
+                                println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                                continue;
+                            }
+                        };
+                        println!("Step {}: Dividindo buffers de tamanhos {} e {}...", current_step, a.len(), b.len());
                         let data = bindings::planner::divworld::plan::Data {
                             input: current_input.clone(),
                             output: vec![],
@@ -918,12 +1000,8 @@ KERNELS = {
                             from_step: origin_step,
                         model_id: input_img.model_id,
                         };
-                        let res = bindings::planner::divworld::plan::div(&first_branch, &current_input, &data);
+                        let res = bindings::planner::divworld::plan::div(&a, &b, &data);
                         computed_output = res.output;
-                    } else {
-                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
-                        div_branches.insert(current_step, current_input);
-                        continue;
                     }
                 },""",
         "variants": {
@@ -1285,6 +1363,42 @@ fn load_all_model_graphs() -> HashMap<u32, ModelGraph> {{
     graphs
 }}
 
+// 31/10: estado de junção (join) por request, PERSISTENTE entre conexões.
+// Antes os buffers eram locais a cada handle_client (uma conexão TCP): com os
+// kernels em grupos diferentes, os dois ramos de um Add/Concat/MatMul/Sub/Div
+// chegam por conexões separadas e nunca se encontravam. Agora, no início de
+// cada conexão, o estado da request é retirado deste mapa (ou criado vazio) e,
+// no fim, devolvido se ainda houver ramo esperando. Os rust_match não mudam.
+#[derive(Default)]
+struct JoinState {{
+    add_branches: HashMap<u32, Vec<f32>>,
+    mul_branches: HashMap<u32, Vec<f32>>,
+    concat_branches: HashMap<u32, HashMap<u32, VecDeque<Vec<f32>>>>,
+    matmul_branches: HashMap<u32, HashMap<u32, Vec<f32>>>,
+    sub_branches: HashMap<u32, Vec<f32>>,
+    div_branches: HashMap<u32, Vec<f32>>,
+    sub_slots: HashMap<u32, HashMap<u32, Vec<f32>>>,
+    div_slots: HashMap<u32, HashMap<u32, Vec<f32>>>,
+}}
+
+impl JoinState {{
+    fn is_empty(&self) -> bool {{
+        self.add_branches.is_empty() && self.mul_branches.is_empty()
+            && self.concat_branches.is_empty() && self.matmul_branches.is_empty()
+            && self.sub_branches.is_empty() && self.div_branches.is_empty()
+            && self.sub_slots.is_empty() && self.div_slots.is_empty()
+    }}
+}}
+
+// 31/10: relê a routing_table.json a cada conexão. Antes ela era lida uma vez
+// no boot do grupo, e um grupo que subiu antes de outro nunca sabia que o
+// outro existia ("Kernel tipo X não está neste nó nem na routing_table").
+// Falha de leitura/parse (ex.: o sys reescrevendo o arquivo) -> usa a do boot.
+fn reload_routing() -> Option<RoutingTable> {{
+    let f = std::fs::File::open("routing_table.json").ok()?;
+    serde_json::from_reader(f).ok()
+}}
+
 // Kernels não presentes neste binário caem no braço `_` do match abaixo e
 // são despachados via TCP para o endereço indicado na routing_table para
 // aquele kernel_type. Kernels presentes rodam direto, sem rede.
@@ -1293,7 +1407,10 @@ fn handle_client(
     initialized: &mut i32,
     graphs: &HashMap<u32, ModelGraph>,
     routing: &RoutingTable,
+    pending_joins: &mut HashMap<u32, JoinState>,
 ) -> std::io::Result<()> {{
+    let fresh_routing = reload_routing();
+    let routing: &RoutingTable = fresh_routing.as_ref().unwrap_or(routing);
     let mut len_buf = [0u8; 4];
 
     loop {{
@@ -1333,23 +1450,18 @@ fn handle_client(
         // Terceiro elemento da tupla = step de origem (from_step), propagado
         // igual ao `next_status.from_step = current_step` dos receivers isolados.
         let mut queue: VecDeque<(u32, Vec<f32>, u32)> = VecDeque::new();
-        let mut add_branches: HashMap<u32, Vec<f32>> = HashMap::new();
-        let mut mul_branches: HashMap<u32, Vec<f32>> = HashMap::new();
-        // Concat (14): chave externa = step do Concat; chave interna =
-        // from_step; valor = fila (não Vec simples) porque o MESMO from_step
-        // pode aparecer 2x em input_order (duas metades do mesmo Split).
-        let mut concat_branches: HashMap<u32, HashMap<u32, VecDeque<Vec<f32>>>> = HashMap::new();
-        // MatMul (17): chave externa = step do MatMul; chave interna =
-        // from_step (lhs_step ou rhs_step) -> buffer. Não usa VecDeque como
-        // o Concat porque lhs_step == rhs_step (mesma origem alimentando os
-        // dois lados) não é suportado por este dynamic_builder (ver panic
-        // no rust_match do kernel 17) — um slot por origem basta.
-        let mut matmul_branches: HashMap<u32, HashMap<u32, Vec<f32>>> = HashMap::new();
-        // Sub (20) / Div (21): mesmo mecanismo de join-buffer do Mul — só
-        // usado no caso raro em que NENHUM lado é constante (ver nota no
-        // rust_match dos kernels 20/21 e no onnx_to_dfg.py).
-        let mut sub_branches: HashMap<u32, Vec<f32>> = HashMap::new();
-        let mut div_branches: HashMap<u32, Vec<f32>> = HashMap::new();
+        // Buffers de junção desta request: retomados de conexões anteriores
+        // (ramos que chegaram antes por outra conexão) — ver JoinState.
+        let JoinState {{
+            mut add_branches,
+            mut mul_branches,
+            mut concat_branches,
+            mut matmul_branches,
+            mut sub_branches,
+            mut div_branches,
+            mut sub_slots,
+            mut div_slots,
+        }} = pending_joins.remove(&input_img.request).unwrap_or_default();
 
         queue.push_back((input_img.current_kernel, input_img.input.clone(), input_img.from_step));
 
@@ -1496,6 +1608,21 @@ fn handle_client(
             }}
         }}
 
+        // Ramo(s) ainda esperando o par: guarda para a próxima conexão desta request.
+        let leftover = JoinState {{
+            add_branches,
+            mul_branches,
+            concat_branches,
+            matmul_branches,
+            sub_branches,
+            div_branches,
+            sub_slots,
+            div_slots,
+        }};
+        if !leftover.is_empty() {{
+            pending_joins.insert(request_id, leftover);
+        }}
+
         // Só devolve pro cliente se a rede terminou DENTRO deste nó. Se tudo
         // que restava foi despachado por rede, quem responde é o nó remoto.
         if reached_final {{
@@ -1546,11 +1673,12 @@ impl bindings::exports::wasi::cli::run::Guest for Component {{
         println!("Listening on {{}}", bind_addr);
 
         let mut init = 0;
+        let mut pending_joins: HashMap<u32, JoinState> = HashMap::new();
         for stream in listener.incoming() {{
             match stream {{
                 Ok(stream) => {{
                     println!("Nova conexão recebida!");
-                    if let Err(e) = handle_client(stream, &mut init, &graphs, &routing) {{
+                    if let Err(e) = handle_client(stream, &mut init, &graphs, &routing, &mut pending_joins) {{
                         eprintln!("Error handling client: {{:?}}", e);
                     }}
                 }}

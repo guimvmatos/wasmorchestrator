@@ -4875,7 +4875,10 @@
       "step": 273,
       "name": "/model.23/Sub_1",
       "kernel_type": 20,
-      "params": {},
+      "params": {
+        "lhs_step": 271,
+        "rhs_step": 270
+      },
       "next_steps": [
         277
       ]

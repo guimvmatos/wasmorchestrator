@@ -43,4 +43,14 @@ void exports_planner_gemmworld_plan_gemm(uint32_t in_features, uint32_t out_feat
     ret->request = result_container->request;
     ret->from_step = result_container->from_step;
     ret->model_id = result_container->model_id;
+
+    // --- 30/10: libera os argumentos recebidos (fix de vazamento de memória) ---
+    // No ABI de componentes, a função exportada é DONA dos argumentos: o
+    // adapter gerado pelo wit-bindgen não os libera, e o post-return só libera
+    // o valor de RETORNO. Sem isso, cada chamada vazava os buffers de entrada
+    // na memória linear do kernel até estourar os 4 GiB do wasm32
+    // (cabi_realloc -> abort). Não liberado aqui: result_container->input vira ret->input; kernels e reply_to vão no retorno.
+    gemmworld_list_f32_free(weights);
+    gemmworld_list_f32_free(bias);
+    gemmworld_list_f32_free(&result_container->output);
 }

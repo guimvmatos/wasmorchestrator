@@ -621,8 +621,8 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
             # YOLO (grid constante pra resolução de entrada fixa). Sub/Div
             # NÃO são comutativos como Add/Mul, então guardamos qual lado é
             # a constante (const_is_first) pro kernel montar a - b na ordem
-            # certa. Quando os dois lados são dinâmicos, o kernel trata como
-            # binário elementwise simples (mesmo shape), igual ao Add.
+            # certa. Quando os dois lados são dinâmicos, grava lhs_step/
+            # rhs_step (ver abaixo).
             in0, in1 = node.input[0], node.input[1]
             const_tensor = None
             const_is_first = False
@@ -639,7 +639,15 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
                     "const_is_first": const_is_first,
                 }
             else:
-                params = {}
+                # Tensor x tensor (30/10): Sub/Div não são comutativos, então,
+                # igual ao MatMul (17), gravamos o step que produz cada lado.
+                # Sem isso o receiver usava a ordem de chegada e o
+                # /model.23/Sub_1 do YOLO26n (wh = x2y2 - x1y1) saía com o
+                # sinal invertido.
+                params = {
+                    "lhs_step": tensor_producer.get(in0),
+                    "rhs_step": tensor_producer.get(in1),
+                }
 
         elif kernel_type == 22:  # Softmax
             full_in_shape = value_info_shapes.get(main_input_name, in_shape)

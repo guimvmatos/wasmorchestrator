@@ -73,4 +73,16 @@ void exports_planner_concatworld_plan_concat(
     ret->input.len = 0;
     ret->kernels.ptr = NULL;
     ret->kernels.len = 0;
+
+    // --- 30/10: libera os argumentos recebidos (fix de vazamento de memória) ---
+    // No ABI de componentes, a função exportada é DONA dos argumentos: o
+    // adapter gerado pelo wit-bindgen não os libera, e o post-return só libera
+    // o valor de RETORNO. Sem isso, cada chamada vazava os buffers de entrada
+    // na memória linear do kernel até estourar os 4 GiB do wasm32
+    // (cabi_realloc -> abort). Não liberado aqui: reply_to vai no retorno.
+    concatworld_list_list_f32_free(inputs);
+    concatworld_list_list_u32_free(shapes);
+    concatworld_list_f32_free(&result_container->input);
+    concatworld_list_f32_free(&result_container->output);
+    concatworld_list_u8_free(&result_container->kernels);
 }

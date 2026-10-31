@@ -60,4 +60,15 @@ void exports_planner_splitworld_plan_split(
 
         offset += size;
     }
+
+    // --- 30/10: libera os argumentos recebidos (fix de vazamento de memória) ---
+    // No ABI de componentes, a função exportada é DONA dos argumentos: o
+    // adapter gerado pelo wit-bindgen não os libera, e o post-return só libera
+    // o valor de RETORNO. Sem isso, cada chamada vazava os buffers de entrada
+    // na memória linear do kernel até estourar os 4 GiB do wasm32
+    // (cabi_realloc -> abort). Não liberado aqui: retorno é list<list<f32>>: nada do container vai no retorno.
+    splitworld_list_f32_free(input);
+    splitworld_list_u32_free(shape);
+    splitworld_list_u32_free(sizes);
+    exports_planner_splitworld_plan_data_free(result_container);
 }
