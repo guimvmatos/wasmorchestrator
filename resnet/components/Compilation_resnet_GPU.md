@@ -1,9 +1,28 @@
 git clone wasmorchestrator.... 
+
+cd Documents/wasmorchestrator/
 export WOR="$(pwd)"
 
 # Runtime
 cd "$WOR/wasi-gfx-runtime"
 cargo build -p runtime --release
+
+cd "$WOR/resnet/components/kernel"
+for k in *_gpu; do echo "--- $k"; (cd "$k" && wkg fetch) || echo "FALHOU: $k"; done
+bash rebuild_kernels_model_id.sh
+
+ou
+(cd bn_gpu && wkg fetch)
+(cd conv_gpu && wkg fetch)
+(cd gap_gpu && wkg fetch)
+(cd gemm_gpu && wkg fetch)
+(cd matmul_gpu && wkg fetch)
+(cd maxpool_gpu && wkg fetch)
+(cd mul_gpu && wkg fetch)
+(cd sigmoid_gpu && wkg fetch)
+(cd silu_gpu && wkg fetch)
+
+bash rebuild_kernels_model_id.sh
 
 # Kernels/Receivers
 ## Conv
