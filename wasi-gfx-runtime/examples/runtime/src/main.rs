@@ -1,10 +1,12 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use clap::Parser;
 use frame_buffer_wasmtime::{FrameBufferCtx, FrameBufferCtxView};
 use surface_wasmtime::{
-    winit::WasiWinitEventLoopProxy, SurfaceCtxView, SurfaceFrameBufferCtx,
-    SurfaceFrameBufferCtxView, SurfaceWebgpuCtx, SurfaceWebgpuCtxView,
+    winit::WasiWinitEventLoopProxy, MainThreadSpawner, Surface, SurfaceCtxView, SurfaceDesc,
+    SurfaceFrameBufferCtx, SurfaceFrameBufferCtxView, SurfaceWebgpuCtx, SurfaceWebgpuCtxView,
 };
 use wasi_webgpu_wasmtime::{WasiWebGpuCtx, WasiWebGpuCtxView, WasiWebGpuOptions};
 use wasmtime::{
@@ -30,6 +32,59 @@ struct RuntimeArgs {
     /// IP para bind (ex: 127.0.0.1 ou 0.0.0.0)
     #[arg(long, default_value = "127.0.0.1")]
     ip: String,
+
+    /// Força o modo sem tela (headless). Sem esta flag, o modo é escolhido sozinho:
+    /// headless quando não há DISPLAY / WAYLAND_DISPLAY / WAYLAND_SOCKET no ambiente.
+    #[arg(long, default_value_t = false)]
+    headless: bool,
+}
+
+// 02/11: modo sem tela (headless), para servidores acessados por SSH.
+//
+// O winit exige uma tela (X11/Wayland) só para CRIAR o event loop; sem tela ele
+// aborta com "neither WAYLAND_DISPLAY nor WAYLAND_SOCKET nor DISPLAY is set".
+// Nossos componentes não usam janela (wasi:surface): só WebGPU de computação e
+// rede/arquivos. Então, sem tela, não criamos o event loop e usamos este spawner,
+// que roda o closure direto (Spawn) e recusa criar janela (create_surface).
+// Com tela, nada muda: continua o proxy do winit, exatamente como antes.
+#[derive(Clone)]
+enum MainSpawner {
+    Winit(WasiWinitEventLoopProxy),
+    Headless,
+}
+
+impl MainThreadSpawner for MainSpawner {
+    fn spawn<F, T>(&self, f: F) -> impl Future<Output = T>
+    where
+        F: FnOnce() -> T + Send + 'static,
+        T: Send + 'static,
+    {
+        let this = self.clone();
+        async move {
+            match this {
+                MainSpawner::Winit(proxy) => proxy.spawn(f).await,
+                MainSpawner::Headless => f(),
+            }
+        }
+    }
+
+    fn create_surface(&self, desc: SurfaceDesc) -> Pin<Box<dyn Future<Output = Surface> + Send>> {
+        match self {
+            MainSpawner::Winit(proxy) => proxy.create_surface(desc),
+            MainSpawner::Headless => panic!(
+                "[HOST] Modo sem tela (headless): o componente pediu uma janela (wasi:surface), \
+                 que não existe neste modo. Rode com DISPLAY/WAYLAND_DISPLAY definido."
+            ),
+        }
+    }
+}
+
+/// true quando o ambiente tem uma tela que o winit consegue usar
+/// (as mesmas variáveis que o winit confere antes de abortar).
+fn has_display() -> bool {
+    ["DISPLAY", "WAYLAND_DISPLAY", "WAYLAND_SOCKET"]
+        .iter()
+        .any(|v| std::env::var_os(v).map_or(false, |s| !s.is_empty()))
 }
 
 
@@ -37,11 +92,11 @@ struct RuntimeArgs {
 struct HostState {
     instance: Arc<wgpu_core::global::Global>,
     webgpu_options: WasiWebGpuOptions,
-    main_thread_proxy: Arc<surface_wasmtime::winit::WasiWinitEventLoopProxy>,
+    main_thread_proxy: Arc<MainSpawner>,
 }
 
 impl HostState {
-    fn new(main_thread_proxy: surface_wasmtime::winit::WasiWinitEventLoopProxy) -> Self {
+    fn new(main_thread_proxy: MainSpawner) -> Self {
         Self {
             instance: Arc::new(wgpu_core::global::Global::new(
                 "webgpu",
@@ -101,7 +156,7 @@ struct WorkloadState {
     wasi_ctx: WasiCtx,
     instance: Arc<wgpu_core::global::Global>,
     webgpu_options: WasiWebGpuOptions,
-    main_thread_proxy: Arc<WasiWinitEventLoopProxy>,
+    main_thread_proxy: Arc<MainSpawner>,
 }
 impl WasiView for WorkloadState {
     fn ctx(&mut self) -> WasiCtxView<'_> {
@@ -135,8 +190,8 @@ impl FrameBufferCtxView for WorkloadState {
 }
 
 impl SurfaceCtxView for WorkloadState {
-    type Spawner = WasiWinitEventLoopProxy;
-    fn surface_ctx(&mut self) -> surface_wasmtime::SurfaceCtx<'_, WasiWinitEventLoopProxy> {
+    type Spawner = MainSpawner;
+    fn surface_ctx(&mut self) -> surface_wasmtime::SurfaceCtx<'_, MainSpawner> {
         surface_wasmtime::SurfaceCtx {
             table: &mut self.table,
             main_thread_spawner: &self.main_thread_proxy,
@@ -144,8 +199,8 @@ impl SurfaceCtxView for WorkloadState {
     }
 }
 impl SurfaceWebgpuCtxView for WorkloadState {
-    type Spawner = WasiWinitEventLoopProxy;
-    fn surface_webgpu_ctx(&mut self) -> SurfaceWebgpuCtx<'_, WasiWinitEventLoopProxy> {
+    type Spawner = MainSpawner;
+    fn surface_webgpu_ctx(&mut self) -> SurfaceWebgpuCtx<'_, MainSpawner> {
         SurfaceWebgpuCtx {
             table: &mut self.table,
             instance: &self.instance,
@@ -154,8 +209,8 @@ impl SurfaceWebgpuCtxView for WorkloadState {
     }
 }
 impl SurfaceFrameBufferCtxView for WorkloadState {
-    type Spawner = WasiWinitEventLoopProxy;
-    fn surface_frame_buffer_ctx(&mut self) -> SurfaceFrameBufferCtx<'_, WasiWinitEventLoopProxy> {
+    type Spawner = MainSpawner;
+    fn surface_frame_buffer_ctx(&mut self) -> SurfaceFrameBufferCtx<'_, MainSpawner> {
         SurfaceFrameBufferCtx {
             table: &mut self.table,
             instance: &self.instance,
@@ -174,8 +229,16 @@ async fn main() -> anyhow::Result<()> {
 
     let args = RuntimeArgs::parse();
 
-    let (main_thread_loop, main_thread_proxy) =
-        surface_wasmtime::winit::create_wasi_winit_event_loop();
+    // Com tela: cria o event loop do winit como antes (a variável segura o loop
+    // vivo até o fim do main, igual ao comportamento anterior). Sem tela: headless.
+    let headless = args.headless || !has_display();
+    let (_main_thread_loop, main_thread_proxy) = if headless {
+        println!("[HOST] Sem tela (DISPLAY/WAYLAND ausentes ou --headless): modo headless. WebGPU de computação continua disponível; janelas (wasi:surface) não.");
+        (None, MainSpawner::Headless)
+    } else {
+        let (event_loop, proxy) = surface_wasmtime::winit::create_wasi_winit_event_loop();
+        (Some(event_loop), MainSpawner::Winit(proxy))
+    };
     let host_state = HostState::new(main_thread_proxy);
 
     let mut config = Config::default();
