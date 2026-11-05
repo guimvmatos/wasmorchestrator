@@ -76,6 +76,21 @@ type ModelsRegistry = HashMap<String, ModelEntry>;
 /// #### TODO: ajustar se a árvore de pastas mudar.
 const MODELS_JSON_PATH: &str = "../../models.json";
 
+// 04/11 (otimização A3): prints por requisição desligados. Para depurar,
+// troque VERBOSE para true. Erros continuam sempre ligados (eprintln!).
+const VERBOSE: bool = false;
+macro_rules! vprintln {
+    ($($t:tt)*) => { if VERBOSE { println!($($t)*); } };
+}
+
+/// 04/11 (otimização A1): lê o JSON inteiro de uma vez. serde_json::from_reader
+/// sobre File sem buffer faz uma leitura por byte: o grafo do modelo (26–100 KB)
+/// custava ~20 ms por requisição só para ser lido.
+fn read_json_file<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
 //fn main() -> std::io::Result<()> {
 fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     let start_total = Instant::now(); // Time counter 1 measures 
@@ -90,7 +105,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     }
 
     let payload_len = u32::from_be_bytes(len_buf) as usize;
-    println!("Recebendo requisição do cliente ({} bytes)...", payload_len);
+    vprintln!("Recebendo requisição do cliente ({} bytes)...", payload_len);
 
 
     // 2. LER E DESSERIALIZAR O CLIENTREQUEST (MessagePack)
@@ -100,7 +115,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     let client_req: ClientRequest = rmp_serde::from_slice(&buffer)
         .expect("Falha ao desserializar o ClientRequest do MessagePack");
 
-    println!(
+    vprintln!(
         "Demanda recebida! Request ID: {}, Modelo Solicitado: {}",
         client_req.request_id, client_req.model_id
     );
@@ -125,7 +140,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     };
 
     let readduration_millis = start_read.elapsed().as_micros() as f64 / 1000.0;
-    println!(
+    vprintln!(
         "Payload convertido com sucesso em {} elementos f32 em {:.3}ms",
         data_raw.len(),
         readduration_millis
@@ -134,16 +149,8 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     // 4. CONSULTAR O models.json PRA SABER QUAL GRAFO ABRIR PRO MODELO PEDIDO
     // (antes abria "resnet18DFG.json" fixo, ignorando client_req.model_id —
     // ver claude/project-state.md, item corrigido em 27/10).
-    let models_registry: ModelsRegistry = {
-        let f = std::fs::File::open(MODELS_JSON_PATH).unwrap_or_else(|e| {
-            panic!(
-                "Erro ao abrir {} (registro central de modelos): {}",
-                MODELS_JSON_PATH, e
-            )
-        });
-        serde_json::from_reader(f)
-            .unwrap_or_else(|e| panic!("Erro no parser de {}: {}", MODELS_JSON_PATH, e))
-    };
+    let models_registry: ModelsRegistry = read_json_file(std::path::Path::new(MODELS_JSON_PATH))
+        .unwrap_or_else(|e| panic!("Erro ao ler/parsear {} (registro central de modelos): {}", MODELS_JSON_PATH, e));
 
     let model_key = client_req.model_id.to_string();
     let model_entry = match models_registry.get(&model_key) {
@@ -168,25 +175,18 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     // abaixo — por isso o prefixo "../../" na frente.
     let graph_path = std::path::Path::new("../../").join(&model_entry.dfg_path);
 
-    println!(
+    vprintln!(
         "Modelo '{}' (id {}) -> grafo em {}",
         model_entry.name,
         client_req.model_id,
         graph_path.display()
     );
 
-    let graph_file = std::fs::File::open(&graph_path).unwrap_or_else(|e| {
+    let graph: ModelGraph = read_json_file(&graph_path).unwrap_or_else(|e| {
         panic!(
-            "Erro ao abrir {} (grafo do modelo '{}'): {}",
+            "Erro ao ler/parsear o grafo '{}' do modelo '{}': {}",
             graph_path.display(),
             model_entry.name,
-            e
-        )
-    });
-    let graph: ModelGraph = serde_json::from_reader(graph_file).unwrap_or_else(|e| {
-        panic!(
-            "Erro no parser do grafo '{}': {}",
-            graph_path.display(),
             e
         )
     });
@@ -213,14 +213,14 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         model_id: client_req.model_id, // propaga o modelo pedido pro resto do pipeline (Problema 1)
     };
 
-    println!(
+    vprintln!(
         "Struct Data criada com sucesso para a requisição {}! Step inicial: {}, Tipo de Kernel: {}",
         data.request, data.current_kernel, first_kernel_type
     );
 
     // TODO: Consultar tabela de roteamento e despachar 'data' via MessagePack para o primeiro Kernel
     let total_time_ms = start_total.elapsed().as_micros() as f64 / 1000.0;
-    println!("Processamento da demanda concluído localmente em {:.3}ms\n", total_time_ms);
+    vprintln!("Processamento da demanda concluído localmente em {:.3}ms\n", total_time_ms);
 
     // Lê a routing_table.json VIVA do sys (resnet/sys_test/), não uma cópia
     // local do handler — a antiga "routing_table.json" local em
@@ -231,16 +231,15 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     // first_kernel_type correto — raiz do bug em que toda requisição,
     // pra qualquer model_id, era despachada pro mesmo endereço fixo
     // (ver claude/project-state.md).
-    let route_file = std::fs::File::open("../../sys_test/routing_table.json")
-        .expect("Erro ao abrir ../../sys_test/routing_table.json (tabela viva do sys)");
-    let routing: RoutingTable = serde_json::from_reader(route_file).expect("Erro no parser de routing_table.json");
+    let routing: RoutingTable = read_json_file(std::path::Path::new("../../sys_test/routing_table.json"))
+        .unwrap_or_else(|e| panic!("Erro ao ler ../../sys_test/routing_table.json (tabela viva do sys): {}", e));
 
     let target_kernel_id = first_kernel_type;
     let target_address = routing.table.get(&first_kernel_type)
         .cloned()
         .unwrap_or_else(|| panic!("Tipo de Kernel {} não encontrado na routing_table.json do sys", first_kernel_type));
 
-    println!("Despachando demanda para o Kernel Tipo {} em {}...", target_kernel_id, target_address);
+    vprintln!("Despachando demanda para o Kernel Tipo {} em {}...", target_kernel_id, target_address);
 
     let start_serialize = Instant::now();
     let serialized_data = rmp_serde::to_vec(&data)
@@ -262,7 +261,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     let send_ms = start_send.elapsed().as_micros() as f64 / 1000.0;
     let total_time_ms = start_total.elapsed().as_micros() as f64 / 1000.0;
 
-    println!(
+    vprintln!(
         "Data despachado com sucesso! ({} bytes | Serialização: {:.3}ms | Envio: {:.3}ms | Total Handler: {:.3}ms)\n",
         payload_len, serialize_ms, send_ms, total_time_ms
     );
@@ -285,7 +284,7 @@ fn main() -> std::io::Result<()> {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                println!("New connection received!");
+                vprintln!("New connection received!");
                 if let Err(e) = handle_client(stream) {
                     eprintln!("Error handling client: {:?}", e);
                 }
@@ -294,7 +293,7 @@ fn main() -> std::io::Result<()> {
                 eprintln!("Connection failed: {:?}", e);
             }
         }
-        println!("Waiting for new incoming requests...");
+        vprintln!("Waiting for new incoming requests...");
     }
 
     Ok(())

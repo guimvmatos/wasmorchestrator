@@ -166,7 +166,7 @@ KERNELS = {
                         let res = bindings::planner::addworld::plan::add(&current_input, const_vec.as_slice(), &data);
                         computed_output = res.output;
                     } else if let Some(first_branch) = add_branches.remove(&current_step) {
-                        println!("Step {}: 2º ramo recebido! Somando buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                        vprintln!("Step {}: 2º ramo recebido! Somando buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
                         let data = bindings::planner::addworld::plan::Data {
                             input: current_input.clone(),
                             output: vec![],
@@ -180,7 +180,7 @@ KERNELS = {
                         let res = bindings::planner::addworld::plan::add(&first_branch, &current_input, &data);
                         computed_output = res.output;
                     } else {
-                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                        vprintln!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
                         add_branches.insert(current_step, current_input);
                         continue;
                     }
@@ -399,7 +399,7 @@ KERNELS = {
                         let res = bindings::planner::mulworld::plan::mul(&current_input, const_vec.as_slice(), &data);
                         computed_output = res.output;
                     } else if let Some(first_branch) = mul_branches.remove(&current_step) {
-                        println!("Step {}: 2º ramo recebido! Multiplicando buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
+                        vprintln!("Step {}: 2º ramo recebido! Multiplicando buffers de tamanhos {} e {}...", current_step, first_branch.len(), current_input.len());
                         let data = bindings::planner::mulworld::plan::Data {
                             input: current_input.clone(),
                             output: vec![],
@@ -413,7 +413,7 @@ KERNELS = {
                         let res = bindings::planner::mulworld::plan::mul(&first_branch, &current_input, &data);
                         computed_output = res.output;
                     } else {
-                        println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                        vprintln!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
                         mul_branches.insert(current_step, current_input);
                         continue;
                     }
@@ -491,7 +491,7 @@ KERNELS = {
                     };
                     let outputs = bindings::planner::splitworld::plan::split(&current_input, &shape, p.axis, &sizes, &data);
                     let out_len: usize = outputs.iter().map(|o| o.len()).sum();
-                    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open("receiver_logs.jsonl") {
+                    {
                         let log_linha = serde_json::json!({
                             "request": request_id,
                             "kernel_id": 13u8,
@@ -502,7 +502,7 @@ KERNELS = {
                             "input_len": input_len,
                             "output_len": out_len,
                         });
-                        let _ = writeln!(file, "{}", log_linha);
+                        log_push(log_linha.to_string());
                     }
                     for route in &current_node.output_routes {
                         let slice = outputs.get(route.output_index as usize).unwrap_or_else(|| {
@@ -542,7 +542,7 @@ KERNELS = {
                     }
                     let filled: usize = concat_branches.get(&current_step).map(|m| m.values().map(|v| v.len()).sum()).unwrap_or(0);
                     if filled < expected {
-                        println!("Step {}: ramo from_step={} guardado no Concat ({}/{}). Aguardando o resto...", current_step, origin_step, filled, expected);
+                        vprintln!("Step {}: ramo from_step={} guardado no Concat ({}/{}). Aguardando o resto...", current_step, origin_step, filled, expected);
                         continue;
                     }
                     let mut slots = concat_branches.remove(&current_step).unwrap();
@@ -722,7 +722,7 @@ KERNELS = {
                             .unwrap_or(false);
 
                         if !ready {
-                            println!("Step {}: ramo from_step={} guardado no MatMul (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
+                            vprintln!("Step {}: ramo from_step={} guardado no MatMul (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
                             continue;
                         }
 
@@ -877,7 +877,7 @@ KERNELS = {
                                     let b = slots.remove(&rhs_step).unwrap();
                                     Some((a, b))
                                 } else {
-                                    println!("Step {}: ramo from_step={} guardado no Sub (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
+                                    vprintln!("Step {}: ramo from_step={} guardado no Sub (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
                                     None
                                 }
                             }
@@ -894,11 +894,11 @@ KERNELS = {
                         let (a, b) = match pair {
                             Some(ab) => ab,
                             None => {
-                                println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                                vprintln!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
                                 continue;
                             }
                         };
-                        println!("Step {}: Subtraindo buffers de tamanhos {} e {}...", current_step, a.len(), b.len());
+                        vprintln!("Step {}: Subtraindo buffers de tamanhos {} e {}...", current_step, a.len(), b.len());
                         let data = bindings::planner::subworld::plan::Data {
                             input: current_input.clone(),
                             output: vec![],
@@ -968,7 +968,7 @@ KERNELS = {
                                     let b = slots.remove(&rhs_step).unwrap();
                                     Some((a, b))
                                 } else {
-                                    println!("Step {}: ramo from_step={} guardado no Div (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
+                                    vprintln!("Step {}: ramo from_step={} guardado no Div (lhs_step={}, rhs_step={}). Aguardando o resto...", current_step, origin_step, lhs_step, rhs_step);
                                     None
                                 }
                             }
@@ -985,11 +985,11 @@ KERNELS = {
                         let (a, b) = match pair {
                             Some(ab) => ab,
                             None => {
-                                println!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
+                                vprintln!("Step {}: 1º ramo guardado no buffer. Aguardando outro ramo...", current_step);
                                 continue;
                             }
                         };
-                        println!("Step {}: Dividindo buffers de tamanhos {} e {}...", current_step, a.len(), b.len());
+                        vprintln!("Step {}: Dividindo buffers de tamanhos {} e {}...", current_step, a.len(), b.len());
                         let data = bindings::planner::divworld::plan::Data {
                             input: current_input.clone(),
                             output: vec![],
@@ -1096,7 +1096,60 @@ use std::net::{{Shutdown, TcpListener, TcpStream}};
 use std::time::Instant;
 use std::cell::RefCell;
 use std::sync::Arc;
+use std::rc::Rc;
 use serde::Deserialize;
+
+// 04/11 (otimização A3): prints por passo/payload desligados. Para depurar,
+// troque VERBOSE para true e recompile o grupo. Erros e [AVISO] continuam
+// sempre ligados (println!/eprintln! normais).
+const VERBOSE: bool = false;
+macro_rules! vprintln {{
+    ($($t:tt)*) => {{ if VERBOSE {{ println!($($t)*); }} }};
+}}
+
+// 04/11 (otimização A2): log em memória, gravado uma vez por conexão, num
+// arquivo por grupo (receiver_logs_<porta>.jsonl). Antes cada passo abria,
+// escrevia e fechava o receiver_logs.jsonl, e grupos do mesmo nó misturavam
+// linhas no mesmo arquivo. Mesmos campos de antes.
+thread_local! {{
+    static LOG_PATH: RefCell<String> = RefCell::new(String::from("receiver_logs.jsonl"));
+    static LOG_BUF: RefCell<Vec<String>> = RefCell::new(Vec::new());
+}}
+
+fn log_push(line: String) {{
+    LOG_BUF.with(|b| b.borrow_mut().push(line));
+}}
+
+fn flush_logs() {{
+    let lines: Vec<String> = LOG_BUF.with(|b| std::mem::take(&mut *b.borrow_mut()));
+    if lines.is_empty() {{
+        return;
+    }}
+    let mut out = String::with_capacity(lines.iter().map(|l| l.len() + 1).sum());
+    for l in &lines {{
+        out.push_str(l);
+        out.push(10u8 as char);
+    }}
+    let path = LOG_PATH.with(|p| p.borrow().clone());
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {{
+        let _ = file.write_all(out.as_bytes());
+    }}
+}}
+
+/// Grava o log pendente ao sair de handle_client, inclusive em erro (`?`).
+struct LogFlushGuard;
+impl Drop for LogFlushGuard {{
+    fn drop(&mut self) {{
+        flush_logs();
+    }}
+}}
+
+/// 04/11 (otimização A1): lê um JSON inteiro de uma vez. serde_json::from_reader
+/// sobre File sem buffer faz uma chamada WASI por byte.
+fn read_json_file<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String> {{
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{{:?}}", e))?;
+    serde_json::from_str(&text).map_err(|e| format!("{{:?}}", e))
+}}
 
 {local_kernels_const}
 {gemm_gpu_state}
@@ -1324,14 +1377,9 @@ const MODELS_JSON_PATH: &str = "models.json";
 /// Cada request escolhe o grafo certo via input_img.model_id em
 /// handle_client, sem reabrir arquivo por request.
 fn load_all_model_graphs() -> HashMap<u32, ModelGraph> {{
-    let registry: ModelsRegistry = {{
-        let f = std::fs::File::open(MODELS_JSON_PATH).unwrap_or_else(|e| {{
-            panic!("Erro ao abrir {{}} (registro central de modelos): {{:?}}", MODELS_JSON_PATH, e)
-        }});
-        serde_json::from_reader(f).unwrap_or_else(|e| {{
-            panic!("Erro no parser de {{}}: {{:?}}", MODELS_JSON_PATH, e)
-        }})
-    }};
+    let registry: ModelsRegistry = read_json_file(MODELS_JSON_PATH).unwrap_or_else(|e| {{
+        panic!("Erro ao ler/parsear {{}} (registro central de modelos): {{}}", MODELS_JSON_PATH, e)
+    }});
 
     let mut graphs: HashMap<u32, ModelGraph> = HashMap::new();
     for (id_str, entry) in registry.iter() {{
@@ -1352,11 +1400,8 @@ fn load_all_model_graphs() -> HashMap<u32, ModelGraph> {{
             .file_name()
             .unwrap_or_else(|| panic!("dfg_path '{{}}' do modelo '{{}}' (id {{}}) sem nome de arquivo válido", entry.dfg_path, entry.name, id));
         let graph_path = std::path::Path::new(graph_filename);
-        let graph_file = std::fs::File::open(&graph_path).unwrap_or_else(|e| {{
-            panic!("Erro ao abrir grafo '{{}}' do modelo '{{}}' (id {{}}): {{:?}}", graph_path.display(), entry.name, id, e)
-        }});
-        let graph: ModelGraph = serde_json::from_reader(graph_file).unwrap_or_else(|e| {{
-            panic!("Erro no parser do grafo '{{}}': {{:?}}", graph_path.display(), e)
+        let graph: ModelGraph = read_json_file(&graph_path.to_string_lossy()).unwrap_or_else(|e| {{
+            panic!("Erro ao ler/parsear o grafo '{{}}' do modelo '{{}}' (id {{}}): {{}}", graph_path.display(), entry.name, id, e)
         }});
         graphs.insert(id, graph);
     }}
@@ -1394,9 +1439,31 @@ impl JoinState {{
 // no boot do grupo, e um grupo que subiu antes de outro nunca sabia que o
 // outro existia ("Kernel tipo X não está neste nó nem na routing_table").
 // Falha de leitura/parse (ex.: o sys reescrevendo o arquivo) -> usa a do boot.
-fn reload_routing() -> Option<RoutingTable> {{
-    let f = std::fs::File::open("routing_table.json").ok()?;
-    serde_json::from_reader(f).ok()
+// 04/11 (otimização A1): só relê quando a data de modificação (ou o tamanho)
+// do arquivo muda; e lê inteiro de uma vez (antes: from_reader sem buffer,
+// uma chamada WASI por byte, a cada conexão — ~5 ms por salto no E4).
+// Editar a tabela continua tendo efeito na conexão seguinte.
+thread_local! {{
+    static ROUTING_CACHE: RefCell<Option<(std::time::SystemTime, u64, Rc<RoutingTable>)>> = RefCell::new(None);
+}}
+
+fn reload_routing() -> Option<Rc<RoutingTable>> {{
+    let meta = std::fs::metadata("routing_table.json").ok();
+    let key = meta.as_ref().and_then(|m| m.modified().ok().map(|t| (t, m.len())));
+    if let Some((mtime, len)) = key {{
+        let hit = ROUTING_CACHE.with(|c| {{
+            c.borrow().as_ref().and_then(|(t, l, r)| if *t == mtime && *l == len {{ Some(Rc::clone(r)) }} else {{ None }})
+        }});
+        if hit.is_some() {{
+            return hit;
+        }}
+    }}
+    let fresh: RoutingTable = read_json_file("routing_table.json").ok()?;
+    let fresh = Rc::new(fresh);
+    if let Some((mtime, len)) = key {{
+        ROUTING_CACHE.with(|c| *c.borrow_mut() = Some((mtime, len, Rc::clone(&fresh))));
+    }}
+    Some(fresh)
 }}
 
 // Kernels não presentes neste binário caem no braço `_` do match abaixo e
@@ -1409,8 +1476,9 @@ fn handle_client(
     routing: &RoutingTable,
     pending_joins: &mut HashMap<u32, JoinState>,
 ) -> std::io::Result<()> {{
+    let _log_guard = LogFlushGuard;
     let fresh_routing = reload_routing();
-    let routing: &RoutingTable = fresh_routing.as_ref().unwrap_or(routing);
+    let routing: &RoutingTable = fresh_routing.as_deref().unwrap_or(routing);
     let mut len_buf = [0u8; 4];
 
     loop {{
@@ -1423,7 +1491,7 @@ fn handle_client(
         }}
 
         let len = u32::from_be_bytes(len_buf) as usize;
-        println!("Recebendo payload de {{}} bytes...", len);
+        vprintln!("Recebendo payload de {{}} bytes...", len);
 
         let mut buffer = vec![0u8; len];
         stream.read_exact(&mut buffer)?;
@@ -1431,7 +1499,7 @@ fn handle_client(
         let net_in_us = start_receive.elapsed().as_micros() as u64; // [T]
 
         let t_de = Instant::now(); // [T]
-        let input_img: WitData = rmp_serde::from_slice(&buffer).expect("Failed to deserialize MessagePack response");
+        let mut input_img: WitData = rmp_serde::from_slice(&buffer).expect("Failed to deserialize MessagePack response");
         let deserialize_us = t_de.elapsed().as_micros() as u64; // [T]
 
         // Seleciona o grafo do modelo pedido por esta request (antes: um
@@ -1463,7 +1531,8 @@ fn handle_client(
             mut div_slots,
         }} = pending_joins.remove(&input_img.request).unwrap_or_default();
 
-        queue.push_back((input_img.current_kernel, input_img.input.clone(), input_img.from_step));
+        // A4: move o tensor recebido em vez de copiar.
+        queue.push_back((input_img.current_kernel, std::mem::take(&mut input_img.input), input_img.from_step));
 
         let mut final_output: Vec<f32> = Vec::new();
         let mut final_from_step: u32 = 0;
@@ -1475,7 +1544,7 @@ fn handle_client(
             let current_node = graph.steps.iter().find(|s| s.step == current_step)
                 .unwrap_or_else(|| panic!("Step {{}} não encontrado no grafo", current_step));
 
-            println!("==> Executando Step {{}} | Camada: '{{}}' | Tipo: {{}}", current_step, current_node.name, current_node.kernel_type);
+            vprintln!("==> Executando Step {{}} | Camada: '{{}}' | Tipo: {{}}", current_step, current_node.name, current_node.kernel_type);
 
             let p = &current_node.params;
             let computed_output: Vec<f32>;
@@ -1499,7 +1568,7 @@ fn handle_client(
                             current_node.kernel_type
                         ));
 
-                    println!(
+                    vprintln!(
                         "Step {{}} (tipo {{}}) não está neste nó — despachando para {{}}...",
                         current_step, current_node.kernel_type, target_address
                     );
@@ -1538,7 +1607,7 @@ fn handle_client(
 
                     let step_total_us = t_step.elapsed().as_micros() as u64; // [T]
 
-                    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open("receiver_logs.jsonl") {{ // [T]
+                    {{ // [T]
                         let log_linha = serde_json::json!({{
                             "request": request_id,
                             "kernel_id": current_node.kernel_type,
@@ -1562,7 +1631,7 @@ fn handle_client(
                                 "step_total": step_total_us
                             }}
                         }});
-                        let _ = writeln!(file, "{{}}", log_linha);
+                        log_push(log_linha.to_string());
                     }} // [T]
 
                     continue;
@@ -1573,7 +1642,7 @@ fn handle_client(
             let output_len = computed_output.len(); // [T]
             let is_local = LOCAL_KERNELS.contains(&current_node.kernel_type); // [T]
 
-            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open("receiver_logs.jsonl") {{
+            {{
                 let log_linha = serde_json::json!({{
                     "request": request_id,
                     "kernel_id": current_node.kernel_type,
@@ -1592,18 +1661,23 @@ fn handle_client(
                         "kernel_call": step_total_us
                     }}
                 }});
-                let _ = writeln!(file, "{{}}", log_linha);
+                log_push(log_linha.to_string());
             }}
 
             if current_node.next_steps.is_empty() {{
-                println!("Fim da rede alcançado localmente no Step {{}}! Saída com {{}} elementos.", current_step, computed_output.len());
+                vprintln!("Fim da rede alcançado localmente no Step {{}}! Saída com {{}} elementos.", current_step, computed_output.len());
                 final_output = computed_output;
                 final_from_step = current_step;
                 reached_final = true;
                 break;
             }} else {{
-                for &nxt in &current_node.next_steps {{
-                    queue.push_back((nxt, computed_output.clone(), current_step));
+                // A4: o último sucessor recebe o tensor por movimento; só os
+                // anteriores (ramificação, ex.: Add dos ResNets) recebem cópia.
+                let n_next = current_node.next_steps.len();
+                let mut out_opt = Some(computed_output);
+                for (i_next, &nxt) in current_node.next_steps.iter().enumerate() {{
+                    let v = if i_next + 1 == n_next {{ out_opt.take().unwrap() }} else {{ out_opt.as_ref().unwrap().clone() }};
+                    queue.push_back((nxt, v, current_step));
                 }}
             }}
         }}
@@ -1648,7 +1722,7 @@ fn handle_client(
         break;
     }}
 
-    println!("Conexão finalizada com o cliente.");
+    vprintln!("Conexão finalizada com o cliente.");
     Ok(())
 }}
 
@@ -1667,8 +1741,9 @@ impl bindings::exports::wasi::cli::run::Guest for Component {{
         // input_img.model_id dentro de handle_client.
         let graphs: HashMap<u32, ModelGraph> = load_all_model_graphs();
 
-        let routing_file = std::fs::File::open("routing_table.json").expect("Erro ao abrir routing_table.json");
-        let routing: RoutingTable = serde_json::from_reader(routing_file).expect("Erro no parser do routing_table.json");
+        let routing: RoutingTable = read_json_file("routing_table.json").unwrap_or_else(|e| panic!("Erro ao ler routing_table.json: {{}}", e));
+        // A2: um arquivo de log por grupo (porta).
+        LOG_PATH.with(|p| *p.borrow_mut() = format!("receiver_logs_{{}}.jsonl", port));
 
         println!("Listening on {{}}", bind_addr);
 
@@ -1677,7 +1752,7 @@ impl bindings::exports::wasi::cli::run::Guest for Component {{
         for stream in listener.incoming() {{
             match stream {{
                 Ok(stream) => {{
-                    println!("Nova conexão recebida!");
+                    vprintln!("Nova conexão recebida!");
                     if let Err(e) = handle_client(stream, &mut init, &graphs, &routing, &mut pending_joins) {{
                         eprintln!("Error handling client: {{:?}}", e);
                     }}
@@ -1686,7 +1761,7 @@ impl bindings::exports::wasi::cli::run::Guest for Component {{
                     eprintln!("Connection failed: {{:?}}", e);
                 }}
             }}
-            println!("Waiting for a new request...");
+            vprintln!("Waiting for a new request...");
         }}
         Ok(())
     }}

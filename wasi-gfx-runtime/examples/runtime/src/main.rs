@@ -268,13 +268,20 @@ async fn main() -> anyhow::Result<()> {
     // uma thread nativa é abandonada quando o processo termina, enquanto uma
     // task do blocking pool do Tokio trava o shutdown do Runtime esperando
     // esse loop terminar — o que nunca acontece.
-    let gpu_global = Arc::clone(&host_state.instance);
-    std::thread::spawn(move || {
-        loop {
-            let _ = gpu_global.poll_all_devices(true);
-            std::thread::sleep(std::time::Duration::from_millis(1));
-        }
-    });
+    // 04/11 (otimização A7): o sys passa WASMORCH_NO_GPU=1 quando roda com
+    // --no-gpu; aí não há dispositivo para consultar e o laço só gastaria CPU.
+    let no_gpu = std::env::var("WASMORCH_NO_GPU").map(|v| v == "1").unwrap_or(false);
+    if no_gpu {
+        println!("[HOST] WASMORCH_NO_GPU=1: laço de polling da GPU desligado.");
+    } else {
+        let gpu_global = Arc::clone(&host_state.instance);
+        std::thread::spawn(move || {
+            loop {
+                let _ = gpu_global.poll_all_devices(true);
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        });
+    }
 
     let workload_state = host_state.add_workload(&kernel_args)?;
     let mut store = Store::new(&engine, workload_state);

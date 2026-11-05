@@ -84,7 +84,14 @@ const RUNTIME_BIN: &str = "../../wasi-gfx-runtime/target/release/runtime";
 /// Porta inicial pra alocação de grupos. Nunca reutiliza uma porta já usada
 /// nesta execução do processo (mesmo depois de um grupo morrer), pra evitar
 /// correr risco de socket ainda em TIME_WAIT.
-const BASE_PORT: u16 = 8080;
+/// 04/11 (otimização A6): era 8080. A faixa 808x é disputada (no superpeach,
+/// containers Docker publicavam 8081/8082 e "roubavam" as conexões dos
+/// grupos). 18080 fica fora das faixas usuais.
+const BASE_PORT: u16 = 18080;
+
+/// 04/11 (A6): tempo máximo para o runtime abrir a porta do grupo. O runtime
+/// compila o componente antes de escutar; em nó lento isso passa de 2 s.
+const LAUNCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// Intervalo entre checagens de conexão ativa antes de matar um grupo
 /// redundante (ver `drain_and_kill_group`).
@@ -129,10 +136,23 @@ impl SysRuntime {
         id
     }
 
-    fn alloc_port(&mut self) -> u16 {
-        let p = self.next_port;
-        self.next_port += 1;
-        p
+    /// 04/11 (A6): só devolve porta que está livre de fato neste IP
+    /// (testa com bind e solta). Porta ocupada por outro processo é pulada.
+    fn alloc_port(&mut self, node_ip: &str) -> io::Result<u16> {
+        for _ in 0..200 {
+            let p = self.next_port;
+            self.next_port += 1;
+            match std::net::TcpListener::bind((node_ip, p)) {
+                Ok(l) => {
+                    drop(l);
+                    return Ok(p);
+                }
+                Err(e) => {
+                    eprintln!("[AVISO] Porta {}:{} ocupada por outro processo ({}) — pulando.", node_ip, p, e);
+                }
+            }
+        }
+        Err(io::Error::new(io::ErrorKind::AddrInUse, "nenhuma porta livre em 200 tentativas"))
     }
 }
 
@@ -144,7 +164,7 @@ fn build_and_launch(
     node_ip: &str,
 ) -> io::Result<(u32, Group)> {
     let group_id = state.alloc_group_id();
-    let port = state.alloc_port();
+    let port = state.alloc_port(node_ip)?;
 
     let mut sorted_kernels = kernels.to_vec();
     sorted_kernels.sort_unstable();
@@ -216,30 +236,48 @@ fn build_and_launch(
         )
     })?;
 
-    let child = Command::new(RUNTIME_BIN)
+    let mut cmd_rt = Command::new(RUNTIME_BIN);
+    cmd_rt
         .arg("--wasm")
         .arg(&output_path)
         .arg("--port")
         .arg(port.to_string())
         .arg("--ip")
-        .arg(node_ip)
-        .spawn()?;
+        .arg(node_ip);
+    // 04/11 (A7): com --no-gpu, o runtime não precisa do laço que consulta a
+    // GPU a cada 1 ms. Vai por variável de ambiente (um runtime antigo só a
+    // ignora, então sys e runtime podem ser atualizados em qualquer ordem).
+    if gpu_disabled() {
+        cmd_rt.env("WASMORCH_NO_GPU", "1");
+    }
+    let mut child = cmd_rt.spawn()?;
 
-    // Aguarda o runtime abrir a porta (mesmo padrão de polling já usado
-    // antes em spawn_wasm_worker).
-    let mut up = false;
-    for _ in 0..200 {
+    // Aguarda o runtime abrir a porta. 04/11 (A6): se o processo morrer
+    // antes (ex.: porta tomada, componente inválido) ou não abrir a porta no
+    // prazo, é erro — antes o sys anunciava "no ar" mesmo assim.
+    let t0 = std::time::Instant::now();
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("runtime do grupo {} morreu ao subir ({}), porta {}", group_id, status, port),
+            ));
+        }
         if TcpStream::connect(format!("{}:{}", node_ip, port)).is_ok() {
-            up = true;
-            break;
+            // Confere de novo que quem respondeu é o nosso processo, vivo.
+            if child.try_wait()?.is_none() {
+                break;
+            }
+        }
+        if t0.elapsed() > LAUNCH_TIMEOUT {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!("grupo {} não abriu {}:{} em {:?}", group_id, node_ip, port, LAUNCH_TIMEOUT),
+            ));
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-    if !up {
-        eprintln!(
-            "[AVISO] Grupo {} não respondeu em {}:{} depois de 2s — seguindo mesmo assim.",
-            group_id, node_ip, port
-        );
     }
 
     println!(
