@@ -1136,6 +1136,41 @@ fn flush_logs() {{
     }}
 }}
 
+// 05/11 (otimização B1): formato na rede. Metadados em msgpack + tensor como
+// floats crus (little-endian; wasm32 e x86_64 são little-endian). Antes o
+// tensor ia dentro do msgpack, 5 bytes por float, codificado um a um.
+//   payload = "WOF1" | u32 BE tamanho_meta | meta (msgpack, input vazio) | f32 LE...
+// O enquadramento externo (u32 BE com o tamanho do payload) não muda.
+// Mensagens sem o "WOF1" (versão antiga) continuam sendo aceitas.
+const WIRE_MAGIC: &[u8; 4] = b"WOF1";
+
+fn encode_frame(meta: &WitData, tensor: &[f32]) -> Vec<u8> {{
+    let meta_bytes = rmp_serde::to_vec(meta).expect("Erro ao serializar metadados");
+    let raw: &[u8] = unsafe {{ std::slice::from_raw_parts(tensor.as_ptr() as *const u8, tensor.len() * 4) }};
+    let mut out = Vec::with_capacity(8 + meta_bytes.len() + raw.len());
+    out.extend_from_slice(WIRE_MAGIC);
+    out.extend_from_slice(&(meta_bytes.len() as u32).to_be_bytes());
+    out.extend_from_slice(&meta_bytes);
+    out.extend_from_slice(raw);
+    out
+}}
+
+fn decode_frame(buf: &[u8]) -> WitData {{
+    if buf.len() >= 8 && &buf[0..4] == WIRE_MAGIC {{
+        let meta_len = u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]) as usize;
+        let mut meta: WitData = rmp_serde::from_slice(&buf[8..8 + meta_len]).expect("Falha ao desserializar metadados");
+        let raw = &buf[8 + meta_len..];
+        assert!(raw.len() % 4 == 0, "tensor com {{}} bytes, não é múltiplo de 4", raw.len());
+        let n = raw.len() / 4;
+        let mut v = vec![0.0f32; n];
+        unsafe {{ std::ptr::copy_nonoverlapping(raw.as_ptr(), v.as_mut_ptr() as *mut u8, n * 4) }};
+        meta.input = v;
+        meta
+    }} else {{
+        rmp_serde::from_slice(buf).expect("Failed to deserialize MessagePack response")
+    }}
+}}
+
 /// Grava o log pendente ao sair de handle_client, inclusive em erro (`?`).
 struct LogFlushGuard;
 impl Drop for LogFlushGuard {{
@@ -1499,7 +1534,7 @@ fn handle_client(
         let net_in_us = start_receive.elapsed().as_micros() as u64; // [T]
 
         let t_de = Instant::now(); // [T]
-        let mut input_img: WitData = rmp_serde::from_slice(&buffer).expect("Failed to deserialize MessagePack response");
+        let mut input_img: WitData = decode_frame(&buffer);
         let deserialize_us = t_de.elapsed().as_micros() as u64; // [T]
 
         // Seleciona o grafo do modelo pedido por esta request (antes: um
@@ -1574,7 +1609,7 @@ fn handle_client(
                     );
 
                     let payload_data = WitData {{
-                        input: current_input,
+                        input: vec![],
                         output: vec![],
                         reply_to: reply_to.clone(),
                         current_kernel: current_step,
@@ -1585,7 +1620,7 @@ fn handle_client(
                     }};
 
                     let t_ser = Instant::now(); // [T]
-                    let response_payload = rmp_serde::to_vec(&payload_data).expect("Erro ao serializar payload externo");
+                    let response_payload = encode_frame(&payload_data, &current_input);
                     let serialize_us = t_ser.elapsed().as_micros() as u64; // [T]
                     let sent_bytes = response_payload.len(); // [T]
 
@@ -1701,7 +1736,7 @@ fn handle_client(
         // que restava foi despachado por rede, quem responde é o nó remoto.
         if reached_final {{
             let final_data = WitData {{
-                input: final_output,
+                input: vec![],
                 output: vec![],
                 reply_to: reply_to.clone(),
                 current_kernel: 0,
@@ -1712,7 +1747,7 @@ fn handle_client(
             }};
 
             let mut next_stream = TcpStream::connect(&reply_to)?;
-            let response_payload = rmp_serde::to_vec(&final_data).expect("Erro ao serializar resposta");
+            let response_payload = encode_frame(&final_data, &final_output);
             let resp_len = response_payload.len() as u32;
             next_stream.write_all(&resp_len.to_be_bytes())?;
             next_stream.write_all(&response_payload)?;

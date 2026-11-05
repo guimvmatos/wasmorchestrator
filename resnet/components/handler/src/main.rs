@@ -34,6 +34,10 @@ struct ClientRequest {
     request_id: u32,
     model_id: u32,
     image_bytes: Vec<u8>,
+    // 05/11: porta de resposta do client (vários clients na mesma máquina, E10).
+    // Client antigo não manda o campo -> 0 -> usa a 9000 de sempre.
+    #[serde(default)]
+    reply_port: u16,
 }
 
 #[derive(Deserialize, Debug)]
@@ -89,6 +93,21 @@ macro_rules! vprintln {
 fn read_json_file<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T, String> {
     let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
     serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+// 05/11 (otimização B1): mesmo formato do receiver.
+//   payload = "WOF1" | u32 BE tamanho_meta | meta (msgpack, input vazio) | f32 LE...
+const WIRE_MAGIC: &[u8; 4] = b"WOF1";
+
+fn encode_frame(meta: &Data, tensor: &[f32]) -> Vec<u8> {
+    let meta_bytes = rmp_serde::to_vec(meta).expect("Falha ao serializar metadados");
+    let raw: &[u8] = unsafe { std::slice::from_raw_parts(tensor.as_ptr() as *const u8, tensor.len() * 4) };
+    let mut out = Vec::with_capacity(8 + meta_bytes.len() + raw.len());
+    out.extend_from_slice(WIRE_MAGIC);
+    out.extend_from_slice(&(meta_bytes.len() as u32).to_be_bytes());
+    out.extend_from_slice(&meta_bytes);
+    out.extend_from_slice(raw);
+    out
 }
 
 //fn main() -> std::io::Result<()> {
@@ -200,10 +219,11 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     // 5. MONTAR A STRUCT DATA UNIVERSAL
     //let client_ip = stream.peer_addr()?.to_string();
     let client_ip_only = stream.peer_addr()?.ip();
-    let reply_to_address = format!("{}:9000", client_ip_only);
+    let reply_port = if client_req.reply_port == 0 { 9000 } else { client_req.reply_port };
+    let reply_to_address = format!("{}:{}", client_ip_only, reply_port);
 
     let data = Data {
-        input: data_raw,
+        input: vec![], // B1: o tensor vai cru no frame, fora do msgpack
         output: vec![],
         reply_to: reply_to_address,
         kernels: vec![], // A rota agora é guiada pelos steps no model_graph.json
@@ -242,8 +262,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     vprintln!("Despachando demanda para o Kernel Tipo {} em {}...", target_kernel_id, target_address);
 
     let start_serialize = Instant::now();
-    let serialized_data = rmp_serde::to_vec(&data)
-        .expect("Falha ao serializar a struct Data via MessagePack");
+    let serialized_data = encode_frame(&data, &data_raw);
     let serialize_ms = start_serialize.elapsed().as_micros() as f64 / 1000.0;
 
     let start_send = Instant::now();

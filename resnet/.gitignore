@@ -3,3 +3,10 @@ target
 deps
 *.wasm
 *.lock
+*.jsonl
+*_bkp_*
+*.bkp_*
+routing_table.json.anterior
+routing_table.json.tmp*
+results_fase3/
+results_final/

@@ -50,7 +50,32 @@ struct Data {
 struct ClientRequest {
     request_id: u32,
     model_id: u32,
+    // 05/11 (otimização B1): bytes como "bin" do msgpack (antes: array de
+    // inteiros, ~1,5 byte por byte da imagem). O handler aceita os dois.
+    #[serde(with = "serde_bytes")]
     image_bytes: Vec<u8>,
+    // 05/11: porta onde este client espera a resposta (a do --listen). Antes o
+    // handler respondia sempre na 9000, o que impedia vários clients na mesma
+    // máquina (teste E10). Handler antigo ignora o campo.
+    reply_port: u16,
+}
+
+// 05/11 (otimização B1): resposta no formato novo do receiver.
+//   payload = "WOF1" | u32 BE tamanho_meta | meta (msgpack, input vazio) | f32 LE...
+// Sem o "WOF1", cai no formato antigo (msgpack inteiro).
+const WIRE_MAGIC: &[u8; 4] = b"WOF1";
+
+fn decode_frame(buf: &[u8]) -> Data {
+    if buf.len() >= 8 && &buf[0..4] == WIRE_MAGIC {
+        let meta_len = u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]) as usize;
+        let mut meta: Data = rmp_serde::from_slice(&buf[8..8 + meta_len]).expect("Falha ao desserializar metadados");
+        let raw = &buf[8 + meta_len..];
+        assert!(raw.len() % 4 == 0, "tensor com {} bytes, não é múltiplo de 4", raw.len());
+        meta.input = raw.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect();
+        meta
+    } else {
+        rmp_serde::from_slice(buf).expect("Falha ao desserializar Data da pipeline")
+    }
 }
 
 struct Args {
@@ -200,6 +225,7 @@ fn run_once(
         request_id,
         model_id,
         image_bytes: image_bytes.to_vec(),
+        reply_port: listener.local_addr()?.port(),
     };
     let payload = rmp_serde::to_vec(&req).expect("Falha ao serializar ClientRequest (MessagePack)");
     let serialize_ms = ms(t);
@@ -227,7 +253,7 @@ fn run_once(
 
     // 4. Desserialização
     let t = Instant::now();
-    let data: Data = rmp_serde::from_slice(&buf).expect("Falha ao desserializar Data da pipeline");
+    let data: Data = decode_frame(&buf);
     let deserialize_ms = ms(t);
 
     let e2e_ms = ms(t0);
