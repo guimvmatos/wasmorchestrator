@@ -9,6 +9,14 @@ use std::process::{Child, Command};
 use std::time::Instant;
 use std::sync::OnceLock;
 
+// 05/11: caixa de entrada por grupo (corrige o travamento entre grupos). Ver relay.rs.
+mod relay;
+use relay::Relay;
+
+/// 05/11: o grupo (runtime) escuta numa porta interna = porta pública + este
+/// deslocamento. A porta pública (a da routing_table) é a caixa de entrada.
+const INNER_PORT_OFFSET: u16 = 10000;
+
 // 31/10: configuração por máquina sem recompilar (Fase 3, vários nós).
 //   cargo run --release -- <node_id> <ip_da_maquina> [--no-gpu]
 // Sem argumentos: node_id 1, ip 127.0.0.1, GPU ligada (comportamento antigo).
@@ -104,8 +112,12 @@ const DRAIN_MAX_WAIT: std::time::Duration = std::time::Duration::from_secs(15);
 
 struct Group {
     kernels: HashSet<u8>,
+    /// Porta pública (routing_table) = caixa de entrada (relay).
     port: u16,
+    /// 05/11: porta onde o runtime do grupo escuta de fato (só o relay usa).
+    inner_port: u16,
     child: Child,
+    relay: Relay,
 }
 
 struct SysRuntime {
@@ -165,6 +177,16 @@ fn build_and_launch(
 ) -> io::Result<(u32, Group)> {
     let group_id = state.alloc_group_id();
     let port = state.alloc_port(node_ip)?;
+    // 05/11: porta interna do runtime; a pública fica com o relay.
+    let inner_port = port.checked_add(INNER_PORT_OFFSET).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::AddrInUse, "porta interna fora da faixa")
+    })?;
+    if let Err(e) = std::net::TcpListener::bind((node_ip, inner_port)) {
+        return Err(io::Error::new(
+            io::ErrorKind::AddrInUse,
+            format!("porta interna {}:{} ocupada ({})", node_ip, inner_port, e),
+        ));
+    }
 
     let mut sorted_kernels = kernels.to_vec();
     sorted_kernels.sort_unstable();
@@ -241,7 +263,7 @@ fn build_and_launch(
         .arg("--wasm")
         .arg(&output_path)
         .arg("--port")
-        .arg(port.to_string())
+        .arg(inner_port.to_string())
         .arg("--ip")
         .arg(node_ip);
     // 04/11 (A7): com --no-gpu, o runtime não precisa do laço que consulta a
@@ -263,7 +285,7 @@ fn build_and_launch(
                 format!("runtime do grupo {} morreu ao subir ({}), porta {}", group_id, status, port),
             ));
         }
-        if TcpStream::connect(format!("{}:{}", node_ip, port)).is_ok() {
+        if TcpStream::connect(format!("{}:{}", node_ip, inner_port)).is_ok() {
             // Confere de novo que quem respondeu é o nosso processo, vivo.
             if child.try_wait()?.is_none() {
                 break;
@@ -274,15 +296,33 @@ fn build_and_launch(
             let _ = child.wait();
             return Err(io::Error::new(
                 io::ErrorKind::TimedOut,
-                format!("grupo {} não abriu {}:{} em {:?}", group_id, node_ip, port, LAUNCH_TIMEOUT),
+                format!("grupo {} não abriu {}:{} em {:?}", group_id, node_ip, inner_port, LAUNCH_TIMEOUT),
             ));
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 
+    // 05/11: só agora abre a porta pública (caixa de entrada -> porta interna).
+    let relay = match Relay::start(
+        node_ip,
+        port,
+        format!("{}:{}", node_ip, inner_port),
+        format!("grupo {}", group_id),
+    ) {
+        Ok(r) => r,
+        Err(e) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(io::Error::new(
+                e.kind(),
+                format!("caixa de entrada do grupo {} não abriu {}:{} ({})", group_id, node_ip, port, e),
+            ));
+        }
+    };
+
     println!(
-        "[GROUPS] Grupo {} no ar em {}:{} (kernels: {:?})",
-        group_id, node_ip, port, sorted_kernels
+        "[GROUPS] Grupo {} no ar em {}:{} (kernels: {:?}) [runtime na porta interna {}]",
+        group_id, node_ip, port, sorted_kernels, inner_port
     );
 
     Ok((
@@ -290,12 +330,15 @@ fn build_and_launch(
         Group {
             kernels: sorted_kernels.into_iter().collect(),
             port,
+            inner_port,
             child,
+            relay,
         },
     ))
 }
 
 fn kill_group(group_id: u32, mut g: Group) {
+    g.relay.stop();
     let _ = g.child.kill();
     let _ = g.child.wait();
     println!(
@@ -351,9 +394,15 @@ fn port_has_established_connection(port: u16) -> bool {
 /// `DRAIN_MAX_WAIT` no pior caso.
 fn drain_and_kill_group(group_id: u32, g: Group) {
     let port = g.port;
+    let inner_port = g.inner_port;
     let start = Instant::now();
     loop {
-        if !port_has_established_connection(port) {
+        // 05/11: com a caixa de entrada, "vazio" = nada na fila do relay e
+        // nenhuma conexão aberta nem na porta pública nem na interna.
+        if g.relay.pending() == 0
+            && !port_has_established_connection(port)
+            && !port_has_established_connection(inner_port)
+        {
             println!(
                 "[GROUPS] Grupo {} (porta {}) drenado — sem conexões ativas, encerrando.",
                 group_id, port
