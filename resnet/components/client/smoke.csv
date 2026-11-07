@@ -1,0 +1,2 @@
+timestamp_ms,label,model_id,request,rep,input_bytes,output_floats,top1,serialize_ms,send_ms,wait_ms,deserialize_ms,e2e_ms
+1793951124384,smoke-yolo-g2,3,900500,0,4915200,705600,,3.2998,1.3009,1007.4342,0.7759,1012.8115
