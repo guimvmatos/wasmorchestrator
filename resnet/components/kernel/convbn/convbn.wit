@@ -1,0 +1,50 @@
+package planner:convbnworld;
+
+// Conv + BatchNormalization fundidos (kernel_type 23).
+// Mesmo padrão do SiLU (12): o exportador detecta Conv -> BN no grafo e
+// emite UM passo deste tipo no lugar dos dois. Os kernels conv (1) e bn (2)
+// continuam existindo e são usados quando o padrão não bate.
+//
+// Recebe os pesos ORIGINAIS do Conv (weights/bias) e os 4 tensores do BN;
+// o BN é aplicado no epílogo de cada saída, sem reescrever pesos:
+//   a = scale / sqrt(var + eps);  b = beta - mean * a
+//   out = (sum_conv + bias) * a + b
+interface plan {
+
+    record data {
+        input: list<f32>,
+        output: list<f32>,
+        reply-to: string,
+        kernels: list<u8>,
+        current-kernel: u32,
+        request: u32,
+        from-step: u32,
+    model-id: u32
+    }
+
+    convbn: func(
+        c-out: u32,
+        c-in: u32,
+        h-in: u32,
+        w-in: u32,
+        kh: u32,
+        kw: u32,
+        stride: u32,
+        padding: u32,
+        groups: u32,
+        epsilon: f32,
+        weights: list<f32>,
+        bias: list<f32>,
+        scale: list<f32>,
+        beta: list<f32>,
+        mean: list<f32>,
+        var: list<f32>,
+        img: data
+    ) -> data;
+}
+
+world convbnworld {
+
+    export plan;
+
+}

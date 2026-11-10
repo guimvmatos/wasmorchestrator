@@ -1,6 +1,10 @@
 package planner:maxpoolworld;
 
+// 10/11 (4c): via residente na GPU. Device do grupo (borrow) e tensores como
+// handles de buffers da GPU. O record data fica só por compatibilidade (o
+// grupo usa o tipo para serializar na rede).
 interface plan {
+    use wasi:webgpu/webgpu@0.3.0-rc.2.{gpu-device, gpu-buffer};
 
     record data {
         input: list<f32>,
@@ -12,22 +16,11 @@ interface plan {
         from-step: u32,
     model-id: u32
     }
-  
-    maxpool: func(
-        channels: u32,
-        h-in: u32,
-        w-in: u32,
-        kh: u32,
-        kw: u32,
-        stride: u32,
-        padding: u32,
-        img: data
-    ) -> data;
-    
+
+    maxpool-r: func(dev: borrow<gpu-device>, channels: u32, h-in: u32, w-in: u32, kh: u32, kw: u32, stride: u32, padding: u32, input: borrow<gpu-buffer>) -> gpu-buffer;
 }
 
 world maxpoolworld-gpu {
     import wasi:webgpu/webgpu@0.3.0-rc.2;
-    import wasi-gfx-runtime:wasi-webgpu/sync-io;
     export plan;
 }

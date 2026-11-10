@@ -1,0 +1,29 @@
+package planner:opsgpuworld;
+
+// 10/11 (4c, parte 2): operadores "leves" na via residente da GPU, todos num
+// componente só (um pipeline por shader, em cache). Mesmo contrato dos outros
+// kernels da via: device do grupo (borrow), tensores como handles de buffers
+// que já estão na GPU, saída como buffer novo (own). Semântica idêntica aos
+// kernels C (broadcast por módulo, nearest com floor, softmax estável etc.).
+interface plan {
+    use wasi:webgpu/webgpu@0.3.0-rc.2.{gpu-device, gpu-buffer};
+
+    // op: 0 = sigmoid, 1 = silu
+    unary-r: func(dev: borrow<gpu-device>, op: u32, n: u32, input: borrow<gpu-buffer>) -> gpu-buffer;
+    // out[i] = a[i] (op) b[i % len-b], len(out) = len-a. op: 0 add, 1 sub, 2 mul, 3 div
+    binop-r: func(dev: borrow<gpu-device>, op: u32, len-a: u32, len-b: u32, a: borrow<gpu-buffer>, b: borrow<gpu-buffer>) -> gpu-buffer;
+    // dst[dst-off + o*dst-stride + j] = src[src-off + o*src-stride + j], o < outer, j < chunk
+    // (Concat e Split; escreve num buffer que já existe)
+    copy-strided: func(dev: borrow<gpu-device>, outer: u32, chunk: u32, src-stride: u32, src-off: u32, dst-stride: u32, dst-off: u32, src: borrow<gpu-buffer>, dst: borrow<gpu-buffer>);
+    transpose-r: func(dev: borrow<gpu-device>, shape: list<u32>, perm: list<u32>, input: borrow<gpu-buffer>) -> gpu-buffer;
+    // devolve (buffer, número de elementos da saída)
+    slice-r: func(dev: borrow<gpu-device>, shape: list<u32>, starts: list<s32>, ends: list<s32>, axes: list<u32>, steps: list<s32>, input: borrow<gpu-buffer>) -> tuple<gpu-buffer, u32>;
+    resize-r: func(dev: borrow<gpu-device>, channels: u32, h-in: u32, w-in: u32, scale-h: f32, scale-w: f32, input: borrow<gpu-buffer>) -> tuple<gpu-buffer, u32>;
+    softmax-r: func(dev: borrow<gpu-device>, shape: list<u32>, axis: u32, input: borrow<gpu-buffer>) -> gpu-buffer;
+    matmul-r: func(dev: borrow<gpu-device>, lhs-shape: list<u32>, rhs-shape: list<u32>, lhs: borrow<gpu-buffer>, rhs: borrow<gpu-buffer>) -> tuple<gpu-buffer, u32>;
+}
+
+world opsgpuworld-gpu {
+    import wasi:webgpu/webgpu@0.3.0-rc.2;
+    export plan;
+}

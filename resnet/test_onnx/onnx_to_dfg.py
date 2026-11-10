@@ -31,6 +31,15 @@ OP_TO_KERNEL = {
 }
 
 SILU_KERNEL_TYPE = 12  # produzido pela fusão Sigmoid+Mul, não é op_type direto
+# 09/11: fusões Conv+BN e Conv+BN+Relu, mesmo padrão do SiLU (não são
+# op_type direto; os kernels 1, 2 e 3 continuam existindo e são usados
+# sempre que o padrão não bate).
+CONVBN_KERNEL_TYPE = 23
+CONVBNRELU_KERNEL_TYPE = 24
+FUSED_KERNEL_TYPES = {"silu": SILU_KERNEL_TYPE, "convbn": CONVBN_KERNEL_TYPE,
+                      "convbnrelu": CONVBNRELU_KERNEL_TYPE}
+FUSE_CONV_BN = True   # --no-fuse-conv-bn desliga
+MODEL_NAME = ""       # --name sobrescreve o nome derivado do .onnx
 
 # Registro central de modelos — mora em resnet/models.json (um nível acima
 # de test_onnx/), pra handler e orchestrator acharem independente de onde
@@ -161,6 +170,89 @@ def try_fuse_silu(valid_nodes):
     return result
 
 
+def try_fuse_conv_bn_relu(entries, graph_output_names):
+    """
+    09/11: mesmo princípio do try_fuse_silu, aplicado sobre a lista que ele
+    devolve. Detecta Conv -> BatchNormalization (-> Relu) e funde em um
+    único nó sintético:
+      ("convbnrelu", conv, bn, relu)  -> kernel_type 24
+      ("convbn", conv, bn)            -> kernel_type 23
+    Critério (em cada elo): a saída do nó anterior tem EXATAMENTE um
+    consumidor, ele é o próximo op esperado, consome essa saída como input[0]
+    e a saída intermediária não é saída do grafo. O Relu só entra se a saída
+    do BN também tiver um único consumidor. Quando o padrão não bate, os nós
+    seguem separados (Conv, BN e Relu individuais), como antes.
+    """
+    output_to_consumers = {}
+    for idx, entry in enumerate(entries):
+        for n in entry[1:]:
+            for inp in n.input:
+                output_to_consumers.setdefault(inp, []).append(idx)
+
+    def single_raw_consumer(tensor, op_type):
+        if tensor in graph_output_names:
+            return None
+        consumers = set(output_to_consumers.get(tensor, []))
+        if len(consumers) != 1:
+            return None
+        cidx = next(iter(consumers))
+        centry = entries[cidx]
+        if centry[0] != "raw" or centry[1].op_type != op_type:
+            return None
+        if not centry[1].input or centry[1].input[0] != tensor:
+            return None
+        return cidx
+
+    absorbed = set()
+    fused_at = {}
+    for idx, entry in enumerate(entries):
+        if entry[0] != "raw" or entry[1].op_type != "Conv" or idx in absorbed:
+            continue
+        conv = entry[1]
+        bn_idx = single_raw_consumer(conv.output[0], "BatchNormalization")
+        if bn_idx is None:
+            continue
+        bn = entries[bn_idx][1]
+        if len([o for o in bn.output if o]) != 1:
+            continue  # BN em modo treino (com saídas extras): não funde
+        relu_idx = single_raw_consumer(bn.output[0], "Relu")
+        if relu_idx is not None:
+            fused_at[idx] = ("convbnrelu", conv, bn, entries[relu_idx][1])
+            absorbed.update({bn_idx, relu_idx})
+        else:
+            fused_at[idx] = ("convbn", conv, bn)
+            absorbed.add(bn_idx)
+
+    result = []
+    for idx, entry in enumerate(entries):
+        if idx in fused_at:
+            result.append(fused_at[idx])
+        elif idx in absorbed:
+            continue
+        else:
+            result.append(entry)
+    return result
+
+
+def entry_output_node(entry):
+    """Nó cuja saída é a saída real da entrada (último da cadeia fundida)."""
+    return entry[-1]
+
+
+def entry_external_inputs(entry):
+    """Inputs que vêm de FORA da entrada (exclui tensores internos da cadeia
+    fundida, ex: a saída do Conv dentro de um Conv+BN)."""
+    internal = set()
+    for n in entry[1:]:
+        internal.update(n.output)
+    ext = []
+    for n in entry[1:]:
+        for inp in n.input:
+            if inp not in internal and inp not in ext:
+                ext.append(inp)
+    return ext
+
+
 def get_node_attribute(node, attr_name, default=None):
     for attr in node.attribute:
         if attr.name == attr_name:
@@ -201,6 +293,64 @@ def get_split_sizes(node, initializers):
         arr = numpy_helper.to_array(sizes_tensor)
         return [int(x) for x in arr.tolist()]
     return None
+
+def conv_params(node, initializers, weights_dir, c_in, h_in, w_in):
+    """Params do Conv (kernel 1). Também usado pelos fundidos 23/24."""
+    strides = get_node_attribute(node, "strides", [1, 1])
+    pads = get_node_attribute(node, "pads", [0, 0, 0, 0])
+    kernel_shape = get_node_attribute(node, "kernel_shape", [3, 3])
+    groups = get_node_attribute(node, "group", 1)  # atributo ONNX chama "group", singular
+
+    w_tensor = initializers.get(node.input[1]) if len(node.input) > 1 else None
+    w_path = save_weight_bin(w_tensor, weights_dir) if w_tensor else ""
+
+    # Terceiro input opcional do Conv: bias (separado de BatchNorm,
+    # usado quando a camada não é seguida de BN — ex: as 3 convs
+    # finais de cada detection head do YOLO, que vão direto pra
+    # Reshape sem normalização).
+    b_tensor = initializers.get(node.input[2]) if len(node.input) > 2 else None
+    b_path = save_weight_bin(b_tensor, weights_dir) if b_tensor else ""
+
+    cout = w_tensor.dims[0] if w_tensor else c_in
+    kh = kernel_shape[0] if len(kernel_shape) > 0 else 3
+    kw = kernel_shape[1] if len(kernel_shape) > 1 else 3
+
+    # cin REAL do tensor de entrada, não w_tensor.dims[1] — para
+    # Conv agrupada/depthwise (groups > 1), o peso ONNX vem no
+    # formato [cout, cin/groups, kh, kw], então w_tensor.dims[1] é
+    # cin/groups, não cin.
+    cin = c_in
+
+    return {
+        "weight_path": w_path,
+        "bias_path": b_path,
+        "cout": int(cout),
+        "cin": int(cin),
+        "groups": int(groups),
+        "h_in": int(h_in),
+        "w_in": int(w_in),
+        "kh": int(kh),
+        "kw": int(kw),
+        "stride": int(strides[0]),
+        "padding": int(pads[0])
+    }
+
+
+def bn_weight_params(node, initializers, weights_dir):
+    """Caminhos dos 4 tensores + epsilon do BN (kernel 2 e fundidos 23/24)."""
+    epsilon = get_node_attribute(node, "epsilon", 1e-5)
+    scale_t = initializers.get(node.input[1]) if len(node.input) > 1 else None
+    beta_t  = initializers.get(node.input[2]) if len(node.input) > 2 else None
+    mean_t  = initializers.get(node.input[3]) if len(node.input) > 3 else None
+    var_t   = initializers.get(node.input[4]) if len(node.input) > 4 else None
+    return {
+        "scale_path": save_weight_bin(scale_t, weights_dir),
+        "beta_path": save_weight_bin(beta_t, weights_dir),
+        "mean_path": save_weight_bin(mean_t, weights_dir),
+        "var_path": save_weight_bin(var_t, weights_dir),
+        "epsilon": float(epsilon),
+    }
+
 
 def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(1, 3, 224, 224)):
     os.makedirs(weights_dir, exist_ok=True)
@@ -247,24 +397,36 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
     # a partir daqui, "fused_nodes" é a lista real usada para gerar o DFG.
     # Cada entrada é ("raw", node) ou ("silu", sigmoid_node, mul_node).
     fused_nodes = try_fuse_silu(valid_nodes)
+    # 09/11: depois do SiLU, Conv+BN(+Relu). Desligável com --no-fuse-conv-bn.
+    if FUSE_CONV_BN:
+        graph_output_names = {o.name for o in graph.output}
+        fused_nodes = try_fuse_conv_bn_relu(fused_nodes, graph_output_names)
+        n23 = sum(1 for e in fused_nodes if e[0] == "convbn")
+        n24 = sum(1 for e in fused_nodes if e[0] == "convbnrelu")
+        print(f"[FUSAO] Conv+BN (23): {n23} | Conv+BN+Relu (24): {n24}")
 
     # Mapear saídas para os passos. Para um par fundido, só o output do
     # Mul (a saída real do SiLU) conta — o output do Sigmoid interno nunca
     # é consumido por fora do par, então não precisa de entrada própria.
+    # Para Conv+BN(+Relu), idem: só a saída do último nó da cadeia.
     for step_id, entry in enumerate(fused_nodes, start=1):
-        if entry[0] == "silu":
-            _, _, mul_node = entry
-            for out_name in mul_node.output:
-                tensor_producer[out_name] = step_id
-        else:
-            _, node = entry
-            for out_name in node.output:
-                tensor_producer[out_name] = step_id
+        for out_name in entry_output_node(entry).output:
+            tensor_producer[out_name] = step_id
 
     # 5. Segundo passe: construir os StepNodes e extrair os pesos
     steps = []
     for step_id, entry in enumerate(fused_nodes, start=1):
-        if entry[0] == "silu":
+        if entry[0] in ("convbn", "convbnrelu"):
+            conv_node, bn_node = entry[1], entry[2]
+            kernel_type = FUSED_KERNEL_TYPES[entry[0]]
+            last_node = entry_output_node(entry)
+            # Nome do último nó (ex: "resnetv15_stage1_relu0"), que é o
+            # tensor que sai do passo — é por ele que o corte por camada acha
+            # o ponto. Os nomes absorvidos ficam em "fused_layers".
+            layer_name = last_node.name if last_node.name else f"{entry[0]}_{step_id}"
+            node = last_node  # usado abaixo só para next_steps
+            main_input_name = conv_node.input[0]
+        elif entry[0] == "silu":
             _, sigmoid_node, mul_node = entry
             kernel_type = SILU_KERNEL_TYPE
             layer_name = mul_node.name if mul_node.name else f"SiLU_{step_id}"
@@ -291,64 +453,21 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
         w_in = in_shape[3] if len(in_shape) > 3 and in_shape[3] is not None else 224
 
         # Preencher atributos específicos de cada operador
-        if kernel_type == 1:  # Conv
-            strides = get_node_attribute(node, "strides", [1, 1])
-            pads = get_node_attribute(node, "pads", [0, 0, 0, 0])
-            kernel_shape = get_node_attribute(node, "kernel_shape", [3, 3])
-            groups = get_node_attribute(node, "group", 1)  # atributo ONNX chama "group", singular
+        if kernel_type in (CONVBN_KERNEL_TYPE, CONVBNRELU_KERNEL_TYPE):
+            params = conv_params(conv_node, initializers, weights_dir, c_in, h_in, w_in)
+            params.update(bn_weight_params(bn_node, initializers, weights_dir))
+            params["fused_layers"] = [n.name for n in entry[1:]]
 
-            w_tensor = initializers.get(node.input[1]) if len(node.input) > 1 else None
-            w_path = save_weight_bin(w_tensor, weights_dir) if w_tensor else ""
-
-            # Terceiro input opcional do Conv: bias (separado de BatchNorm,
-            # usado quando a camada não é seguida de BN — ex: as 3 convs
-            # finais de cada detection head do YOLO, que vão direto pra
-            # Reshape sem normalização).
-            b_tensor = initializers.get(node.input[2]) if len(node.input) > 2 else None
-            b_path = save_weight_bin(b_tensor, weights_dir) if b_tensor else ""
-
-            cout = w_tensor.dims[0] if w_tensor else c_in
-            kh = kernel_shape[0] if len(kernel_shape) > 0 else 3
-            kw = kernel_shape[1] if len(kernel_shape) > 1 else 3
-
-            # cin REAL do tensor de entrada, não w_tensor.dims[1] — para
-            # Conv agrupada/depthwise (groups > 1), o peso ONNX vem no
-            # formato [cout, cin/groups, kh, kw], então w_tensor.dims[1] é
-            # cin/groups, não cin. Usar sempre o shape do tensor de entrada
-            # (já lido acima como c_in) evita essa armadilha silenciosa.
-            cin = c_in
-
-            params = {
-                "weight_path": w_path,
-                "bias_path": b_path,
-                "cout": int(cout),
-                "cin": int(cin),
-                "groups": int(groups),
-                "h_in": int(h_in),
-                "w_in": int(w_in),
-                "kh": int(kh),
-                "kw": int(kw),
-                "stride": int(strides[0]),
-                "padding": int(pads[0])
-            }
+        elif kernel_type == 1:  # Conv
+            params = conv_params(node, initializers, weights_dir, c_in, h_in, w_in)
 
         elif kernel_type == 2:  # BatchNorm
-            epsilon = get_node_attribute(node, "epsilon", 1e-5)
-            scale_t = initializers.get(node.input[1]) if len(node.input) > 1 else None
-            beta_t  = initializers.get(node.input[2]) if len(node.input) > 2 else None
-            mean_t  = initializers.get(node.input[3]) if len(node.input) > 3 else None
-            var_t   = initializers.get(node.input[4]) if len(node.input) > 4 else None
-
-            params = {
-                "scale_path": save_weight_bin(scale_t, weights_dir),
-                "beta_path": save_weight_bin(beta_t, weights_dir),
-                "mean_path": save_weight_bin(mean_t, weights_dir),
-                "var_path": save_weight_bin(var_t, weights_dir),
-                "epsilon": float(epsilon),
+            params = bn_weight_params(node, initializers, weights_dir)
+            params.update({
                 "channels": int(c_in),
                 "h_in": int(h_in),
                 "w_in": int(w_in)
-            }
+            })
 
         elif kernel_type == 4:  # MaxPool
             strides = get_node_attribute(node, "strides", [1, 1])
@@ -667,8 +786,9 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
             for consumer_step, consumer_entry in enumerate(fused_nodes, start=1):
                 if consumer_step == step_id:
                     continue
-                consumer_node = consumer_entry[-1]  # mul_node para "silu", node para "raw"
-                if out_name in consumer_node.input:
+                # Inputs externos da entrada consumidora (para Conv+BN(+Relu),
+                # o input do Conv; para SiLU, os do par; para "raw", os do nó).
+                if out_name in entry_external_inputs(consumer_entry):
                     if consumer_step not in next_steps:
                         next_steps.append(consumer_step)
                     output_routes.append({"to_step": consumer_step, "output_index": out_idx})
@@ -685,7 +805,7 @@ def extract_dfg(onnx_path, output_json, weights_dir="bin_weights", input_shape=(
         steps.append(step_entry)
 
     model_dfg = {
-        "model": os.path.basename(onnx_path).replace(".onnx", ""),
+        "model": MODEL_NAME or os.path.basename(onnx_path).replace(".onnx", ""),
         "steps": steps
     }
 
@@ -702,6 +822,14 @@ if __name__ == "__main__":
     parser.add_argument("--onnx", type=str, required=True, help="Caminho para o arquivo .onnx")
     parser.add_argument("--output", type=str, default="modelDFG.json", help="Arquivo JSON de saída")
     parser.add_argument("--weights-dir", type=str, default="bin_weights", help="Diretório de saída dos pesos binários")
+    parser.add_argument("--no-fuse-conv-bn", action="store_true",
+                        help="Não fundir Conv+BN(+Relu) nos kernels 23/24 (gera o DFG antigo, com 1/2/3 separados)")
+    parser.add_argument("--name", type=str, default="",
+                        help="Nome do modelo no DFG/models.json (padrão: nome do .onnx). "
+                             "Um nome novo ganha um model_id novo; um nome existente atualiza a entrada.")
     args = parser.parse_args()
+
+    FUSE_CONV_BN = not args.no_fuse_conv_bn
+    MODEL_NAME = args.name
 
     extract_dfg(args.onnx, args.output, args.weights_dir)

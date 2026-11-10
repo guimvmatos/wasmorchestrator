@@ -16,6 +16,17 @@
 // na ordem de chegada, para o grupo, na porta interna dele. Assim quem envia
 // nunca fica esperando um grupo ocupado, e o ciclo de espera não se forma.
 // Nada muda no componente WASM, no handler nem no client.
+//
+// 09/11 (item 3): conexões persistentes + fila com limite.
+// - Ack = 1 byte (0x06) por quadro, e a conexão continua aberta para o
+//   próximo quadro (a caixa de saída dos grupos reaproveita a conexão).
+//   Quem envia um quadro só e fecha (handler, grupo antigo) continua
+//   funcionando: lê o byte (ou o fechamento) e vai embora; aqui o EOF encerra
+//   a thread daquela conexão.
+// - Fila com limite (WASMORCH_RELAY_QUEUE, padrão 256 quadros): quando cheia,
+//   o ack só sai quando abrir espaço — backpressure para quem envia, em vez
+//   de memória sem limite. Cuidado: com dois grupos se enviando e as DUAS
+//   filas cheias, volta a poder travar; por isso o limite padrão é folgado.
 
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
@@ -29,15 +40,56 @@ pub struct Relay {
     public_addr: String,
 }
 
+/// 09/11: TCP_QUICKACK. Nas conexões persistentes, o remetente (componente
+/// WASM; o WASI não tem TCP_NODELAY) fica com o algoritmo de Nagle ligado e
+/// segura o último pedaço do quadro até receber o ACK do anterior; o Linux
+/// aqui adia esse ACK em até 40 ms (delayed ACK). Medido no notebook: ack_wait
+/// p99 = 40,5 ms com conexão persistente contra 0,34 ms com conexão nova (que
+/// começa em modo quickack). Ligar o quickack antes de cada leitura faz este
+/// lado confirmar na hora. O kernel desliga o modo sozinho, por isso é a cada
+/// leitura.
+#[cfg(target_os = "linux")]
+fn quickack(s: &TcpStream) {
+    use std::os::unix::io::AsRawFd;
+    let one: libc::c_int = 1;
+    unsafe {
+        libc::setsockopt(
+            s.as_raw_fd(),
+            libc::IPPROTO_TCP,
+            libc::TCP_QUICKACK,
+            &one as *const libc::c_int as *const libc::c_void,
+            std::mem::size_of::<libc::c_int>() as libc::socklen_t,
+        );
+    }
+}
+#[cfg(not(target_os = "linux"))]
+fn quickack(_s: &TcpStream) {}
+
 /// Lê um quadro inteiro: u32 BE com o tamanho + o conteúdo. Devolve os bytes
-/// já com o prefixo, prontos para reenviar sem mexer.
-fn read_frame(s: &mut TcpStream) -> io::Result<Vec<u8>> {
+/// já com o prefixo, prontos para reenviar sem mexer. `pending` sobe assim
+/// que o tamanho chega (há um quadro a caminho) — uma conexão persistente
+/// parada, esperando o próximo quadro, não conta como pendente.
+fn read_frame(s: &mut TcpStream, pending: &AtomicUsize) -> io::Result<Vec<u8>> {
     let mut len_buf = [0u8; 4];
+    quickack(s);
     s.read_exact(&mut len_buf)?;
+    pending.fetch_add(1, Ordering::SeqCst);
+    quickack(s);
     let len = u32::from_be_bytes(len_buf) as usize;
     let mut msg = vec![0u8; 4 + len];
     msg[..4].copy_from_slice(&len_buf);
-    s.read_exact(&mut msg[4..])?;
+    // Lê em pedaços religando o quickack: o kernel pode voltar ao modo
+    // "adiado" no meio de um quadro grande.
+    let mut off = 4;
+    while off < msg.len() {
+        let end = (off + 256 * 1024).min(msg.len());
+        if let Err(e) = s.read_exact(&mut msg[off..end]) {
+            pending.fetch_sub(1, Ordering::SeqCst);
+            return Err(e);
+        }
+        quickack(s);
+        off = end;
+    }
     Ok(msg)
 }
 
@@ -65,7 +117,9 @@ impl Relay {
         let listener = TcpListener::bind((bind_ip, public_port))?;
         let stop = Arc::new(AtomicBool::new(false));
         let pending = Arc::new(AtomicUsize::new(0));
-        let (tx, rx) = mpsc::channel::<Vec<u8>>();
+        let cap: usize = std::env::var("WASMORCH_RELAY_QUEUE").ok()
+            .and_then(|v| v.parse().ok()).filter(|&n| n > 0).unwrap_or(256);
+        let (tx, rx) = mpsc::sync_channel::<Vec<u8>>(cap);
 
         // Entrega: uma thread, ordem de chegada.
         {
@@ -110,19 +164,31 @@ impl Relay {
                         Ok(s) => s,
                         Err(_) => continue,
                     };
-                    pending.fetch_add(1, Ordering::SeqCst);
                     let tx = tx.clone();
                     let pending = pending.clone();
-                    std::thread::spawn(move || match read_frame(&mut s) {
-                        Ok(msg) => {
-                            // ack para quem enviou: a mensagem já está guardada aqui.
-                            let _ = s.shutdown(Shutdown::Both);
-                            if tx.send(msg).is_err() {
-                                pending.fetch_sub(1, Ordering::SeqCst);
+                    std::thread::spawn(move || {
+                        let _ = s.set_nodelay(true);
+                        // Vários quadros por conexão, até o outro lado fechar.
+                        loop {
+                            match read_frame(&mut s, &pending) {
+                                Ok(msg) => {
+                                    // Guarda (bloqueia se a fila estiver cheia) e só
+                                    // então confirma: o ack significa "está aqui".
+                                    if tx.send(msg).is_err() {
+                                        pending.fetch_sub(1, Ordering::SeqCst);
+                                        let _ = s.shutdown(Shutdown::Both);
+                                        break;
+                                    }
+                                    if s.write_all(&[0x06]).is_err() {
+                                        break;
+                                    }
+                                }
+                                Err(_) => {
+                                    // EOF (remetente fechou) ou erro: fim desta conexão
+                                    // (read_frame já desfez o pending, se tinha subido).
+                                    break;
+                                }
                             }
-                        }
-                        Err(_) => {
-                            pending.fetch_sub(1, Ordering::SeqCst);
                         }
                     });
                 }

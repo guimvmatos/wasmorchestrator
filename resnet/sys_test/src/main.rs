@@ -43,6 +43,10 @@ struct RoutingTable {
     table: HashMap<u8, String>,
     node_scores: HashMap<u8, f32>,
     assignments: HashMap<u8, Vec<u8>>,
+    // 09/11: corte por camada (escrito pelo fase3_table.py cut). O sys não
+    // usa; só preserva ao regravar a tabela.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    step_routes: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -77,7 +81,8 @@ struct SystemMetrics {
 /// Kernels que têm variante GPU e devem usá-la quando presentes num grupo —
 /// mesmo conjunto já validado manualmente (`--gpu 1,2,4,6,8,10,11,12,17`).
 /// #### TODO: se um novo kernel ganhar variante GPU, incluir aqui.
-const GPU_CAPABLE_KERNELS: &[u8] = &[1, 2, 4, 6, 8, 10, 11, 12, 17];
+/// 09/11: + 23 (Conv+BN) e 24 (Conv+BN+Relu), kernels fundidos.
+const GPU_CAPABLE_KERNELS: &[u8] = &[1, 2, 4, 6, 8, 10, 11, 12, 17, 23, 24];
 
 /// Caminho do crate do Dynamic Builder relativo ao cwd do sys (sys_test/).
 /// #### TODO: ajustar se a árvore de pastas mudar.
@@ -398,9 +403,13 @@ fn drain_and_kill_group(group_id: u32, g: Group) {
     let start = Instant::now();
     loop {
         // 05/11: com a caixa de entrada, "vazio" = nada na fila do relay e
-        // nenhuma conexão aberta nem na porta pública nem na interna.
+        // nenhuma conexão aberta na porta interna.
+        // 09/11 (item 3): a porta PÚBLICA não entra mais no teste — as caixas
+        // de saída dos outros grupos mantêm conexões persistentes abertas
+        // nela, mesmo paradas. O relay.pending() conta todo quadro desde o
+        // 1º byte até a entrega ao grupo, então cobre o que estava no teste.
+        let _ = port;
         if g.relay.pending() == 0
-            && !port_has_established_connection(port)
             && !port_has_established_connection(inner_port)
         {
             println!(

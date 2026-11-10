@@ -1,6 +1,10 @@
 package planner:gapworld;
 
+// 10/11 (4c): via residente na GPU. Device do grupo (borrow) e tensores como
+// handles de buffers da GPU. O record data fica só por compatibilidade (o
+// grupo usa o tipo para serializar na rede).
 interface plan {
+    use wasi:webgpu/webgpu@0.3.0-rc.2.{gpu-device, gpu-buffer};
 
     record data {
         input: list<f32>,
@@ -12,13 +16,11 @@ interface plan {
         from-step: u32,
     model-id: u32
     }
-  
-    gap: func(channels: u32, img: data) -> data;
-    
+
+    gap-r: func(dev: borrow<gpu-device>, channels: u32, spatial: u32, input: borrow<gpu-buffer>) -> gpu-buffer;
 }
 
 world gapworld-gpu {
     import wasi:webgpu/webgpu@0.3.0-rc.2;
-    import wasi-gfx-runtime:wasi-webgpu/sync-io;
     export plan;
 }

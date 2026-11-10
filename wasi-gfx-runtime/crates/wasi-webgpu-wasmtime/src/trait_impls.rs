@@ -2633,6 +2633,17 @@ impl<'a> sync_io::Host for WasiWebGpuCtx<'a> {
             .buffer_map_async(buffer_id, offset, size, op)
             .unwrap();
 
+        // 10/11 (correção P, DESLIGADA por padrão): poll na própria thread em
+        // vez de esperar a thread de fundo. Medido no notebook (RTX 4050):
+        // com a via residente (4c) não muda a mediana (R18F 25,1 x 25,3 ms) e
+        // piora a cauda (p95 33,5 x 27,1); no vaivém CPU<->GPU a cada passo
+        // fica ~3x mais lento (R18F 156,7 x 59,3 ms; YOLO 507 x 411 ms) —
+        // poll_all_devices(true) espera TODOS os devices do processo.
+        // Ligar só para experimento: WASMORCH_POLL_INLINE=1 no ambiente do sys.
+        if std::env::var("WASMORCH_POLL_INLINE").map(|v| v == "1").unwrap_or(false) {
+            let _ = self.instance.poll_all_devices(true);
+        }
+
         // Bloqueia a THREAD NATIVA do host aqui (não a task do wasm — essa
         // função é uma func comum, sem "async" na WIT). Isso é permitido
         // pelo Canonical ABI porque, do ponto de vista do guest, é só uma

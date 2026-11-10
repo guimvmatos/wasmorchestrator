@@ -43,13 +43,15 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 
-# 22 kernels CPU (C) — wit-bindgen c + wasi-sdk clang, mesma receita de
+# 24 kernels CPU (C) — 22 originais + convbn (23) e convbnrelu (24), 09/11 — wit-bindgen c + wasi-sdk clang, mesma receita de
 # components/Compilation_resnet.md, pra cada um.
 CPU_KERNELS=(
   add
   bn
   concat
   conv
+  convbn
+  convbnrelu
   div
   dropout
   flatten
@@ -70,14 +72,19 @@ CPU_KERNELS=(
   transpose
 )
 
-# 9 kernels GPU (Rust + wit_bindgen::generate! macro) — só precisa recompilar,
+# 14 kernels GPU (Rust — 9 originais + convbn_gpu e convbnrelu_gpu, 09/11; + relu_gpu e add_gpu, 10/11 (4c); + ops_gpu, 10/11 (4c parte 2) + wit_bindgen::generate! macro) — só precisa recompilar,
 # os bindings são regerados automaticamente pela macro no build.
 GPU_KERNELS=(
   bn_gpu
   conv_gpu
+  convbn_gpu
+  convbnrelu_gpu
+  add_gpu
+  relu_gpu
   gap_gpu
   gemm_gpu
   matmul_gpu
+  ops_gpu
   maxpool_gpu
   mul_gpu
   sigmoid_gpu
@@ -125,6 +132,11 @@ for name in "${GPU_KERNELS[@]}"; do
   (
     set -e
     cd "$name"
+    # Crate novo (ex: convbn_gpu): baixa as deps WIT (wasi:webgpu) uma vez,
+    # como já foi feito nos outros crates GPU.
+    if [ ! -d wit/deps ]; then
+      wkg wit fetch
+    fi
     CC="" cargo build --target=wasm32-wasip2 --release
   )
   if [ $? -ne 0 ]; then
@@ -134,7 +146,7 @@ done
 
 echo ""
 if [ ${#FAILED[@]} -eq 0 ]; then
-  echo "=== Tudo rebuildado com sucesso (22 CPU + 9 GPU) ==="
+  echo "=== Tudo rebuildado com sucesso (24 CPU + 14 GPU) ==="
 else
   echo "=== Falharam: ${FAILED[*]} ==="
   echo "Corrija e rode de novo só pra esses (o script é idempotente por kernel)."

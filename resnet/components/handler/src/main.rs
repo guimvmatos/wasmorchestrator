@@ -45,6 +45,17 @@ struct RoutingTable {
     table: HashMap<u8, String>,
     node_scores: HashMap<u8, f32>,
     assignments: HashMap<u8, Vec<u8>>,
+    // 09/11: corte por camada (ver build_custom.py). Se o 1º passo do modelo
+    // cai numa faixa, a requisição vai direto pro nó daquela faixa.
+    #[serde(default)]
+    step_routes: HashMap<String, Vec<StepRange>>,
+}
+
+#[derive(Deserialize, Debug)]
+struct StepRange {
+    de: u32,
+    ate: u32,
+    no: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -255,9 +266,15 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         .unwrap_or_else(|e| panic!("Erro ao ler ../../sys_test/routing_table.json (tabela viva do sys): {}", e));
 
     let target_kernel_id = first_kernel_type;
-    let target_address = routing.table.get(&first_kernel_type)
-        .cloned()
-        .unwrap_or_else(|| panic!("Tipo de Kernel {} não encontrado na routing_table.json do sys", first_kernel_type));
+    let step_dest = routing.step_routes.get(&client_req.model_id.to_string())
+        .and_then(|rs| rs.iter().find(|r| r.de <= first_step && first_step <= r.ate))
+        .map(|r| r.no.clone());
+    let target_address = match step_dest {
+        Some(d) => d,
+        None => routing.table.get(&first_kernel_type)
+            .cloned()
+            .unwrap_or_else(|| panic!("Tipo de Kernel {} não encontrado na routing_table.json do sys", first_kernel_type)),
+    };
 
     vprintln!("Despachando demanda para o Kernel Tipo {} em {}...", target_kernel_id, target_address);
 

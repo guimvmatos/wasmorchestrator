@@ -14,7 +14,10 @@ KERNELS = {
     1: {
         "name": "conv",
         "wit_import": "    import planner:convworld/plan;",
-        "rust_match": """                1 => {
+        # 09/11 (4a): a variante GPU recebe os pesos uma vez só (load_weights)
+        # e depois só o weight-id; a CPU continua igual.
+        "rust_match_variants": {
+            "cpu": """                1 => {
                     let out_h = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;
                     let out_w = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;
                     let output_size = (p.cout * out_h * out_w) as usize;
@@ -37,6 +40,12 @@ KERNELS = {
                     );
                     computed_output = res.output;
                 },""",
+            "gpu": """                1 => {
+                    // 10/11 (4c): passo GPU local é tratado pela via residente
+                    // antes do match; aqui nunca chega.
+                    unreachable!("4c: tipo 1 na GPU vai pela via residente")
+                },""",
+        },
         "variants": {
             "cpu": {
                 "wkg_override": '"planner:convworld" = { path = "../../../kernel/conv/" }',
@@ -51,7 +60,10 @@ KERNELS = {
     2: {
         "name": "bn",
         "wit_import": "    import planner:bnworld/plan;",
-        "rust_match": """                2 => {
+        # 09/11 (4a): a variante GPU recebe os pesos uma vez só (load_weights)
+        # e depois só o weight-id; a CPU continua igual.
+        "rust_match_variants": {
+            "cpu": """                2 => {
                     let scale = load_weights_file_cached(&p.scale_path);
                     let beta  = load_weights_file_cached(&p.beta_path);
                     let mean  = load_weights_file_cached(&p.mean_path);
@@ -72,6 +84,12 @@ KERNELS = {
                     );
                     computed_output = res.output;
                 },""",
+            "gpu": """                2 => {
+                    // 10/11 (4c): passo GPU local é tratado pela via residente
+                    // antes do match; aqui nunca chega.
+                    unreachable!("4c: tipo 2 na GPU vai pela via residente")
+                },""",
+        },
         "variants": {
             "cpu": {
                 "wkg_override": '"planner:bnworld" = { path = "../../../kernel/bn/" }',
@@ -110,7 +128,8 @@ KERNELS = {
     4: {
         "name": "maxpool",
         "wit_import": "    import planner:maxpoolworld/plan;",
-        "rust_match": """                4 => {
+        "rust_match_variants": {
+            "cpu": """                4 => {
                     let out_h = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;
                     let out_w = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;
                     let output_size = (p.channels * out_h * out_w) as usize;
@@ -129,6 +148,12 @@ KERNELS = {
                     );
                     computed_output = res.output;
                 },""",
+            "gpu": """                4 => {
+                    // 10/11 (4c): passo GPU local é tratado pela via residente
+                    // antes do match; aqui nunca chega.
+                    unreachable!("4c: tipo 4 na GPU vai pela via residente")
+                },""",
+        },
         "variants": {
             "cpu": {
                 "wkg_override": '"planner:maxpoolworld" = { path = "../../../kernel/maxpool/" }',
@@ -212,18 +237,9 @@ KERNELS = {
                     computed_output = res.output;
                 },""",
             "gpu": """                6 => {
-                    let data = bindings::planner::gapworld::plan::Data {
-                        input: current_input.clone(),
-                        output: vec![0.0f32; p.channels as usize],
-                        reply_to: reply_to.clone(),
-                        current_kernel: current_step,
-                        request: request_id,
-                        kernels: vec![],
-                        from_step: origin_step,
-                    model_id: input_img.model_id,
-                    };
-                    let res = bindings::planner::gapworld::plan::gap(p.channels, &data);
-                    computed_output = res.output;
+                    // 10/11 (4c): passo GPU local é tratado pela via residente
+                    // antes do match; aqui nunca chega.
+                    unreachable!("4c: tipo 6 na GPU vai pela via residente")
                 },""",
         },
         "variants": {
@@ -289,29 +305,9 @@ KERNELS = {
                     computed_output = res.output;
                 },""",
             "gpu": """                8 => {
-                    let weight_id = p.weight_path.clone();
-                    if !GEMM_GPU_LOADED.with(|loaded| loaded.borrow().contains(&weight_id)) {
-                        let weights = load_weights_file_cached(&p.weight_path);
-                        let bias = load_weights_file_cached(&p.bias_path);
-                        bindings::planner::gemmworld::plan::gemm_load_weights(
-                            &weight_id, weights.as_slice(), bias.as_slice(),
-                        );
-                        GEMM_GPU_LOADED.with(|loaded| loaded.borrow_mut().insert(weight_id.clone()));
-                    }
-                    let data = bindings::planner::gemmworld::plan::Data {
-                        input: current_input,
-                        output: vec![0.0f32; p.out_features as usize],
-                        reply_to: reply_to.clone(),
-                        current_kernel: current_step,
-                        request: request_id,
-                        kernels: vec![],
-                        from_step: origin_step,
-                    model_id: input_img.model_id,
-                    };
-                    let res = bindings::planner::gemmworld::plan::gemm(
-                        &weight_id, p.in_features, p.out_features, &data,
-                    );
-                    computed_output = res.output;
+                    // 10/11 (4c): passo GPU local é tratado pela via residente
+                    // antes do match; aqui nunca chega.
+                    unreachable!("4c: tipo 8 na GPU vai pela via residente")
                 },""",
         },
         "variants": {
@@ -1011,6 +1007,116 @@ KERNELS = {
             },
         },
     },
+    # 09/11: Conv+BN fundidos (23) — mesmo padrão do SiLU (12): o exportador emite este tipo
+    # quando acha a sequência no grafo; os kernels individuais continuam
+    # existindo. Params = os do Conv + os 4 caminhos e o epsilon do BN.
+    23: {
+        "name": "convbn",
+        "wit_import": "    import planner:convbnworld/plan;",
+        # 09/11 (4a): a variante GPU recebe os pesos uma vez só (load_weights)
+        # e depois só o weight-id; a CPU continua igual.
+        "rust_match_variants": {
+            "cpu": """                23 => {
+                    let out_h = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;
+                    let out_w = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;
+                    let output_size = (p.cout * out_h * out_w) as usize;
+                    let weights = load_weights_file_cached(&p.weight_path);
+                    let bias = load_weights_file_cached(&p.bias_path);
+                    let scale = load_weights_file_cached(&p.scale_path);
+                    let beta  = load_weights_file_cached(&p.beta_path);
+                    let mean  = load_weights_file_cached(&p.mean_path);
+                    let var   = load_weights_file_cached(&p.var_path);
+                    let conv_groups = if p.groups == 0 { 1 } else { p.groups };
+                    let data = bindings::planner::convbnworld::plan::Data {
+                        input: current_input,
+                        output: vec![0.0f32; output_size],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    model_id: input_img.model_id,
+                    };
+                    let res = bindings::planner::convbnworld::plan::convbn(
+                        p.cout, p.cin, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, conv_groups,
+                        p.epsilon,
+                        weights.as_slice(), bias.as_slice(),
+                        scale.as_slice(), beta.as_slice(), mean.as_slice(), var.as_slice(), &data,
+                    );
+                    computed_output = res.output;
+                },""",
+            "gpu": """                23 => {
+                    // 10/11 (4c): passo GPU local é tratado pela via residente
+                    // antes do match; aqui nunca chega.
+                    unreachable!("4c: tipo 23 na GPU vai pela via residente")
+                },""",
+        },
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:convbnworld" = { path = "../../../kernel/convbn/" }',
+                "wasm_path": "../../../kernel/convbn/convbnworld_component.wasm",
+            },
+            "gpu": {
+                "wkg_override": '"planner:convbnworld" = { path = "../../../kernel/convbn_gpu/wit" }',
+                "wasm_path": "../../../kernel/convbn_gpu/target/wasm32-wasip2/release/convbn_gpu.wasm",
+            },
+        },
+    },
+    # 09/11: Conv+BN+Relu fundidos (24) — mesmo padrão do SiLU (12): o exportador emite este tipo
+    # quando acha a sequência no grafo; os kernels individuais continuam
+    # existindo. Params = os do Conv + os 4 caminhos e o epsilon do BN.
+    24: {
+        "name": "convbnrelu",
+        "wit_import": "    import planner:convbnreluworld/plan;",
+        # 09/11 (4a): a variante GPU recebe os pesos uma vez só (load_weights)
+        # e depois só o weight-id; a CPU continua igual.
+        "rust_match_variants": {
+            "cpu": """                24 => {
+                    let out_h = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;
+                    let out_w = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;
+                    let output_size = (p.cout * out_h * out_w) as usize;
+                    let weights = load_weights_file_cached(&p.weight_path);
+                    let bias = load_weights_file_cached(&p.bias_path);
+                    let scale = load_weights_file_cached(&p.scale_path);
+                    let beta  = load_weights_file_cached(&p.beta_path);
+                    let mean  = load_weights_file_cached(&p.mean_path);
+                    let var   = load_weights_file_cached(&p.var_path);
+                    let conv_groups = if p.groups == 0 { 1 } else { p.groups };
+                    let data = bindings::planner::convbnreluworld::plan::Data {
+                        input: current_input,
+                        output: vec![0.0f32; output_size],
+                        reply_to: reply_to.clone(),
+                        current_kernel: current_step,
+                        request: request_id,
+                        kernels: vec![],
+                        from_step: origin_step,
+                    model_id: input_img.model_id,
+                    };
+                    let res = bindings::planner::convbnreluworld::plan::convbnrelu(
+                        p.cout, p.cin, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, conv_groups,
+                        p.epsilon,
+                        weights.as_slice(), bias.as_slice(),
+                        scale.as_slice(), beta.as_slice(), mean.as_slice(), var.as_slice(), &data,
+                    );
+                    computed_output = res.output;
+                },""",
+            "gpu": """                24 => {
+                    // 10/11 (4c): passo GPU local é tratado pela via residente
+                    // antes do match; aqui nunca chega.
+                    unreachable!("4c: tipo 24 na GPU vai pela via residente")
+                },""",
+        },
+        "variants": {
+            "cpu": {
+                "wkg_override": '"planner:convbnreluworld" = { path = "../../../kernel/convbnrelu/" }',
+                "wasm_path": "../../../kernel/convbnrelu/convbnreluworld_component.wasm",
+            },
+            "gpu": {
+                "wkg_override": '"planner:convbnreluworld" = { path = "../../../kernel/convbnrelu_gpu/wit" }',
+                "wasm_path": "../../../kernel/convbnrelu_gpu/target/wasm32-wasip2/release/convbnrelu_gpu.wasm",
+            },
+        },
+    },
 }
 
 WASI_GFX_OVERRIDE = (
@@ -1018,6 +1124,80 @@ WASI_GFX_OVERRIDE = (
     '{ path = "../../../../../wasi-gfx-runtime/crates/wasi-webgpu-wasmtime/wit/" }'
 )
 
+
+# 10/11 (4c): via residente na GPU.
+LANE_CODE = {1: '                1 => {\n                    let wkey = p.weight_path.clone();\n                    let wtag = format!("1:{}", wkey);\n                    if !GPU_W_LOADED.with(|l| l.borrow().contains(&wtag)) {\n                        let weights = load_weights_file_cached(&p.weight_path);\n                        let bias = load_weights_file_cached(&p.bias_path);\n                        bindings::planner::convworld::plan::conv_load_weights(&dev, &wkey, weights.as_slice(), bias.as_slice());\n                        GPU_W_LOADED.with(|l| l.borrow_mut().insert(wtag));\n                    }\n                    let g = if p.groups == 0 { 1 } else { p.groups };\n                    let oh = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;\n                    let ow = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;\n                    let b = bindings::planner::convworld::plan::conv_r(&dev, &wkey, p.cout, p.cin, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, g, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: (p.cout * oh * ow) as usize })\n                }', 2: '                2 => {\n                    let wkey = p.scale_path.clone();\n                    let wtag = format!("2:{}", wkey);\n                    if !GPU_W_LOADED.with(|l| l.borrow().contains(&wtag)) {\n                        let sc = load_weights_file_cached(&p.scale_path);\n                        let be = load_weights_file_cached(&p.beta_path);\n                        let me = load_weights_file_cached(&p.mean_path);\n                        let va = load_weights_file_cached(&p.var_path);\n                        bindings::planner::bnworld::plan::bn_load_weights(&dev, &wkey, sc.as_slice(), be.as_slice(), me.as_slice(), va.as_slice());\n                        GPU_W_LOADED.with(|l| l.borrow_mut().insert(wtag));\n                    }\n                    let b = bindings::planner::bnworld::plan::bn_r(&dev, &wkey, p.channels, p.h_in, p.w_in, p.epsilon, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: inp.len })\n                }', 4: '                4 => {\n                    let oh = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;\n                    let ow = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;\n                    let b = bindings::planner::maxpoolworld::plan::maxpool_r(&dev, p.channels, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: (p.channels * oh * ow) as usize })\n                }', 6: '                6 => {\n                    let ch = p.channels.max(1);\n                    let b = bindings::planner::gapworld::plan::gap_r(&dev, ch, (inp.len as u32) / ch, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: ch as usize })\n                }', 8: '                8 => {\n                    let wkey = p.weight_path.clone();\n                    let wtag = format!("8:{}", wkey);\n                    if !GPU_W_LOADED.with(|l| l.borrow().contains(&wtag)) {\n                        let weights = load_weights_file_cached(&p.weight_path);\n                        let bias = load_weights_file_cached(&p.bias_path);\n                        bindings::planner::gemmworld::plan::gemm_load_weights(&dev, &wkey, weights.as_slice(), bias.as_slice());\n                        GPU_W_LOADED.with(|l| l.borrow_mut().insert(wtag));\n                    }\n                    let b = bindings::planner::gemmworld::plan::gemm_r(&dev, &wkey, p.in_features, p.out_features, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: p.out_features as usize })\n                }', 23: '                23 => {\n                    let wkey = p.weight_path.clone();\n                    let wtag = format!("23:{}", wkey);\n                    if !GPU_W_LOADED.with(|l| l.borrow().contains(&wtag)) {\n                        let weights = load_weights_file_cached(&p.weight_path);\n                        let bias = load_weights_file_cached(&p.bias_path);\n                        let sc = load_weights_file_cached(&p.scale_path);\n                        let be = load_weights_file_cached(&p.beta_path);\n                        let me = load_weights_file_cached(&p.mean_path);\n                        let va = load_weights_file_cached(&p.var_path);\n                        bindings::planner::convbnworld::plan::convbn_load_weights(&dev, &wkey, p.epsilon, weights.as_slice(), bias.as_slice(), sc.as_slice(), be.as_slice(), me.as_slice(), va.as_slice());\n                        GPU_W_LOADED.with(|l| l.borrow_mut().insert(wtag));\n                    }\n                    let g = if p.groups == 0 { 1 } else { p.groups };\n                    let oh = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;\n                    let ow = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;\n                    let b = bindings::planner::convbnworld::plan::convbn_r(&dev, &wkey, p.cout, p.cin, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, g, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: (p.cout * oh * ow) as usize })\n                }', 24: '                24 => {\n                    let wkey = p.weight_path.clone();\n                    let wtag = format!("24:{}", wkey);\n                    if !GPU_W_LOADED.with(|l| l.borrow().contains(&wtag)) {\n                        let weights = load_weights_file_cached(&p.weight_path);\n                        let bias = load_weights_file_cached(&p.bias_path);\n                        let sc = load_weights_file_cached(&p.scale_path);\n                        let be = load_weights_file_cached(&p.beta_path);\n                        let me = load_weights_file_cached(&p.mean_path);\n                        let va = load_weights_file_cached(&p.var_path);\n                        bindings::planner::convbnreluworld::plan::convbnrelu_load_weights(&dev, &wkey, p.epsilon, weights.as_slice(), bias.as_slice(), sc.as_slice(), be.as_slice(), me.as_slice(), va.as_slice());\n                        GPU_W_LOADED.with(|l| l.borrow_mut().insert(wtag));\n                    }\n                    let g = if p.groups == 0 { 1 } else { p.groups };\n                    let oh = ((p.h_in + 2 * p.padding - p.kh) / p.stride) + 1;\n                    let ow = ((p.w_in + 2 * p.padding - p.kw) / p.stride) + 1;\n                    let b = bindings::planner::convbnreluworld::plan::convbnrelu_r(&dev, &wkey, p.cout, p.cin, p.h_in, p.w_in, p.kh, p.kw, p.stride, p.padding, g, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: (p.cout * oh * ow) as usize })\n                }'}
+LANE_EXTRA_CODE = {3: '                3 => {\n                    let b = bindings::planner::relugpuworld::plan::relu_r(&dev, inp.len as u32, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: inp.len })\n                }', 5: '                5 => {\n                    // Junção do resíduo na GPU. O 1º ramo espera em GPU_ADD_JOIN\n                    // (ou já está no join de CPU, se chegou antes pela rede).\n                    let key = (request_id, current_step);\n                    let other = GPU_ADD_JOIN.with(|j| j.borrow_mut().remove(&key))\n                        .or_else(|| add_branches.remove(&current_step).map(|h| gpu_upload(&dev, &h)));\n                    match other {\n                        Some(o) => {\n                            let b = bindings::planner::addgpuworld::plan::add_r(&dev, inp.len as u32, &o.buf, &inp.buf);\n                            Some(GpuT { buf: Rc::new(b), len: inp.len })\n                        }\n                        None => {\n                            GPU_ADD_JOIN.with(|j| j.borrow_mut().insert(key, inp.clone()));\n                            None\n                        }\n                    }\n                }', 7: '                7 => Some(inp.clone()),', 9: '                9 => Some(inp.clone()),'}
+EXTRA_GPU = {3: {'name': 'relugpu', 'wit_import': '    import planner:relugpuworld/plan;', 'wkg_override': '"planner:relugpuworld" = { path = "../../../kernel/relu_gpu/wit" }', 'wasm_path': '../../../kernel/relu_gpu/target/wasm32-wasip2/release/relu_gpu.wasm'}, 5: {'name': 'addgpu', 'wit_import': '    import planner:addgpuworld/plan;', 'wkg_override': '"planner:addgpuworld" = { path = "../../../kernel/add_gpu/wit" }', 'wasm_path': '../../../kernel/add_gpu/target/wasm32-wasip2/release/add_gpu.wasm'}}
+
+
+def lane_plan(active_kernel_ids, variant_map):
+    """Quais tipos vão pela via residente neste grupo e quais componentes
+    extra (relu/add na GPU) entram na composição."""
+    gpu_lane = [k for k in LANE_CODE if k in active_kernel_ids and variant_map.get(k) == "gpu"]
+    if not gpu_lane:
+        return [], []
+    extras = [k for k in (3, 5) if k in active_kernel_ids]
+    ident = [k for k in (7, 9) if k in active_kernel_ids]
+    return sorted(gpu_lane + extras + ident), extras
+
+GPU_LANE_HELPERS = '\n// ===== 10/11 (4c): via residente na GPU =====================================\n// Um device por GRUPO (antes: um por kernel). Os kernels GPU recebem o device\n// (borrow) e o tensor de entrada como handle de buffer da GPU, e devolvem a\n// saída como handle. O dado só desce para a CPU quando o próximo passo é de\n// CPU, vai para a rede ou é a saída final. Arquivo `gpu_resident_off` no\n// diretório do sys: baixa depois de TODO passo (comportamento antigo, para\n// medir antes × depois sem recompilar).\nuse bindings::wasi::webgpu::webgpu;\nuse bindings::wasi_gfx_runtime::wasi_webgpu::sync_io;\n\n#[derive(Clone)]\nstruct GpuT {\n    buf: Rc<webgpu::GpuBuffer>,\n    len: usize,\n}\n\nthread_local! {\n    static GROUP_DEV: RefCell<Option<Rc<webgpu::GpuDevice>>> = RefCell::new(None);\n    // (request, passo produtor) -> (tensor, consumidores que ainda faltam)\n    static GPU_REG: RefCell<HashMap<(u32, u32), (GpuT, u32)>> = RefCell::new(HashMap::new());\n    // (request, passo do Add) -> 1º ramo\n    static GPU_ADD_JOIN: RefCell<HashMap<(u32, u32), GpuT>> = RefCell::new(HashMap::new());\n}\n\nfn group_device() -> Rc<webgpu::GpuDevice> {\n    GROUP_DEV.with(|d| {\n        if d.borrow().is_none() {\n            let gpu = webgpu::get_gpu();\n            let opts = webgpu::GpuRequestAdapterOptions {\n                feature_level: None,\n                power_preference: Some(webgpu::GpuPowerPreference::HighPerformance),\n                force_fallback_adapter: None,\n                xr_compatible: None,\n            };\n            let adapter = wit_bindgen::block_on(gpu.request_adapter(Some(opts))).expect("sem adapter de GPU");\n            let info = adapter.info();\n            eprintln!("[GPU4C] device do grupo: vendor=\'{}\' device=\'{}\'", info.vendor(), info.device());\n            // limites altos para as FC grandes (VGG), como o gemm_gpu já fazia\n            let limits = adapter.limits();\n            let rl = webgpu::RecordOptionGpuSize64::new();\n            rl.add("maxStorageBufferBindingSize", Some(limits.max_storage_buffer_binding_size()));\n            rl.add("maxBufferSize", Some(limits.max_buffer_size()));\n            let desc = webgpu::GpuDeviceDescriptor {\n                required_features: None,\n                required_limits: Some(rl),\n                default_queue: None,\n                label: Some("grupo".to_string()),\n            };\n            let dev = wit_bindgen::block_on(adapter.request_device(Some(desc))).expect("request_device falhou");\n            *d.borrow_mut() = Some(Rc::new(dev));\n        }\n        Rc::clone(d.borrow().as_ref().unwrap())\n    })\n}\n\nfn gpu_resident_off() -> bool {\n    std::path::Path::new("gpu_resident_off").exists()\n}\n\nfn gpu_upload(dev: &webgpu::GpuDevice, data: &[f32]) -> GpuT {\n    let n = data.len().max(1);\n    let b = dev.create_buffer(&webgpu::GpuBufferDescriptor {\n        label: None,\n        size: (n * 4) as u64,\n        usage: webgpu::GpuBufferUsage::STORAGE | webgpu::GpuBufferUsage::COPY_SRC | webgpu::GpuBufferUsage::COPY_DST,\n        mapped_at_creation: Some(true),\n    });\n    if !data.is_empty() {\n        let bytes: &[u8] = unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 4) };\n        b.get_mapped_range_set_with_copy(bytes, None, None).unwrap();\n    }\n    b.unmap().unwrap();\n    GpuT { buf: Rc::new(b), len: data.len() }\n}\n\nfn gpu_download(dev: &webgpu::GpuDevice, t: &GpuT) -> Vec<f32> {\n    let n = t.len.max(1);\n    let stg = dev.create_buffer(&webgpu::GpuBufferDescriptor {\n        label: None,\n        size: (n * 4) as u64,\n        usage: webgpu::GpuBufferUsage::MAP_READ | webgpu::GpuBufferUsage::COPY_DST,\n        mapped_at_creation: None,\n    });\n    let enc = dev.create_command_encoder(None);\n    enc.copy_buffer_to_buffer(&t.buf, None, &stg, None, None);\n    dev.queue().submit(&[&enc.finish(None)]);\n    let bytes = sync_io::map_and_read_sync(&stg, webgpu::GpuMapMode::READ, Some(0), None)\n        .expect("map_and_read_sync falhou");\n    let mut v = vec![0.0f32; t.len];\n    let k = (t.len * 4).min(bytes.len());\n    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), v.as_mut_ptr() as *mut u8, k) };\n    v\n}\n\nfn gpu_reg_take(request: u32, producer: u32) -> Option<GpuT> {\n    GPU_REG.with(|r| {\n        let mut r = r.borrow_mut();\n        let key = (request, producer);\n        let (t, left) = r.get_mut(&key)?;\n        let out = t.clone();\n        *left -= 1;\n        if *left == 0 {\n            r.remove(&key);\n        }\n        Some(out)\n    })\n}\n\n/// O passo `step` deste modelo vai pela via residente aqui?\nfn lane_eligible(graph: &ModelGraph, routing: &RoutingTable, model_id: u32, step: u32) -> bool {\n    let Some(node) = graph.steps.iter().find(|s| s.step == step) else { return false };\n    if !LANE_KERNELS.contains(&node.kernel_type) || !LOCAL_KERNELS.contains(&node.kernel_type) {\n        return false;\n    }\n    if node.kernel_type == 5 && !node.params.const_path.is_empty() {\n        return false; // Add com constante: CPU\n    }\n    step_route_dest(routing, model_id, step).is_none()\n}\n'
+GPU_LANE_BLOCK = '\n            // ===== 10/11 (4c): via residente na GPU =====\n            let gpu_in = gpu_reg_take(request_id, origin_step);\n            if step_dest.is_none() && lane_eligible(graph, routing, input_img.model_id, current_step) {\n                let dev = group_device();\n                let inp: GpuT = match gpu_in {\n                    Some(t) => t,\n                    None => gpu_upload(&dev, &current_input),\n                };\n                let in_len = inp.len; // [T]\n                let out: Option<GpuT> = match current_node.kernel_type {\n@@LANE_ARMS@@\n                    _ => unreachable!(),\n                };\n                let lane_us = t_step.elapsed().as_micros() as u64; // [T]\n                {\n                    let log_linha = serde_json::json!({\n                        "request": request_id,\n                        "kernel_id": current_node.kernel_type,\n                        "kernel_type": current_node.kernel_type,\n                        "step": current_step,\n                        "layer_name": current_node.name,\n                        "next_steps": current_node.next_steps,\n                        "call_idx": call_idx,\n                        "ts_unix_ms": ts_unix_ms,\n                        "dispatch": "gpu-resident",\n                        "input_len": in_len,\n                        "output_len": out.as_ref().map(|o| o.len).unwrap_or(0),\n                        "timing_us": { "net_in": net_in_us, "deserialize": deserialize_us, "kernel_call": lane_us }\n                    });\n                    log_push(log_linha.to_string());\n                }\n                let Some(out) = out else { continue; }; // Add esperando o outro ramo\n                if current_node.next_steps.is_empty() {\n                    final_output = gpu_download(&dev, &out);\n                    final_from_step = current_step;\n                    reached_final = true;\n                    break;\n                }\n                let resident = !gpu_resident_off();\n                let mut on_gpu: Vec<u32> = Vec::new();\n                let mut on_host: Vec<u32> = Vec::new();\n                for &nxt in current_node.next_steps.iter() {\n                    if resident && lane_eligible(graph, routing, input_img.model_id, nxt) {\n                        on_gpu.push(nxt);\n                    } else {\n                        on_host.push(nxt);\n                    }\n                }\n                if !on_gpu.is_empty() {\n                    GPU_REG.with(|r| r.borrow_mut().insert((request_id, current_step), (out.clone(), on_gpu.len() as u32)));\n                    for nxt in on_gpu {\n                        queue.push_back((nxt, Vec::new(), current_step));\n                    }\n                }\n                if !on_host.is_empty() {\n                    let host = gpu_download(&dev, &out);\n                    for nxt in on_host {\n                        queue.push_back((nxt, host.clone(), current_step));\n                    }\n                }\n                continue;\n            }\n            // Passo que não vai pela via (CPU, rede, Add com constante...) mas\n            // cujo tensor está na GPU: baixa aqui.\n            if let Some(t) = gpu_in {\n                current_input = gpu_download(&group_device(), &t);\n            }\n'
+
+# 10/11 (4c, parte 2): todos os operadores na via residente.
+_HELPERS_EXTRA = '\n// ===== 10/11 (4c, parte 2) =====\nuse bindings::planner::opsgpuworld::plan as opsgpu;\n\nthread_local! {\n    // (request, passo do join) -> passo de origem -> ramos (FIFO: o mesmo\n    // produtor pode mandar 2 fatias para o mesmo consumidor, ex. Split->Concat)\n    static GPU_JOIN: RefCell<HashMap<(u32, u32), HashMap<u32, VecDeque<GpuT>>>> = RefCell::new(HashMap::new());\n    // constantes (const_path) já na GPU\n    static GPU_CONST: RefCell<HashMap<String, GpuT>> = RefCell::new(HashMap::new());\n    // buffer de leitura reaproveitado entre downloads (cresce até o maior tensor)\n    static GPU_STG: RefCell<Option<(u64, webgpu::GpuBuffer)>> = RefCell::new(None);\n}\n\nfn gpu_reg_put(request: u32, producer: u32, consumer: u32, t: GpuT) {\n    GPU_REG.with(|r| r.borrow_mut().entry((request, producer, consumer)).or_insert_with(VecDeque::new).push_back(t));\n}\n\nfn gpu_alloc(dev: &webgpu::GpuDevice, n: usize) -> GpuT {\n    let b = dev.create_buffer(&webgpu::GpuBufferDescriptor {\n        label: None,\n        size: (n.max(1) * 4) as u64,\n        usage: webgpu::GpuBufferUsage::STORAGE | webgpu::GpuBufferUsage::COPY_SRC | webgpu::GpuBufferUsage::COPY_DST,\n        mapped_at_creation: None,\n    });\n    GpuT { buf: Rc::new(b), len: n }\n}\n\nfn gpu_const(dev: &webgpu::GpuDevice, path: &str) -> GpuT {\n    if let Some(t) = GPU_CONST.with(|c| c.borrow().get(path).cloned()) {\n        return t;\n    }\n    let v = load_weights_file_cached(path);\n    let t = gpu_upload(dev, v.as_slice());\n    GPU_CONST.with(|c| c.borrow_mut().insert(path.to_string(), t.clone()));\n    t\n}\n\n/// out[i] = a[i] op b[i % len_b] (0 add, 1 sub, 2 mul, 3 div), len = len_a\nfn gpu_binop(dev: &webgpu::GpuDevice, op: u32, a: &GpuT, b: &GpuT) -> GpuT {\n    let r = opsgpu::binop_r(dev, op, a.len as u32, b.len as u32, &a.buf, &b.buf);\n    GpuT { buf: Rc::new(r), len: a.len }\n}\n\nfn gpu_join_put(request: u32, step: u32, origin: u32, t: GpuT) {\n    GPU_JOIN.with(|j| j.borrow_mut().entry((request, step)).or_insert_with(HashMap::new)\n        .entry(origin).or_insert_with(VecDeque::new).push_back(t));\n}\n\nfn gpu_join_has(request: u32, step: u32, origin: u32) -> bool {\n    GPU_JOIN.with(|j| j.borrow().get(&(request, step)).and_then(|m| m.get(&origin)).map(|q| !q.is_empty()).unwrap_or(false))\n}\n\nfn gpu_join_count(request: u32, step: u32) -> usize {\n    GPU_JOIN.with(|j| j.borrow().get(&(request, step)).map(|m| m.values().map(|q| q.len()).sum()).unwrap_or(0))\n}\n\nfn gpu_join_take(request: u32, step: u32, origin: u32) -> Option<GpuT> {\n    GPU_JOIN.with(|j| j.borrow_mut().get_mut(&(request, step)).and_then(|m| m.get_mut(&origin)).and_then(|q| q.pop_front()))\n}\n\n/// Junção por ordem de chegada (Mul tensor x tensor, igual ao braço de CPU).\nfn gpu_join_take_any(request: u32, step: u32) -> Option<GpuT> {\n    GPU_JOIN.with(|j| {\n        let mut j = j.borrow_mut();\n        let m = j.get_mut(&(request, step))?;\n        let t = m.values_mut().find(|q| !q.is_empty()).and_then(|q| q.pop_front());\n        if m.values().all(|q| q.is_empty()) {\n            j.remove(&(request, step));\n        }\n        t\n    })\n}\n\nfn gpu_join_clear(request: u32, step: u32) {\n    GPU_JOIN.with(|j| j.borrow_mut().remove(&(request, step)));\n}\n\n/// Junção por lhs_step/rhs_step (MatMul, Sub, Div): devolve (a, b) quando os\n/// dois ramos chegaram.\nfn gpu_join_pair(request: u32, step: u32, origin: u32, inp: &GpuT, lhs: u32, rhs: u32) -> Option<(GpuT, GpuT)> {\n    gpu_join_put(request, step, origin, inp.clone());\n    if gpu_join_has(request, step, lhs) && gpu_join_has(request, step, rhs) {\n        let a = gpu_join_take(request, step, lhs).unwrap();\n        let b = gpu_join_take(request, step, rhs).unwrap();\n        gpu_join_clear(request, step);\n        Some((a, b))\n    } else {\n        None\n    }\n}\n\nfn shape_u32(v: &[i64]) -> Vec<u32> {\n    v.iter().map(|&d| if d > 0 { d as u32 } else { 1 }).collect()\n}\n'
+_GPU_DOWNLOAD_OLD = 'fn gpu_download(dev: &webgpu::GpuDevice, t: &GpuT) -> Vec<f32> {\n    let n = t.len.max(1);\n    let stg = dev.create_buffer(&webgpu::GpuBufferDescriptor {\n        label: None,\n        size: (n * 4) as u64,\n        usage: webgpu::GpuBufferUsage::MAP_READ | webgpu::GpuBufferUsage::COPY_DST,\n        mapped_at_creation: None,\n    });\n    let enc = dev.create_command_encoder(None);\n    enc.copy_buffer_to_buffer(&t.buf, None, &stg, None, None);\n    dev.queue().submit(&[&enc.finish(None)]);\n    let bytes = sync_io::map_and_read_sync(&stg, webgpu::GpuMapMode::READ, Some(0), None)\n        .expect("map_and_read_sync falhou");\n'
+_GPU_DOWNLOAD_NEW = 'fn gpu_download(dev: &webgpu::GpuDevice, t: &GpuT) -> Vec<f32> {\n    // 10/11 (4c, parte 2): um staging só, reaproveitado (antes: um novo por\n    // download). O map_and_read_sync já desmapeia antes de voltar.\n    let nbytes = (t.len.max(1) * 4) as u64;\n    let bytes = GPU_STG.with(|s| {\n        let mut s = s.borrow_mut();\n        if s.as_ref().map(|(sz, _)| *sz < nbytes).unwrap_or(true) {\n            let b = dev.create_buffer(&webgpu::GpuBufferDescriptor {\n                label: Some("staging".to_string()),\n                size: nbytes,\n                usage: webgpu::GpuBufferUsage::MAP_READ | webgpu::GpuBufferUsage::COPY_DST,\n                mapped_at_creation: None,\n            });\n            *s = Some((nbytes, b));\n        }\n        let stg = &s.as_ref().unwrap().1;\n        let enc = dev.create_command_encoder(None);\n        enc.copy_buffer_to_buffer(&t.buf, Some(0), stg, Some(0), Some(nbytes));\n        dev.queue().submit(&[&enc.finish(None)]);\n        sync_io::map_and_read_sync(stg, webgpu::GpuMapMode::READ, Some(0), Some(nbytes))\n            .expect("map_and_read_sync falhou")\n    });\n'
+_REG_TAKE_OLD = 'fn gpu_reg_take(request: u32, producer: u32) -> Option<GpuT> {\n    GPU_REG.with(|r| {\n        let mut r = r.borrow_mut();\n        let key = (request, producer);\n        let (t, left) = r.get_mut(&key)?;\n        let out = t.clone();\n        *left -= 1;\n        if *left == 0 {\n            r.remove(&key);\n        }\n        Some(out)\n    })\n}\n'
+_REG_TAKE_NEW = 'fn gpu_reg_take(request: u32, producer: u32, consumer: u32) -> Option<GpuT> {\n    GPU_REG.with(|r| {\n        let mut r = r.borrow_mut();\n        let key = (request, producer, consumer);\n        let q = r.get_mut(&key)?;\n        let out = q.pop_front();\n        if q.is_empty() {\n            r.remove(&key);\n        }\n        out\n    })\n}\n'
+LANE_EXTRA_CODE.update({5: '                5 => {\n                    if !p.const_path.is_empty() {\n                        // Add com constante (decode do YOLO): agora também na GPU\n                        let c = gpu_const(&dev, &p.const_path);\n                        Some(gpu_binop(&dev, 0, &inp, &c))\n                    } else {\n                    // Junção do resíduo na GPU. O 1º ramo espera em GPU_ADD_JOIN\n                    // (ou já está no join de CPU, se chegou antes pela rede).\n                    let key = (request_id, current_step);\n                    let other = GPU_ADD_JOIN.with(|j| j.borrow_mut().remove(&key))\n                        .or_else(|| add_branches.remove(&current_step).map(|h| gpu_upload(&dev, &h)));\n                    match other {\n                        Some(o) => {\n                            let b = bindings::planner::addgpuworld::plan::add_r(&dev, inp.len as u32, &o.buf, &inp.buf);\n                            Some(GpuT { buf: Rc::new(b), len: inp.len })\n                        }\n                        None => {\n                            GPU_ADD_JOIN.with(|j| j.borrow_mut().insert(key, inp.clone()));\n                            None\n                        }\n                    }\n                    }\n                }', 10: '                10 => {\n                    let b = opsgpu::unary_r(&dev, 0, inp.len as u32, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: inp.len })\n                }', 12: '                12 => {\n                    let b = opsgpu::unary_r(&dev, 1, inp.len as u32, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: inp.len })\n                }', 11: '                11 => {\n                    if !p.const_path.is_empty() {\n                        let c = gpu_const(&dev, &p.const_path);\n                        Some(gpu_binop(&dev, 2, &inp, &c))\n                    } else {\n                        match gpu_join_take_any(request_id, current_step) {\n                            Some(first) => Some(gpu_binop(&dev, 2, &first, &inp)),\n                            None => {\n                                gpu_join_put(request_id, current_step, origin_step, inp.clone());\n                                None\n                            }\n                        }\n                    }\n                }', 13: '                13 => {\n                    if current_node.output_routes.is_empty() {\n                        panic!("Step {} (Split) sem output_routes — grafo desatualizado?", current_step);\n                    }\n                    let shape = shape_u32(&p.input_shape);\n                    let sizes: Vec<u32> = match &p.split {\n                        Some(s) => s.clone(),\n                        None => {\n                            let n = p.num_outputs.max(1);\n                            let total = *shape.get(p.axis as usize).unwrap_or(&0);\n                            assert_eq!(total % n, 0, "Split step {}: shape[axis]={} não divide igualmente em num_outputs={}", current_step, total, n);\n                            vec![total / n; n as usize]\n                        }\n                    };\n                    let ax = p.axis as usize;\n                    let outer: u32 = shape[..ax].iter().product();\n                    let inner: u32 = shape[ax + 1..].iter().product();\n                    let total_axis: u32 = sizes.iter().sum();\n                    let mut outs: Vec<GpuT> = Vec::new();\n                    let mut off = 0u32;\n                    for &sz in sizes.iter() {\n                        let chunk = sz * inner;\n                        let o = gpu_alloc(&dev, (outer * chunk) as usize);\n                        opsgpu::copy_strided(&dev, outer, chunk, total_axis * inner, off * inner, chunk, 0, &inp.buf, &o.buf);\n                        outs.push(o);\n                        off += sz;\n                    }\n                    {\n                        let log_linha = serde_json::json!({\n                            "request": request_id,\n                            "kernel_id": 13u8,\n                            "step": current_step,\n                            "layer_name": current_node.name,\n                            "dispatch": "gpu-resident-split",\n                            "output_routes": current_node.output_routes.iter().map(|r| (r.to_step, r.output_index)).collect::<Vec<_>>(),\n                            "input_len": inp.len,\n                            "timing_us": { "net_in": net_in_us, "deserialize": deserialize_us, "kernel_call": t_step.elapsed().as_micros() as u64 }\n                        });\n                        log_push(log_linha.to_string());\n                    }\n                    let resident = !gpu_resident_off();\n                    for route in current_node.output_routes.iter() {\n                        let t = outs.get(route.output_index as usize).unwrap_or_else(|| {\n                            panic!("Split step {}: output_routes aponta output_index {} mas há {} fatias", current_step, route.output_index, outs.len())\n                        }).clone();\n                        if resident && lane_eligible(graph, routing, input_img.model_id, route.to_step) {\n                            gpu_reg_put(request_id, current_step, route.to_step, t);\n                            queue.push_back((route.to_step, Vec::new(), current_step));\n                        } else {\n                            queue.push_back((route.to_step, gpu_download(&dev, &t), current_step));\n                        }\n                    }\n                    continue;\n                }', 14: '                14 => {\n                    if p.input_order.is_empty() {\n                        panic!("Step {} (Concat) sem input_order nos params — grafo desatualizado?", current_step);\n                    }\n                    if p.input_order.iter().any(|e| e.is_const) {\n                        panic!("Concat step {}: entrada constante no input_order ainda não é suportada", current_step);\n                    }\n                    gpu_join_put(request_id, current_step, origin_step, inp.clone());\n                    if gpu_join_count(request_id, current_step) < p.input_order.len() {\n                        None\n                    } else {\n                        let shapes: Vec<Vec<u32>> = p.input_order.iter().map(|e| shape_u32(&e.shape)).collect();\n                        let ax = p.axis as usize;\n                        let outer: u32 = shapes[0][..ax].iter().product();\n                        let inner: u32 = shapes[0][ax + 1..].iter().product();\n                        let total_axis: u32 = shapes.iter().map(|s| s[ax]).sum();\n                        let out = gpu_alloc(&dev, (outer * total_axis * inner) as usize);\n                        let mut run = 0u32;\n                        for (e, sh) in p.input_order.iter().zip(shapes.iter()) {\n                            let src_step = e.step.unwrap_or_else(|| panic!("Concat step {}: entrada sem step de origem", current_step));\n                            let src = gpu_join_take(request_id, current_step, src_step)\n                                .unwrap_or_else(|| panic!("Concat step {}: faltou o ramo do step {}", current_step, src_step));\n                            let chunk = sh[ax] * inner;\n                            opsgpu::copy_strided(&dev, outer, chunk, chunk, 0, total_axis * inner, run * inner, &src.buf, &out.buf);\n                            run += sh[ax];\n                        }\n                        gpu_join_clear(request_id, current_step);\n                        Some(out)\n                    }\n                }', 15: '                15 => Some(inp.clone()),', 16: '                16 => {\n                    let shape = shape_u32(&p.input_shape);\n                    let b = opsgpu::transpose_r(&dev, &shape, &p.perm, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: inp.len })\n                }', 17: '                17 => {\n                    let pair: Option<(GpuT, GpuT)> = if !p.lhs_const_path.is_empty() {\n                        Some((gpu_const(&dev, &p.lhs_const_path), inp.clone()))\n                    } else if !p.rhs_const_path.is_empty() {\n                        Some((inp.clone(), gpu_const(&dev, &p.rhs_const_path)))\n                    } else {\n                        let l = p.lhs_step.unwrap_or_else(|| panic!("Step {}: MatMul sem params.lhs_step — grafo desatualizado?", current_step));\n                        let r = p.rhs_step.unwrap_or_else(|| panic!("Step {}: MatMul sem params.rhs_step — grafo desatualizado?", current_step));\n                        if l == r {\n                            panic!("Step {}: MatMul com lhs_step == rhs_step ({}) não é suportado", current_step, l);\n                        }\n                        gpu_join_pair(request_id, current_step, origin_step, &inp, l, r)\n                    };\n                    match pair {\n                        Some((a, b)) => {\n                            let (buf, n) = opsgpu::matmul_r(&dev, &shape_u32(&p.lhs_shape), &shape_u32(&p.rhs_shape), &a.buf, &b.buf);\n                            Some(GpuT { buf: Rc::new(buf), len: n as usize })\n                        }\n                        None => None,\n                    }\n                }', 18: '                18 => {\n                    let (b, n) = opsgpu::resize_r(&dev, p.channels, p.h_in, p.w_in, p.scale_h, p.scale_w, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: n as usize })\n                }', 19: '                19 => {\n                    let shape = shape_u32(&p.input_shape);\n                    let starts: Vec<i32> = p.starts.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();\n                    let ends: Vec<i32> = p.ends.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();\n                    let steps: Vec<i32> = p.steps.iter().map(|&v| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32).collect();\n                    let (b, n) = opsgpu::slice_r(&dev, &shape, &starts, &ends, &p.axes, &steps, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: n as usize })\n                }', 22: '                22 => {\n                    let shape = shape_u32(&p.input_shape);\n                    let b = opsgpu::softmax_r(&dev, &shape, p.axis, &inp.buf);\n                    Some(GpuT { buf: Rc::new(b), len: inp.len })\n                }', 20: '                20 => {\n                    if !p.const_path.is_empty() {\n                        let c = gpu_const(&dev, &p.const_path);\n                        Some(if p.const_is_first { gpu_binop(&dev, 1, &c, &inp) } else { gpu_binop(&dev, 1, &inp, &c) })\n                    } else {\n                        match (p.lhs_step, p.rhs_step) {\n                            (Some(l), Some(r)) if l == r => Some(gpu_binop(&dev, 1, &inp, &inp)),\n                            (Some(l), Some(r)) => gpu_join_pair(request_id, current_step, origin_step, &inp, l, r)\n                                .map(|(a, b)| gpu_binop(&dev, 1, &a, &b)),\n                            _ => match gpu_join_take_any(request_id, current_step) {\n                                Some(first) => Some(gpu_binop(&dev, 1, &first, &inp)),\n                                None => {\n                                    gpu_join_put(request_id, current_step, origin_step, inp.clone());\n                                    None\n                                }\n                            },\n                        }\n                    }\n                }', 21: '                21 => {\n                    if !p.const_path.is_empty() {\n                        let c = gpu_const(&dev, &p.const_path);\n                        Some(if p.const_is_first { gpu_binop(&dev, 3, &c, &inp) } else { gpu_binop(&dev, 3, &inp, &c) })\n                    } else {\n                        match (p.lhs_step, p.rhs_step) {\n                            (Some(l), Some(r)) if l == r => Some(gpu_binop(&dev, 3, &inp, &inp)),\n                            (Some(l), Some(r)) => gpu_join_pair(request_id, current_step, origin_step, &inp, l, r)\n                                .map(|(a, b)| gpu_binop(&dev, 3, &a, &b)),\n                            _ => match gpu_join_take_any(request_id, current_step) {\n                                Some(first) => Some(gpu_binop(&dev, 3, &first, &inp)),\n                                None => {\n                                    gpu_join_put(request_id, current_step, origin_step, inp.clone());\n                                    None\n                                }\n                            },\n                        }\n                    }\n                }'})
+EXTRA_GPU[100] = {'name': 'opsgpu', 'wit_import': '    import planner:opsgpuworld/plan;', 'wkg_override': '"planner:opsgpuworld" = { path = "../../../kernel/ops_gpu/wit" }', 'wasm_path': '../../../kernel/ops_gpu/target/wasm32-wasip2/release/ops_gpu.wasm'}
+
+def _lane_sub(src, old, new):
+    assert src.count(old) == 1, ("4c-2: trecho não encontrado", old[:80])
+    return src.replace(old, new)
+
+GPU_LANE_HELPERS = _lane_sub(GPU_LANE_HELPERS,
+    "    static GPU_REG: RefCell<HashMap<(u32, u32), (GpuT, u32)>> = RefCell::new(HashMap::new());",
+    "    // (request, produtor, consumidor) -> tensores (FIFO)\n    static GPU_REG: RefCell<HashMap<(u32, u32, u32), VecDeque<GpuT>>> = RefCell::new(HashMap::new());")
+GPU_LANE_HELPERS = _lane_sub(GPU_LANE_HELPERS, _GPU_DOWNLOAD_OLD, _GPU_DOWNLOAD_NEW)
+GPU_LANE_HELPERS = _lane_sub(GPU_LANE_HELPERS, _REG_TAKE_OLD, _REG_TAKE_NEW)
+GPU_LANE_HELPERS = _lane_sub(GPU_LANE_HELPERS,
+    "    if node.kernel_type == 5 && !node.params.const_path.is_empty() {\n        return false; // Add com constante: CPU\n    }\n", "")
+GPU_LANE_HELPERS = _lane_sub(GPU_LANE_HELPERS,
+    "    if !LANE_KERNELS.contains(&node.kernel_type) || !LOCAL_KERNELS.contains(&node.kernel_type) {\n        return false;\n    }\n",
+    "    if !LANE_KERNELS.contains(&node.kernel_type) || !LOCAL_KERNELS.contains(&node.kernel_type) {\n        return false;\n    }\n"
+    "    if node.kernel_type == 14 && node.params.input_order.iter().any(|e| e.is_const) {\n        return false; // Concat com constante: CPU (que também não suporta)\n    }\n")
+GPU_LANE_HELPERS += _HELPERS_EXTRA
+
+GPU_LANE_BLOCK = _lane_sub(GPU_LANE_BLOCK, "let gpu_in = gpu_reg_take(request_id, origin_step);",
+    "let gpu_in = gpu_reg_take(request_id, origin_step, current_step);")
+GPU_LANE_BLOCK = _lane_sub(GPU_LANE_BLOCK,
+    "                    GPU_REG.with(|r| r.borrow_mut().insert((request_id, current_step), (out.clone(), on_gpu.len() as u32)));\n                    for nxt in on_gpu {\n                        queue.push_back((nxt, Vec::new(), current_step));",
+    "                    for nxt in on_gpu {\n                        gpu_reg_put(request_id, current_step, nxt, out.clone());\n                        queue.push_back((nxt, Vec::new(), current_step));")
+GPU_LANE_BLOCK = _lane_sub(GPU_LANE_BLOCK, "let Some(out) = out else { continue; }; // Add esperando o outro ramo",
+    "let Some(out) = out else { continue; }; // junção esperando os outros ramos")
+
+# Tipos leves que vão pela via quando ela existe (componente opsgpu).
+OPS_LANE = (10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22)
+# Com a via ativa, Sigmoid/Mul/SiLU/MatMul vão pelo opsgpu; os componentes
+# GPU antigos deles saem da composição (a variante de CPU fica como reserva).
+_LANE_FORCED = [False]
+
+
+def lane_plan(active_kernel_ids, variant_map):
+    """Quais tipos vão pela via residente neste grupo e quais componentes
+    extra (relu/add/ops na GPU) entram na composição."""
+    gpu_lane = [k for k in LANE_CODE if k in active_kernel_ids and variant_map.get(k) == "gpu"]
+    act = bool(gpu_lane) or _LANE_FORCED[0] or any(
+        variant_map.get(k) == "gpu" for k in (10, 11, 12, 17) if k in active_kernel_ids)
+    if not act:
+        return [], []
+    light = [k for k in (3, 5) if k in active_kernel_ids]
+    ops = [k for k in OPS_LANE if k in active_kernel_ids]
+    ident = [k for k in (7, 9) if k in active_kernel_ids]
+    extras = light + [100]
+    return sorted(set(gpu_lane + light + ops + ident)), extras
 
 def generate_local_kernels_const(active_kernel_ids):
     # Conhecido em build time: quais kernel_type estão embutidos NESTE wasm.
@@ -1035,11 +1215,18 @@ def get_rust_match(kernel_id, variant):
 
 
 # 2. GERADORES DE CONTEÚDO DOS ARQUIVOS
-def generate_world_wit(active_kernel_ids):
+def generate_world_wit(active_kernel_ids, variant_map=None):
     # O world.wit NUNCA menciona wasi:webgpu, mesmo com kernels GPU
     # selecionados — o wac propaga esse import automaticamente a partir do
     # .wasm plugado, não precisa ser declarado aqui.
     imports = "\n".join([KERNELS[k]["wit_import"] for k in active_kernel_ids])
+    # 10/11 (4c): com a via residente o grupo cria o device e lê/escreve
+    # buffers, então importa webgpu e sync-io diretamente (os mesmos nomes que
+    # os kernels importam; o wac unifica as instâncias na composição).
+    lane, extras = lane_plan(active_kernel_ids, variant_map or {})
+    if lane:
+        imports += "\n    import wasi:webgpu/webgpu@0.3.0-rc.2;\n    import wasi-gfx-runtime:wasi-webgpu/sync-io;"
+        imports += "".join("\n" + EXTRA_GPU[k]["wit_import"] for k in extras)
     return f"""package example:server;
 
 world runner {{
@@ -1054,6 +1241,9 @@ def generate_wkg_toml(active_kernel_ids, variant_map):
     for k in active_kernel_ids:
         variant = variant_map.get(k, "cpu")
         lines.append(KERNELS[k]["variants"][variant]["wkg_override"])
+    _lane, _extras = lane_plan(active_kernel_ids, variant_map)
+    for k in _extras:
+        lines.append(EXTRA_GPU[k]["wkg_override"])
     if any(v == "gpu" for v in variant_map.values()):
         lines.append(WASI_GFX_OVERRIDE)
     overrides = "\n".join(lines)
@@ -1066,9 +1256,17 @@ def generate_lib_rs(active_kernel_ids, variant_map):
     # active_kernel_ids também define LOCAL_KERNELS, usado só para rotular
     # o log (dispatch local/network) — não afeta o roteamento em si.
     first_kernel_mod = "convworld" if 1 in active_kernel_ids else None
+    # 10/11 (4c): o WIT GPU da via residente não usa o record data nas
+    # funções, e o wit-bindgen não gera tipos que nenhuma função usa. O WitData
+    # vem então do primeiro kernel que está em CPU neste grupo.
+    _cpu_ids = [k for k in active_kernel_ids if variant_map.get(k, "cpu") == "cpu"]
+    if first_kernel_mod is not None and variant_map.get(1) == "gpu":
+        first_kernel_mod = f"{KERNELS[_cpu_ids[0]]['name']}world" if _cpu_ids else None
+        if first_kernel_mod is None:
+            raise SystemExit("[ERRO] 4c: grupo só com kernels GPU — inclua ao menos um kernel de CPU (ex.: 3 ou 7)")
     if first_kernel_mod is None:
-        # WitData precisa de um módulo real; usa o primeiro kernel ativo.
-        first_id = active_kernel_ids[0]
+        # WitData precisa de um módulo real; usa o primeiro kernel ativo de CPU.
+        first_id = (_cpu_ids or active_kernel_ids)[0]
         first_kernel_mod = f"{KERNELS[first_id]['name']}world"
 
     match_arms = "\n".join(
@@ -1076,11 +1274,24 @@ def generate_lib_rs(active_kernel_ids, variant_map):
     )
 
     local_kernels_const = generate_local_kernels_const(active_kernel_ids)
+    lane_ids, _lane_extras = lane_plan(active_kernel_ids, variant_map)
+    lane_const = "const LANE_KERNELS: &[u8] = &[" + ", ".join(str(k) for k in lane_ids) + "];"
+    lane_arms = "\n".join((LANE_CODE.get(k) or LANE_EXTRA_CODE[k]) for k in lane_ids)
+    lane_helpers = GPU_LANE_HELPERS if lane_ids else ""
+    lane_block = (GPU_LANE_BLOCK.replace("@@LANE_ARMS@@", lane_arms)) if lane_ids else ""
     # Só declara o estado de controle do Gemm GPU se ele de fato estiver
     # presente neste nó — evita código morto/não-usado nos outros casos.
     gemm_gpu_state = ""
+    # 09/11 (4a): conjunto de (tipo:weight-id) já enviados aos kernels GPU de
+    # Conv/BN/ConvBN/ConvBNReLU neste processo (o gemm tem o seu próprio).
+    if any(variant_map.get(k) == "gpu" for k in (1, 2, 8, 23, 24) if k in active_kernel_ids):
+        gemm_gpu_state += (
+            "thread_local! {\n"
+            "    static GPU_W_LOADED: RefCell<std::collections::HashSet<String>> = RefCell::new(std::collections::HashSet::new());\n"
+            "}\n"
+        )
     if 8 in active_kernel_ids and variant_map.get(8) == "gpu":
-        gemm_gpu_state = (
+        gemm_gpu_state += (
             "thread_local! {\n"
             "    // Controla quais weight_id (= weight_path) já foram enviados\n"
             "    // ao kernel GPU via gemm_load_weights neste processo. Evita\n"
@@ -1144,8 +1355,33 @@ fn flush_logs() {{
 // Mensagens sem o "WOF1" (versão antiga) continuam sendo aceitas.
 const WIRE_MAGIC: &[u8; 4] = b"WOF1";
 
+// 10/11 (4c): espelho do Data só para o serde (mesmos campos e ordem — os
+// bytes na rede não mudam). O grupo agora importa wasi:webgpu, cujos tipos
+// têm recursos e não podem derivar Serialize, então o additional_derives saiu.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct WireMeta {{
+    input: Vec<f32>,
+    output: Vec<f32>,
+    reply_to: String,
+    kernels: Vec<u8>,
+    current_kernel: u32,
+    request: u32,
+    from_step: u32,
+    model_id: u32,
+}}
+
+fn to_wire(m: &WitData) -> WireMeta {{
+    WireMeta {{ input: m.input.clone(), output: m.output.clone(), reply_to: m.reply_to.clone(), kernels: m.kernels.clone(),
+        current_kernel: m.current_kernel, request: m.request, from_step: m.from_step, model_id: m.model_id }}
+}}
+
+fn from_wire(w: WireMeta) -> WitData {{
+    WitData {{ input: w.input, output: w.output, reply_to: w.reply_to, kernels: w.kernels,
+        current_kernel: w.current_kernel, request: w.request, from_step: w.from_step, model_id: w.model_id }}
+}}
+
 fn encode_frame(meta: &WitData, tensor: &[f32]) -> Vec<u8> {{
-    let meta_bytes = rmp_serde::to_vec(meta).expect("Erro ao serializar metadados");
+    let meta_bytes = rmp_serde::to_vec(&to_wire(meta)).expect("Erro ao serializar metadados");
     let raw: &[u8] = unsafe {{ std::slice::from_raw_parts(tensor.as_ptr() as *const u8, tensor.len() * 4) }};
     let mut out = Vec::with_capacity(8 + meta_bytes.len() + raw.len());
     out.extend_from_slice(WIRE_MAGIC);
@@ -1158,7 +1394,7 @@ fn encode_frame(meta: &WitData, tensor: &[f32]) -> Vec<u8> {{
 fn decode_frame(buf: &[u8]) -> WitData {{
     if buf.len() >= 8 && &buf[0..4] == WIRE_MAGIC {{
         let meta_len = u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]) as usize;
-        let mut meta: WitData = rmp_serde::from_slice(&buf[8..8 + meta_len]).expect("Falha ao desserializar metadados");
+        let mut meta: WitData = from_wire(rmp_serde::from_slice(&buf[8..8 + meta_len]).expect("Falha ao desserializar metadados"));
         let raw = &buf[8 + meta_len..];
         assert!(raw.len() % 4 == 0, "tensor com {{}} bytes, não é múltiplo de 4", raw.len());
         let n = raw.len() / 4;
@@ -1167,7 +1403,7 @@ fn decode_frame(buf: &[u8]) -> WitData {{
         meta.input = v;
         meta
     }} else {{
-        rmp_serde::from_slice(buf).expect("Failed to deserialize MessagePack response")
+        from_wire(rmp_serde::from_slice(buf).expect("Failed to deserialize MessagePack response"))
     }}
 }}
 
@@ -1190,6 +1426,9 @@ fn read_json_file<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, Strin
 {gemm_gpu_state}
 
 type WitData = bindings::planner::{first_kernel_mod}::plan::Data;
+
+{lane_const}
+{lane_helpers}
 
 thread_local! {{
     // Cache de pesos/bias já lidos do disco, chaveado pelo path do arquivo.
@@ -1220,10 +1459,6 @@ mod bindings {{
     use super::Component;
     wit_bindgen::generate!({{
         generate_all,
-        additional_derives: [
-            serde::Deserialize,
-            serde::Serialize,
-        ],
     }});
     export!(Component);
 }}
@@ -1235,6 +1470,139 @@ struct RoutingTable {{
     table: std::collections::HashMap<u8, String>,
     node_scores: std::collections::HashMap<u8, f32>,
     assignments: HashMap<u8, Vec<u8>>,
+    // 09/11: corte por camada. Por modelo (chave = model_id em texto), faixas
+    // de passos e o nó que as executa. Tem prioridade sobre `table` (rota por
+    // tipo); passo fora de qualquer faixa, ou modelo sem entrada, continua
+    // na rota por tipo, como antes.
+    #[serde(default)]
+    step_routes: HashMap<String, Vec<StepRange>>,
+}}
+
+#[derive(Deserialize, Debug, Clone)]
+struct StepRange {{
+    de: u32,
+    ate: u32,
+    no: String,
+}}
+
+// 09/11: endereço público deste grupo (o mesmo que o sys escreve na tabela:
+// ip do nó + porta da caixa de entrada = porta interna − 10000). Usado para
+// saber se uma faixa de step_routes é "minha" (executa aqui) ou de outro nó.
+thread_local! {{
+    static SELF_ADDR: RefCell<String> = RefCell::new(String::new());
+}}
+
+/// Destino REMOTO de um passo pela rota por camada: Some(endereço) só quando
+/// o passo cai numa faixa de step_routes do modelo e essa faixa é de outro
+/// grupo. None = sem faixa (vale a rota por tipo) ou a faixa é deste grupo.
+fn step_route_dest(routing: &RoutingTable, model_id: u32, step: u32) -> Option<String> {{
+    let ranges = routing.step_routes.get(&model_id.to_string())?;
+    let r = ranges.iter().find(|r| r.de <= step && step <= r.ate)?;
+    let is_self = SELF_ADDR.with(|a| *a.borrow() == r.no);
+    if is_self {{ None }} else {{ Some(r.no.clone()) }}
+}}
+
+/// Para onde um passo iria por rede (rota por camada ou, sem ela, por tipo
+/// quando o kernel não está neste binário). None = executa aqui.
+fn remote_dest_for(routing: &RoutingTable, graph: &ModelGraph, model_id: u32, step: u32) -> Option<String> {{
+    if let Some(d) = step_route_dest(routing, model_id, step) {{
+        return Some(d);
+    }}
+    let kt = graph.steps.iter().find(|s| s.step == step)?.kernel_type;
+    if LOCAL_KERNELS.contains(&kt) {{ None }} else {{ routing.table.get(&kt).cloned() }}
+}}
+
+// Passos extras de um envio agrupado: u32 LE em sequência no campo `kernels`
+// (que não era usado). Um tensor que vai para 2+ passos no mesmo nó (ramo
+// residual) atravessa a rede uma vez só.
+// 09/11 (item 3): CAIXA DE SAÍDA. Conexões de saída persistentes, uma por
+// destino, reaproveitadas entre saltos e entre requisições. Antes: conexão
+// TCP nova a cada salto (handshake + slow start + espera do fechamento =
+// ~6,9 RTTs por salto). Agora: escreve o quadro numa conexão já aberta e
+// espera 1 byte de ack da caixa de entrada (~1 RTT + bytes/banda).
+// Protocolo compatível: a caixa de entrada nova responde 1 byte e continua
+// lendo; um destino antigo (ou um grupo sem caixa de entrada) fecha a
+// conexão — aí a leitura do ack devolve 0 e a conexão sai do cache (o envio
+// valeu, só não é reaproveitada).
+// Desligar (para medir antes × depois, ao vivo, sem recompilar): criar o
+// arquivo `outbox_off` no diretório do sys (sys_test/). O runtime não repassa
+// variáveis de ambiente ao componente, por isso é arquivo e não variável.
+thread_local! {{
+    static OUTBOX: RefCell<HashMap<String, TcpStream>> = RefCell::new(HashMap::new());
+}}
+
+fn outbox_enabled() -> bool {{
+    !std::path::Path::new("outbox_off").exists()
+}}
+
+struct SendStats {{
+    connect_us: u64,
+    write_us: u64,
+    ack_us: u64,
+    reused: bool,
+    retried: bool,
+}}
+
+/// Escreve o quadro inteiro numa chamada só (tamanho + conteúdo) e espera o ack.
+fn write_and_ack(stream: &mut TcpStream, frame: &[u8]) -> std::io::Result<(u64, u64, usize)> {{
+    let t_w = Instant::now();
+    stream.write_all(frame)?;
+    stream.flush()?;
+    let write_us = t_w.elapsed().as_micros() as u64;
+    let t_a = Instant::now();
+    let mut ack = [0u8; 1];
+    let n = loop {{
+        match stream.read(&mut ack) {{
+            Ok(n) => break n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        }}
+    }};
+    Ok((write_us, t_a.elapsed().as_micros() as u64, n))
+}}
+
+/// Envia `frame` (já com o u32 BE do tamanho na frente) para `addr`.
+fn send_frame(addr: &str, frame: &[u8]) -> std::io::Result<SendStats> {{
+    let use_cache = outbox_enabled();
+    // 1ª tentativa: conexão do cache, se houver.
+    if use_cache {{
+        let cached = OUTBOX.with(|o| o.borrow_mut().remove(addr));
+        if let Some(mut s) = cached {{
+            match write_and_ack(&mut s, frame) {{
+                Ok((write_us, ack_us, 1)) => {{
+                    OUTBOX.with(|o| o.borrow_mut().insert(addr.to_string(), s));
+                    return Ok(SendStats {{ connect_us: 0, write_us, ack_us, reused: true, retried: false }});
+                }}
+                // 0 bytes ou erro numa conexão reaproveitada: o outro lado
+                // fechou (reinício da caixa de entrada). Reenvia numa nova.
+                _ => {{}}
+            }}
+            return send_new(addr, frame, use_cache, true);
+        }}
+    }}
+    send_new(addr, frame, use_cache, false)
+}}
+
+fn send_new(addr: &str, frame: &[u8], use_cache: bool, retried: bool) -> std::io::Result<SendStats> {{
+    let t_c = Instant::now();
+    let mut s = TcpStream::connect(addr)?;
+    let _ = s.set_nodelay(true); // pode não existir no WASI; o quadro vai numa escrita só
+    let connect_us = t_c.elapsed().as_micros() as u64;
+    let (write_us, ack_us, n) = write_and_ack(&mut s, frame)?;
+    if use_cache && n == 1 {{
+        OUTBOX.with(|o| o.borrow_mut().insert(addr.to_string(), s));
+    }}
+    Ok(SendStats {{ connect_us, write_us, ack_us, reused: false, retried }})
+}}
+
+fn encode_extra_steps(steps: &[u32]) -> Vec<u8> {{
+    let mut v = Vec::with_capacity(steps.len() * 4);
+    for s in steps {{ v.extend_from_slice(&s.to_le_bytes()); }}
+    v
+}}
+
+fn decode_extra_steps(bytes: &[u8]) -> Vec<u32> {{
+    bytes.chunks_exact(4).map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect()
 }}
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -1566,6 +1934,11 @@ fn handle_client(
             mut div_slots,
         }} = pending_joins.remove(&input_img.request).unwrap_or_default();
 
+        // 09/11: envio agrupado — o mesmo tensor também alimenta os passos
+        // extras listados em `kernels` (mesma origem).
+        for extra in decode_extra_steps(&input_img.kernels) {{
+            queue.push_back((extra, input_img.input.clone(), input_img.from_step));
+        }}
         // A4: move o tensor recebido em vez de copiar.
         queue.push_back((input_img.current_kernel, std::mem::take(&mut input_img.input), input_img.from_step));
 
@@ -1575,7 +1948,7 @@ fn handle_client(
         let reply_to = input_img.reply_to.clone();
         let request_id = input_img.request;
 
-        while let Some((current_step, current_input, origin_step)) = queue.pop_front() {{
+        while let Some((current_step, mut current_input, origin_step)) = queue.pop_front() {{
             let current_node = graph.steps.iter().find(|s| s.step == current_step)
                 .unwrap_or_else(|| panic!("Step {{}} não encontrado no grafo", current_step));
 
@@ -1591,17 +1964,47 @@ fn handle_client(
             // reescrever os 9 rust_match do catálogo KERNELS individualmente.
             let t_step = Instant::now(); // [T]
 
-            match current_node.kernel_type {{
+            // 09/11: rota por camada primeiro. Se o passo é de outro nó, vai
+            // pro braço de rede mesmo que o kernel exista aqui (tipo 0 não
+            // existe no catálogo, então cai no `_`).
+            let step_dest = step_route_dest(routing, input_img.model_id, current_step);
+            let dispatch_kt: u8 = if step_dest.is_some() {{ 0 }} else {{ current_node.kernel_type }};
+{lane_block}
+
+            match dispatch_kt {{
 {match_arms}
                 _ => {{
-                    // Kernel não incluído neste binário: despacha por rede.
+                    // Kernel não incluído neste binário (ou passo de outro nó
+                    // pela rota por camada): despacha por rede.
                     let t_route = Instant::now(); // [T]
-                    let target_address = routing.table.get(&current_node.kernel_type)
-                        .cloned()
-                        .unwrap_or_else(|| panic!(
-                            "Kernel tipo {{}} não está neste nó nem na routing_table",
-                            current_node.kernel_type
-                        ));
+                    let route_kind = if step_dest.is_some() {{ "step" }} else {{ "type" }};
+                    let target_address = match &step_dest {{
+                        Some(d) => d.clone(),
+                        None => routing.table.get(&current_node.kernel_type)
+                            .cloned()
+                            .unwrap_or_else(|| panic!(
+                                "Kernel tipo {{}} não está neste nó nem na routing_table",
+                                current_node.kernel_type
+                            )),
+                    }};
+
+                    // 09/11: outros passos na fila com o MESMO tensor (mesma
+                    // origem) e o MESMO destino vão juntos neste envio.
+                    let mut merged_steps: Vec<u32> = Vec::new();
+                    let mut i_q = 0;
+                    while i_q < queue.len() {{
+                        let same = {{
+                            let (s2, t2, o2) = &queue[i_q];
+                            *o2 == origin_step && t2.len() == current_input.len() && *t2 == current_input
+                                && remote_dest_for(routing, graph, input_img.model_id, *s2).as_deref() == Some(target_address.as_str())
+                        }};
+                        if same {{
+                            let (s2, _, _) = queue.remove(i_q).unwrap();
+                            merged_steps.push(s2);
+                        }} else {{
+                            i_q += 1;
+                        }}
+                    }}
 
                     vprintln!(
                         "Step {{}} (tipo {{}}) não está neste nó — despachando para {{}}...",
@@ -1614,31 +2017,25 @@ fn handle_client(
                         reply_to: reply_to.clone(),
                         current_kernel: current_step,
                         request: request_id,
-                        kernels: vec![],
+                        kernels: encode_extra_steps(&merged_steps),
                         from_step: origin_step,
                         model_id: input_img.model_id,
                     }};
 
                     let t_ser = Instant::now(); // [T]
                     let response_payload = encode_frame(&payload_data, &current_input);
+                    // Quadro completo (u32 BE + conteúdo) para uma escrita só.
+                    let mut frame = Vec::with_capacity(4 + response_payload.len());
+                    frame.extend_from_slice(&(response_payload.len() as u32).to_be_bytes());
+                    frame.extend_from_slice(&response_payload);
+                    drop(response_payload);
                     let serialize_us = t_ser.elapsed().as_micros() as u64; // [T]
-                    let sent_bytes = response_payload.len(); // [T]
+                    let sent_bytes = frame.len() - 4; // [T]
 
-                    let t_conn = Instant::now(); // [T]
-                    let mut next_stream = TcpStream::connect(&target_address)?;
-                    let connect_us = t_conn.elapsed().as_micros() as u64; // [T]
-
-                    let resp_len = response_payload.len() as u32;
-                    let t_write = Instant::now(); // [T]
-                    next_stream.write_all(&resp_len.to_be_bytes())?;
-                    next_stream.write_all(&response_payload)?;
-                    next_stream.flush()?;
-                    let write_us = t_write.elapsed().as_micros() as u64; // [T]
-
-                    let t_ack = Instant::now(); // [T]
-                    let mut ack_buf = [0u8; 1];
-                    let _ = next_stream.read(&mut ack_buf);
-                    let ack_wait_us = t_ack.elapsed().as_micros() as u64; // [T]
+                    let st = send_frame(&target_address, &frame)?;
+                    let connect_us = st.connect_us; // [T]
+                    let write_us = st.write_us; // [T]
+                    let ack_wait_us = st.ack_us; // [T]
 
                     let step_total_us = t_step.elapsed().as_micros() as u64; // [T]
 
@@ -1653,8 +2050,13 @@ fn handle_client(
                             "call_idx": call_idx,
                             "ts_unix_ms": ts_unix_ms,
                             "dispatch": "network",
+                            "route": route_kind,
+                            "dest": target_address,
+                            "merged_steps": merged_steps,
                             "input_len": input_len,
                             "sent_bytes": sent_bytes,
+                            "conn_reused": st.reused,
+                            "conn_retried": st.retried,
                             "timing_us": {{
                                 "net_in": net_in_us,
                                 "deserialize": deserialize_us,
@@ -1768,6 +2170,9 @@ impl bindings::exports::wasi::cli::run::Guest for Component {{
         let ip = args.get(2).map(|s| s.as_str()).unwrap_or("0.0.0.0");
         let bind_addr = format!("{{}}:{{}}", ip, port);
         let listener = TcpListener::bind(&bind_addr).expect(&format!("Não conseguiu abrir a porta {{}}", port));
+        // 09/11: endereço público = o da caixa de entrada (porta interna − 10000).
+        let public_port: u32 = port.parse::<u32>().map(|p| if p >= 20000 {{ p - 10000 }} else {{ p }}).unwrap_or(0);
+        SELF_ADDR.with(|a| *a.borrow_mut() = format!("{{}}:{{}}", ip, public_port));
 
         // Grafos de TODOS os modelos cadastrados em models.json, carregados
         // uma vez no boot do processo (antes: um único "resnet18DFG.json"
@@ -1820,7 +2225,7 @@ def main():
 
     for k in kernel_ids:
         if k not in KERNELS:
-            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: 1 a 21, 22.")
+            print(f"[ERRO] Kernel ID {k} inválido. Disponíveis: {sorted(KERNELS)}.")
             sys.exit(1)
 
     for k in gpu_ids:
@@ -1834,6 +2239,12 @@ def main():
             sys.exit(1)
 
     variant_map = {k: ("gpu" if k in gpu_ids else "cpu") for k in kernel_ids}
+    # 10/11 (4c, parte 2): com a via residente, os leves vão pelo opsgpu.
+    if lane_plan(kernel_ids, variant_map)[0]:
+        _LANE_FORCED[0] = True
+        for _k in (10, 11, 12, 17):
+            if variant_map.get(_k) == "gpu":
+                variant_map[_k] = "cpu"
 
     print(f"[*] Kernels incluídos neste nó: {kernel_ids}")
     print(f"[*] Variantes: {variant_map}")
@@ -1846,7 +2257,7 @@ def main():
     os.makedirs(src_dir, exist_ok=True)
 
     with open(os.path.join(wit_dir, "world.wit"), "w") as f:
-        f.write(generate_world_wit(kernel_ids))
+        f.write(generate_world_wit(kernel_ids, variant_map))
     print(" -> wit/world.wit gerado.")
 
     with open(os.path.join(comp_dir, "wkg.toml"), "w") as f:
@@ -1888,22 +2299,26 @@ def main():
     temp_wasm = current_wasm
     temp_files = []
 
-    for idx, k in enumerate(kernel_ids):
-        variant = variant_map[k]
-        k_meta = KERNELS[k]["variants"][variant]
-        k_wasm_path = os.path.normpath(os.path.join(comp_dir, k_meta["wasm_path"]))
+    # 10/11 (4c): relu/add na GPU entram como componentes extra (a versão de
+    # CPU continua no grupo para os casos que não vão pela via residente).
+    _lane, _extras = lane_plan(kernel_ids, variant_map)
+    plug_list = [(k, KERNELS[k]["variants"][variant_map[k]]["wasm_path"], KERNELS[k]["name"], variant_map[k]) for k in kernel_ids]
+    plug_list += [(k, EXTRA_GPU[k]["wasm_path"], EXTRA_GPU[k]["name"], "gpu") for k in _extras]
+
+    for idx, (k, k_rel, k_name, variant) in enumerate(plug_list):
+        k_wasm_path = os.path.normpath(os.path.join(comp_dir, k_rel))
 
         if not os.path.exists(k_wasm_path):
-            print(f"[ERRO] Binário do kernel {KERNELS[k]['name']} ({variant}) não encontrado em: {k_wasm_path}")
+            print(f"[ERRO] Binário do kernel {k_name} ({variant}) não encontrado em: {k_wasm_path}")
             sys.exit(1)
 
-        if idx == len(kernel_ids) - 1:
+        if idx == len(plug_list) - 1:
             out_step = os.path.abspath(args.output)
         else:
             out_step = os.path.join(comp_dir, f"temp_plug_{idx}.wasm")
             temp_files.append(out_step)
 
-        print(f" -> Plugando Kernel {k} ({KERNELS[k]['name']}, {variant})...")
+        print(f" -> Plugando Kernel {k} ({k_name}, {variant})...")
         cmd_wac = ["wac", "plug", temp_wasm, "--plug", k_wasm_path, "-o", out_step]
         res = subprocess.run(cmd_wac)
         if res.returncode != 0:

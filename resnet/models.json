@@ -75,5 +75,59 @@
       7,
       8
     ]
+  },
+  "6": {
+    "name": "resnet18-v1-7-fused",
+    "dfg_path": "sys_test/resnet18_fused.json",
+    "kernels": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      23,
+      24
+    ]
+  },
+  "7": {
+    "name": "resnet34-v1-7-fused",
+    "dfg_path": "sys_test/resnet34_fused.json",
+    "kernels": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      23,
+      24
+    ]
+  },
+  "8": {
+    "name": "resnet50-v1-7-fused",
+    "dfg_path": "sys_test/resnet50_fused.json",
+    "kernels": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      23,
+      24
+    ]
+  },
+  "9": {
+    "name": "vgg16-bn-7-fused",
+    "dfg_path": "sys_test/vgg16_fused.json",
+    "kernels": [
+      3,
+      4,
+      7,
+      8,
+      9,
+      24
+    ]
   }
 }

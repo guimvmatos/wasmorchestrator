@@ -1,0 +1,596 @@
+{
+  "model": "vgg16-bn-7-fused",
+  "steps": [
+    {
+      "step": 1,
+      "name": "vgg0_relu0_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv0_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv0_bias.bin",
+        "cout": 64,
+        "cin": 3,
+        "groups": 1,
+        "h_in": 224,
+        "w_in": 224,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm0_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm0_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm0_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm0_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv0_fwd",
+          "vgg0_batchnorm0_fwd",
+          "vgg0_relu0_fwd"
+        ]
+      },
+      "next_steps": [
+        2
+      ]
+    },
+    {
+      "step": 2,
+      "name": "vgg0_relu1_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv1_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv1_bias.bin",
+        "cout": 64,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 224,
+        "w_in": 224,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm1_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm1_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm1_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm1_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv1_fwd",
+          "vgg0_batchnorm1_fwd",
+          "vgg0_relu1_fwd"
+        ]
+      },
+      "next_steps": [
+        3
+      ]
+    },
+    {
+      "step": 3,
+      "name": "vgg0_pool0_fwd",
+      "kernel_type": 4,
+      "params": {
+        "channels": 64,
+        "h_in": 224,
+        "w_in": 224,
+        "kh": 2,
+        "kw": 2,
+        "stride": 2,
+        "padding": 0
+      },
+      "next_steps": [
+        4
+      ]
+    },
+    {
+      "step": 4,
+      "name": "vgg0_relu2_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv2_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv2_bias.bin",
+        "cout": 128,
+        "cin": 64,
+        "groups": 1,
+        "h_in": 112,
+        "w_in": 112,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm2_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm2_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm2_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm2_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv2_fwd",
+          "vgg0_batchnorm2_fwd",
+          "vgg0_relu2_fwd"
+        ]
+      },
+      "next_steps": [
+        5
+      ]
+    },
+    {
+      "step": 5,
+      "name": "vgg0_relu3_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv3_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv3_bias.bin",
+        "cout": 128,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 112,
+        "w_in": 112,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm3_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm3_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm3_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm3_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv3_fwd",
+          "vgg0_batchnorm3_fwd",
+          "vgg0_relu3_fwd"
+        ]
+      },
+      "next_steps": [
+        6
+      ]
+    },
+    {
+      "step": 6,
+      "name": "vgg0_pool1_fwd",
+      "kernel_type": 4,
+      "params": {
+        "channels": 128,
+        "h_in": 112,
+        "w_in": 112,
+        "kh": 2,
+        "kw": 2,
+        "stride": 2,
+        "padding": 0
+      },
+      "next_steps": [
+        7
+      ]
+    },
+    {
+      "step": 7,
+      "name": "vgg0_relu4_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv4_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv4_bias.bin",
+        "cout": 256,
+        "cin": 128,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm4_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm4_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm4_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm4_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv4_fwd",
+          "vgg0_batchnorm4_fwd",
+          "vgg0_relu4_fwd"
+        ]
+      },
+      "next_steps": [
+        8
+      ]
+    },
+    {
+      "step": 8,
+      "name": "vgg0_relu5_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv5_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv5_bias.bin",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm5_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm5_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm5_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm5_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv5_fwd",
+          "vgg0_batchnorm5_fwd",
+          "vgg0_relu5_fwd"
+        ]
+      },
+      "next_steps": [
+        9
+      ]
+    },
+    {
+      "step": 9,
+      "name": "vgg0_relu6_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv6_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv6_bias.bin",
+        "cout": 256,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm6_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm6_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm6_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm6_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv6_fwd",
+          "vgg0_batchnorm6_fwd",
+          "vgg0_relu6_fwd"
+        ]
+      },
+      "next_steps": [
+        10
+      ]
+    },
+    {
+      "step": 10,
+      "name": "vgg0_pool2_fwd",
+      "kernel_type": 4,
+      "params": {
+        "channels": 256,
+        "h_in": 56,
+        "w_in": 56,
+        "kh": 2,
+        "kw": 2,
+        "stride": 2,
+        "padding": 0
+      },
+      "next_steps": [
+        11
+      ]
+    },
+    {
+      "step": 11,
+      "name": "vgg0_relu7_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv7_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv7_bias.bin",
+        "cout": 512,
+        "cin": 256,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm7_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm7_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm7_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm7_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv7_fwd",
+          "vgg0_batchnorm7_fwd",
+          "vgg0_relu7_fwd"
+        ]
+      },
+      "next_steps": [
+        12
+      ]
+    },
+    {
+      "step": 12,
+      "name": "vgg0_relu8_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv8_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv8_bias.bin",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm8_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm8_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm8_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm8_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv8_fwd",
+          "vgg0_batchnorm8_fwd",
+          "vgg0_relu8_fwd"
+        ]
+      },
+      "next_steps": [
+        13
+      ]
+    },
+    {
+      "step": 13,
+      "name": "vgg0_relu9_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv9_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv9_bias.bin",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm9_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm9_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm9_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm9_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv9_fwd",
+          "vgg0_batchnorm9_fwd",
+          "vgg0_relu9_fwd"
+        ]
+      },
+      "next_steps": [
+        14
+      ]
+    },
+    {
+      "step": 14,
+      "name": "vgg0_pool3_fwd",
+      "kernel_type": 4,
+      "params": {
+        "channels": 512,
+        "h_in": 28,
+        "w_in": 28,
+        "kh": 2,
+        "kw": 2,
+        "stride": 2,
+        "padding": 0
+      },
+      "next_steps": [
+        15
+      ]
+    },
+    {
+      "step": 15,
+      "name": "vgg0_relu10_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv10_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv10_bias.bin",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm10_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm10_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm10_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm10_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv10_fwd",
+          "vgg0_batchnorm10_fwd",
+          "vgg0_relu10_fwd"
+        ]
+      },
+      "next_steps": [
+        16
+      ]
+    },
+    {
+      "step": 16,
+      "name": "vgg0_relu11_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv11_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv11_bias.bin",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm11_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm11_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm11_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm11_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv11_fwd",
+          "vgg0_batchnorm11_fwd",
+          "vgg0_relu11_fwd"
+        ]
+      },
+      "next_steps": [
+        17
+      ]
+    },
+    {
+      "step": 17,
+      "name": "vgg0_relu12_fwd",
+      "kernel_type": 24,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_conv12_weight.bin",
+        "bias_path": "../bin_weights/vgg0_conv12_bias.bin",
+        "cout": 512,
+        "cin": 512,
+        "groups": 1,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 3,
+        "kw": 3,
+        "stride": 1,
+        "padding": 1,
+        "scale_path": "../bin_weights/vgg0_batchnorm12_gamma.bin",
+        "beta_path": "../bin_weights/vgg0_batchnorm12_beta.bin",
+        "mean_path": "../bin_weights/vgg0_batchnorm12_running_mean.bin",
+        "var_path": "../bin_weights/vgg0_batchnorm12_running_var.bin",
+        "epsilon": 9.999999747378752e-06,
+        "fused_layers": [
+          "vgg0_conv12_fwd",
+          "vgg0_batchnorm12_fwd",
+          "vgg0_relu12_fwd"
+        ]
+      },
+      "next_steps": [
+        18
+      ]
+    },
+    {
+      "step": 18,
+      "name": "vgg0_pool4_fwd",
+      "kernel_type": 4,
+      "params": {
+        "channels": 512,
+        "h_in": 14,
+        "w_in": 14,
+        "kh": 2,
+        "kw": 2,
+        "stride": 2,
+        "padding": 0
+      },
+      "next_steps": [
+        19
+      ]
+    },
+    {
+      "step": 19,
+      "name": "flatten_125",
+      "kernel_type": 7,
+      "params": {},
+      "next_steps": [
+        20
+      ]
+    },
+    {
+      "step": 20,
+      "name": "vgg0_dense0_fwd",
+      "kernel_type": 8,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_dense0_weight.bin",
+        "bias_path": "../bin_weights/vgg0_dense0_bias.bin",
+        "in_features": 25088,
+        "out_features": 4096
+      },
+      "next_steps": [
+        21
+      ]
+    },
+    {
+      "step": 21,
+      "name": "vgg0_dense0_relu_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        22
+      ]
+    },
+    {
+      "step": 22,
+      "name": "vgg0_dropout0_fwd",
+      "kernel_type": 9,
+      "params": {},
+      "next_steps": [
+        23
+      ]
+    },
+    {
+      "step": 23,
+      "name": "flatten_130",
+      "kernel_type": 7,
+      "params": {},
+      "next_steps": [
+        24
+      ]
+    },
+    {
+      "step": 24,
+      "name": "vgg0_dense1_fwd",
+      "kernel_type": 8,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_dense1_weight.bin",
+        "bias_path": "../bin_weights/vgg0_dense1_bias.bin",
+        "in_features": 4096,
+        "out_features": 4096
+      },
+      "next_steps": [
+        25
+      ]
+    },
+    {
+      "step": 25,
+      "name": "vgg0_dense1_relu_fwd",
+      "kernel_type": 3,
+      "params": {},
+      "next_steps": [
+        26
+      ]
+    },
+    {
+      "step": 26,
+      "name": "vgg0_dropout1_fwd",
+      "kernel_type": 9,
+      "params": {},
+      "next_steps": [
+        27
+      ]
+    },
+    {
+      "step": 27,
+      "name": "flatten_135",
+      "kernel_type": 7,
+      "params": {},
+      "next_steps": [
+        28
+      ]
+    },
+    {
+      "step": 28,
+      "name": "vgg0_dense2_fwd",
+      "kernel_type": 8,
+      "params": {
+        "weight_path": "../bin_weights/vgg0_dense2_weight.bin",
+        "bias_path": "../bin_weights/vgg0_dense2_bias.bin",
+        "in_features": 4096,
+        "out_features": 1000
+      },
+      "next_steps": []
+    }
+  ]
+}
