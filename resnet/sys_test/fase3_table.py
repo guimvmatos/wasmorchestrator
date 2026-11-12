@@ -187,6 +187,11 @@ def main():
         ranges = [{"de": bounds[i] + 1, "ate": bounds[i + 1], "no": nodes[i]} for i in range(len(nodes))]
         d = load()
         d.setdefault("step_routes", {})[str(mid)] = ranges
+        # 12/11: corte manual vale para todas as requisições novas: apaga a
+        # versão/histórico do cut_ctl.py para este modelo (senão o handler
+        # carimbaria uma versão antiga).
+        d.get("route_version", {}).pop(str(mid), None)
+        d.get("step_routes_hist", {}).pop(str(mid), None)
         save(d)
         print(f"modelo {mid} ({name}) cortado:")
         for r in ranges:
@@ -196,6 +201,8 @@ def main():
             sys.exit("uso: uncut <model_id>")
         d = load()
         removed = d.get("step_routes", {}).pop(str(int(a[1])), None)
+        d.get("route_version", {}).pop(str(int(a[1])), None)
+        d.get("step_routes_hist", {}).pop(str(int(a[1])), None)
         if not d.get("step_routes"):
             d.pop("step_routes", None)
         save(d)

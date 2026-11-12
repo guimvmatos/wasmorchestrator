@@ -49,6 +49,11 @@ struct RoutingTable {
     // cai numa faixa, a requisição vai direto pro nó daquela faixa.
     #[serde(default)]
     step_routes: HashMap<String, Vec<StepRange>>,
+    // 12/11: versão do corte por modelo e histórico das versões (cut_ctl.py).
+    #[serde(default)]
+    route_version: HashMap<String, u32>,
+    #[serde(default)]
+    step_routes_hist: HashMap<String, HashMap<String, Vec<StepRange>>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -266,9 +271,22 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         .unwrap_or_else(|e| panic!("Erro ao ler ../../sys_test/routing_table.json (tabela viva do sys): {}", e));
 
     let target_kernel_id = first_kernel_type;
-    let step_dest = routing.step_routes.get(&client_req.model_id.to_string())
+    // 12/11: a requisição inteira segue a versão do corte que vale AGORA:
+    // carimba a versão nos 16 bits altos do model_id (os grupos repassam o
+    // model_id intacto e usam essa versão do histórico em todos os saltos).
+    let model_key_s = client_req.model_id.to_string();
+    let route_ver: u32 = routing.route_version.get(&model_key_s).copied().unwrap_or(0) & 0xFFFF;
+    let ranges_now: Option<&Vec<StepRange>> = if route_ver > 0 {
+        routing.step_routes_hist.get(&model_key_s).and_then(|h| h.get(&route_ver.to_string()))
+    } else {
+        None
+    }
+    .or_else(|| routing.step_routes.get(&model_key_s));
+    let step_dest = ranges_now
         .and_then(|rs| rs.iter().find(|r| r.de <= first_step && first_step <= r.ate))
         .map(|r| r.no.clone());
+    let mut data = data;
+    data.model_id = (client_req.model_id & 0xFFFF) | (route_ver << 16);
     let target_address = match step_dest {
         Some(d) => d,
         None => routing.table.get(&first_kernel_type)

@@ -47,6 +47,34 @@ struct RoutingTable {
     // usa; só preserva ao regravar a tabela.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     step_routes: HashMap<String, serde_json::Value>,
+    // 12/11: versão do corte por modelo + histórico por versão (cut_ctl.py).
+    // O sys só preserva e, no plano de controle, grava.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    route_version: HashMap<String, u32>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    step_routes_hist: HashMap<String, serde_json::Map<String, serde_json::Value>>,
+}
+
+/// 12/11: grava a versão `v` do corte do modelo (ranges vazio = sem corte),
+/// marca como a versão atual e mantém só as 32 versões mais novas.
+fn set_route_version(rd: &mut RoutingTable, model: &str, v: u32, ranges: serde_json::Value) {
+    let h = rd.step_routes_hist.entry(model.to_string()).or_default();
+    h.insert(v.to_string(), ranges);
+    let mut keys: Vec<u32> = h.keys().filter_map(|k| k.parse().ok()).collect();
+    keys.sort_unstable();
+    while keys.len() > 32 {
+        let k = keys.remove(0);
+        h.remove(&k.to_string());
+    }
+    rd.route_version.insert(model.to_string(), v);
+}
+
+fn next_version(rd: &RoutingTable, model: &str, msg: &serde_json::Value) -> u32 {
+    if let Some(v) = msg.get("version").and_then(|v| v.as_u64()) {
+        return (v as u32) & 0xFFFF;
+    }
+    let cur = rd.route_version.get(model).copied().unwrap_or(0);
+    if cur >= 0xFFFF { 1 } else { cur + 1 }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -598,12 +626,189 @@ fn send_to_orchestrator(metrics: SystemMetrics) {
     }
 }
 
+// ===== 12/11: plano de controle do corte por camada ==========================
+// O controlador (cut_ctl.py) manda, pela porta 9999 de cada sys, uma mensagem
+// JSON com 4 bytes de tamanho (big-endian) na frente:
+//   {"op":"cut","model":"6","ranges":[{"de":1,"ate":19,"no":"ip:18080"},...],"commit":true|false}
+//   {"op":"uncut","model":"6"}      {"op":"show"}
+// "cut" primeiro VALIDA: para cada faixa cujo destino é um grupo DESTE nó,
+// confere se os kernels dos passos estão em algum grupo daqui; se faltar,
+// sobe um grupo novo com o que falta (Regra 1: isolado, não mexe nos que
+// estão no ar) e só então grava a rota (commit). Com commit=false só prepara
+// (o controlador prepara todos os nós antes de gravar em qualquer um).
+// Resposta: o mesmo enquadramento, com um JSON {"ok":..., "built":[...], ...}.
+fn ctl_reply(mut stream: TcpStream, v: serde_json::Value) -> io::Result<()> {
+    let bytes = serde_json::to_vec(&v).unwrap_or_default();
+    stream.write_all(&(bytes.len() as u32).to_be_bytes())?;
+    stream.write_all(&bytes)?;
+    stream.flush()
+}
+
+fn now_unix_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+/// Tipos de kernel dos passos de..=ate do modelo (lidos do DFG via ../models.json).
+fn kernel_types_in_range(model: &str, de: u64, ate: u64) -> Result<HashSet<u8>, String> {
+    let reg: serde_json::Value = serde_json::from_str(&std::fs::read_to_string("../models.json").map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    let dfg_rel = reg.get(model).and_then(|e| e.get("dfg_path")).and_then(|p| p.as_str())
+        .ok_or_else(|| format!("modelo {} sem dfg_path em ../models.json", model))?;
+    let dfg: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("../{}", dfg_rel)).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    let mut out = HashSet::new();
+    for st in dfg.get("steps").and_then(|s| s.as_array()).cloned().unwrap_or_default() {
+        let step = st.get("step").and_then(|v| v.as_u64()).unwrap_or(0);
+        if step >= de && step <= ate {
+            if let Some(k) = st.get("kernel_type").and_then(|v| v.as_u64()) {
+                out.insert(k as u8);
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn load_routing_file() -> io::Result<RoutingTable> {
+    let content = std::fs::read_to_string("routing_table.json")?;
+    serde_json::from_str(&content).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
+}
+
+fn handle_control(stream: TcpStream, buffer: &[u8], state: &mut SysRuntime, node_id: u8, node_ip: &str) -> Result<Vec<FunctionInfo>, io::Error> {
+    let t0 = Instant::now();
+    let t_recv = now_unix_ms();
+    let msg: serde_json::Value = match serde_json::from_slice(buffer) {
+        Ok(v) => v,
+        Err(e) => {
+            ctl_reply(stream, serde_json::json!({"ok": false, "err": format!("json inválido: {}", e)}))?;
+            return Ok(Vec::new());
+        }
+    };
+    let op = msg.get("op").and_then(|v| v.as_str()).unwrap_or("");
+    let mut routing_data = load_routing_file()?;
+    let functions_now = |state: &SysRuntime| -> Vec<FunctionInfo> {
+        let mut f = Vec::new();
+        for g in state.groups.values() {
+            for &k in &g.kernels {
+                f.push(FunctionInfo { id: k, endpoint: format!("{}:{}", node_ip, g.port) });
+            }
+        }
+        f
+    };
+    match op {
+        "cut" => {
+            let model = msg.get("model").map(|m| m.as_str().map(|s| s.to_string()).unwrap_or_else(|| m.to_string())).unwrap_or_default();
+            let ranges = msg.get("ranges").and_then(|r| r.as_array()).cloned().unwrap_or_default();
+            let commit = msg.get("commit").and_then(|c| c.as_bool()).unwrap_or(true);
+            if model.is_empty() || ranges.is_empty() {
+                ctl_reply(stream, serde_json::json!({"ok": false, "err": "cut precisa de model e ranges"}))?;
+                return Ok(functions_now(state));
+            }
+            // Endereços que são grupos DESTE nó.
+            let mut self_addrs: HashSet<String> = HashSet::new();
+            for g in state.groups.values() {
+                for host in [node_ip, "127.0.0.1", "localhost", "0.0.0.0"] {
+                    self_addrs.insert(format!("{}:{}", host, g.port));
+                }
+            }
+            let mut needed: HashSet<u8> = HashSet::new();
+            for r in &ranges {
+                let no = r.get("no").and_then(|v| v.as_str()).unwrap_or("");
+                if !self_addrs.contains(no) {
+                    continue;
+                }
+                let de = r.get("de").and_then(|v| v.as_u64()).unwrap_or(0);
+                let ate = r.get("ate").and_then(|v| v.as_u64()).unwrap_or(0);
+                match kernel_types_in_range(&model, de, ate) {
+                    Ok(ks) => needed.extend(ks),
+                    Err(e) => {
+                        ctl_reply(stream, serde_json::json!({"ok": false, "err": e}))?;
+                        return Ok(functions_now(state));
+                    }
+                }
+            }
+            let covered = state.covered_kernels();
+            let mut missing: Vec<u8> = needed.difference(&covered).cloned().collect();
+            missing.sort_unstable();
+            let mut built_ms: u64 = 0;
+            if !missing.is_empty() {
+                let tb = Instant::now();
+                println!("[{}] [CTL] corte do modelo {} precisa dos kernels {:?}, que este nó não tem — subindo grupo antes de gravar a rota.",
+                    Local::now().format("%H:%M:%S"), model, missing);
+                let mut wanted: HashSet<u8> = routing_data.assignments.get(&node_id).cloned().unwrap_or_default().into_iter().collect();
+                wanted.extend(missing.iter().cloned());
+                let mut w: Vec<u8> = wanted.iter().cloned().collect();
+                w.sort_unstable();
+                routing_data.assignments.insert(node_id, w);
+                let (_f, changed) = reconcile_groups(state, &wanted, node_ip, &mut routing_data);
+                if changed {
+                    if let Ok(json_data) = serde_json::to_string_pretty(&routing_data) {
+                        let _ = write_table_atomic(&json_data);
+                    }
+                }
+                built_ms = tb.elapsed().as_millis() as u64;
+                let still: Vec<u8> = missing.iter().cloned().filter(|k| !state.covered_kernels().contains(k)).collect();
+                if !still.is_empty() {
+                    ctl_reply(stream, serde_json::json!({"ok": false, "node": node_id, "err": format!("falhou subir os kernels {:?}", still)}))?;
+                    return Ok(functions_now(state));
+                }
+            }
+            if commit {
+                // Relê o arquivo (o reconcile pode ter gravado) e só troca o step_routes.
+                let mut rd = load_routing_file()?;
+                rd.step_routes.insert(model.clone(), serde_json::Value::Array(ranges.clone()));
+                let v = next_version(&rd, &model, &msg);
+                set_route_version(&mut rd, &model, v, serde_json::Value::Array(ranges.clone()));
+                let json_data = serde_json::to_string_pretty(&rd).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                write_table_atomic(&json_data)?;
+                println!("[{}] [CTL] corte do modelo {} gravado: {}", Local::now().format("%H:%M:%S"), model,
+                    ranges.iter().map(|r| format!("{}..{} -> {}", r["de"], r["ate"], r["no"].as_str().unwrap_or("?"))).collect::<Vec<_>>().join(" | "));
+            }
+            ctl_reply(stream, serde_json::json!({
+                "ok": true, "node": node_id, "op": "cut", "model": model, "commit": commit,
+                "built": missing, "build_ms": built_ms, "total_ms": t0.elapsed().as_millis() as u64,
+                "version": if commit { load_routing_file().ok().and_then(|r| r.route_version.get(&model).copied()).unwrap_or(0) } else { 0 },
+                "t_recv_unix_ms": t_recv, "t_done_unix_ms": now_unix_ms()
+            }))?;
+        }
+        "uncut" => {
+            let model = msg.get("model").map(|m| m.as_str().map(|s| s.to_string()).unwrap_or_else(|| m.to_string())).unwrap_or_default();
+            let removed = routing_data.step_routes.remove(&model).is_some();
+            let v = next_version(&routing_data, &model, &msg);
+            set_route_version(&mut routing_data, &model, v, serde_json::Value::Array(vec![]));
+            let json_data = serde_json::to_string_pretty(&routing_data).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            write_table_atomic(&json_data)?;
+            println!("[{}] [CTL] modelo {} sem corte (tinha: {})", Local::now().format("%H:%M:%S"), model, removed);
+            ctl_reply(stream, serde_json::json!({"ok": true, "node": node_id, "op": "uncut", "model": model, "removed": removed,
+                "t_recv_unix_ms": t_recv, "t_done_unix_ms": now_unix_ms()}))?;
+        }
+        "show" => {
+            let kernels: Vec<u8> = { let mut v: Vec<u8> = state.covered_kernels().into_iter().collect(); v.sort_unstable(); v };
+            let groups: Vec<serde_json::Value> = state.groups.iter().map(|(id, g)| {
+                let mut ks: Vec<u8> = g.kernels.iter().cloned().collect(); ks.sort_unstable();
+                serde_json::json!({"id": id, "port": g.port, "kernels": ks})
+            }).collect();
+            ctl_reply(stream, serde_json::json!({"ok": true, "node": node_id, "ip": node_ip, "kernels": kernels, "groups": groups,
+                "step_routes": routing_data.step_routes}))?;
+        }
+        _ => {
+            ctl_reply(stream, serde_json::json!({"ok": false, "err": format!("op desconhecida: {:?}", op)}))?;
+        }
+    }
+    Ok(functions_now(state))
+}
+
 fn handle_orchestrator(mut stream: TcpStream, state: &mut SysRuntime, node_id: u8, node_ip: &str) -> Result<Vec<FunctionInfo>, io::Error> {
     let mut len_buf = [0u8; 4];
     stream.read_exact(&mut len_buf)?;
     let len = u32::from_be_bytes(len_buf) as usize;
     let mut buffer = vec![0u8; len];
     stream.read_exact(&mut buffer)?;
+
+    // 12/11: plano de controle do corte. Mensagem JSON (começa com '{') em vez
+    // da RoutingTable em msgpack do orquestrador (que nunca começa com '{').
+    if buffer.first() == Some(&b'{') {
+        return handle_control(stream, &buffer, state, node_id, node_ip);
+    }
 
     let mut routing_data: RoutingTable = rmp_serde::from_slice(&buffer).expect("Falha ao deserializar");
 

@@ -1196,8 +1196,23 @@ def lane_plan(active_kernel_ids, variant_map):
     light = [k for k in (3, 5) if k in active_kernel_ids]
     ops = [k for k in OPS_LANE if k in active_kernel_ids]
     ident = [k for k in (7, 9) if k in active_kernel_ids]
-    extras = light + [100]
+    extras = light + ([100] if (ops or 5 in active_kernel_ids) else [])
     return sorted(set(gpu_lane + light + ops + ident)), extras
+
+# 12/11: passo recebido pela rede ("pinned") também entra na via residente.
+GPU_LANE_BLOCK = _lane_sub(GPU_LANE_BLOCK,
+    "if step_dest.is_none() && lane_eligible(graph, routing, input_img.model_id, current_step) {",
+    "if step_dest.is_none() && (lane_eligible(graph, routing, input_img.model_id, current_step) || (pinned.contains(&current_step) && lane_kind_ok(graph, current_step))) {")
+GPU_LANE_HELPERS += """
+/// Tipo do passo vai pela via residente aqui, ignorando a rota (passo recebido pela rede).
+fn lane_kind_ok(graph: &ModelGraph, step: u32) -> bool {
+    let Some(node) = graph.steps.iter().find(|s| s.step == step) else { return false };
+    if !LANE_KERNELS.contains(&node.kernel_type) || !LOCAL_KERNELS.contains(&node.kernel_type) {
+        return false;
+    }
+    !(node.kernel_type == 14 && node.params.input_order.iter().any(|e| e.is_const))
+}
+"""
 
 def generate_local_kernels_const(active_kernel_ids):
     # Conhecido em build time: quais kernel_type estão embutidos NESTE wasm.
@@ -1263,11 +1278,11 @@ def generate_lib_rs(active_kernel_ids, variant_map):
     if first_kernel_mod is not None and variant_map.get(1) == "gpu":
         first_kernel_mod = f"{KERNELS[_cpu_ids[0]]['name']}world" if _cpu_ids else None
         if first_kernel_mod is None:
-            raise SystemExit("[ERRO] 4c: grupo só com kernels GPU — inclua ao menos um kernel de CPU (ex.: 3 ou 7)")
+            first_kernel_mod = "__wire__"
     if first_kernel_mod is None:
-        # WitData precisa de um módulo real; usa o primeiro kernel ativo de CPU.
-        first_id = (_cpu_ids or active_kernel_ids)[0]
-        first_kernel_mod = f"{KERNELS[first_id]['name']}world"
+        first_kernel_mod = f"{KERNELS[_cpu_ids[0]]['name']}world" if _cpu_ids else "__wire__"
+    # 12/11: sem kernel de CPU no grupo não existe Data gerado: usa o WireMeta.
+    wit_data_ty = "WireMeta" if first_kernel_mod == "__wire__" else f"bindings::planner::{first_kernel_mod}::plan::Data"
 
     match_arms = "\n".join(
         get_rust_match(k, variant_map.get(k, "cpu")) for k in active_kernel_ids
@@ -1278,6 +1293,12 @@ def generate_lib_rs(active_kernel_ids, variant_map):
     lane_const = "const LANE_KERNELS: &[u8] = &[" + ", ".join(str(k) for k in lane_ids) + "];"
     lane_arms = "\n".join((LANE_CODE.get(k) or LANE_EXTRA_CODE[k]) for k in lane_ids)
     lane_helpers = GPU_LANE_HELPERS if lane_ids else ""
+    if lane_ids and 100 not in _lane_extras:
+        # sem ops_gpu na composição: tira o que depende dele (só usado pelos tipos 5/10–22)
+        lane_helpers = lane_helpers.replace("use bindings::planner::opsgpuworld::plan as opsgpu;\n", "")
+        _i = lane_helpers.index("/// out[i] = a[i] op b[i % len_b]")
+        _j = lane_helpers.index("fn gpu_join_put(")
+        lane_helpers = lane_helpers[:_i] + lane_helpers[_j:]
     lane_block = (GPU_LANE_BLOCK.replace("@@LANE_ARMS@@", lane_arms)) if lane_ids else ""
     # Só declara o estado de controle do Gemm GPU se ele de fato estiver
     # presente neste nó — evita código morto/não-usado nos outros casos.
@@ -1358,7 +1379,7 @@ const WIRE_MAGIC: &[u8; 4] = b"WOF1";
 // 10/11 (4c): espelho do Data só para o serde (mesmos campos e ordem — os
 // bytes na rede não mudam). O grupo agora importa wasi:webgpu, cujos tipos
 // têm recursos e não podem derivar Serialize, então o additional_derives saiu.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 struct WireMeta {{
     input: Vec<f32>,
     output: Vec<f32>,
@@ -1425,7 +1446,7 @@ fn read_json_file<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, Strin
 {local_kernels_const}
 {gemm_gpu_state}
 
-type WitData = bindings::planner::{first_kernel_mod}::plan::Data;
+type WitData = {wit_data_ty};
 
 {lane_const}
 {lane_helpers}
@@ -1476,6 +1497,10 @@ struct RoutingTable {{
     // na rota por tipo, como antes.
     #[serde(default)]
     step_routes: HashMap<String, Vec<StepRange>>,
+    // 12/11: histórico de cortes por versão (a requisição usa o da versão
+    // carimbada no model_id; sem versão ou versão desconhecida = o atual).
+    #[serde(default)]
+    step_routes_hist: HashMap<String, HashMap<String, Vec<StepRange>>>,
 }}
 
 #[derive(Deserialize, Debug, Clone)]
@@ -1496,7 +1521,11 @@ thread_local! {{
 /// o passo cai numa faixa de step_routes do modelo e essa faixa é de outro
 /// grupo. None = sem faixa (vale a rota por tipo) ou a faixa é deste grupo.
 fn step_route_dest(routing: &RoutingTable, model_id: u32, step: u32) -> Option<String> {{
-    let ranges = routing.step_routes.get(&model_id.to_string())?;
+    // model_id = modelo (16 bits baixos) | versão do corte (16 bits altos).
+    let m = (model_id & 0xFFFF).to_string();
+    let v = model_id >> 16;
+    let hist = if v > 0 {{ routing.step_routes_hist.get(&m).and_then(|h| h.get(&v.to_string())) }} else {{ None }};
+    let ranges = match hist {{ Some(r) => r, None => routing.step_routes.get(&m)? }};
     let r = ranges.iter().find(|r| r.de <= step && step <= r.ate)?;
     let is_self = SELF_ADDR.with(|a| *a.borrow() == r.no);
     if is_self {{ None }} else {{ Some(r.no.clone()) }}
@@ -1907,8 +1936,8 @@ fn handle_client(
 
         // Seleciona o grafo do modelo pedido por esta request (antes: um
         // único grafo fixo pra qualquer model_id — ver claude/project-state.md).
-        let graph = graphs.get(&input_img.model_id).unwrap_or_else(|| {{
-            panic!("model_id {{}} não encontrado no registro de grafos (models.json)", input_img.model_id)
+        let graph = graphs.get(&(input_img.model_id & 0xFFFF)).unwrap_or_else(|| {{
+            panic!("model_id {{}} não encontrado no registro de grafos (models.json)", input_img.model_id & 0xFFFF)
         }});
 
         *initialized += 1; // [T] contador de requisições atendidas por este processo
@@ -1941,6 +1970,9 @@ fn handle_client(
         }}
         // A4: move o tensor recebido em vez de copiar.
         queue.push_back((input_img.current_kernel, std::mem::take(&mut input_img.input), input_img.from_step));
+        // 12/11: passos recebidos pela rede rodam aqui (quem enviou já decidiu
+        // a rota); a tabela local só vale para os passos seguintes.
+        let pinned: Vec<u32> = queue.iter().map(|q| q.0).collect();
 
         let mut final_output: Vec<f32> = Vec::new();
         let mut final_from_step: u32 = 0;
@@ -1967,7 +1999,11 @@ fn handle_client(
             // 09/11: rota por camada primeiro. Se o passo é de outro nó, vai
             // pro braço de rede mesmo que o kernel exista aqui (tipo 0 não
             // existe no catálogo, então cai no `_`).
-            let step_dest = step_route_dest(routing, input_img.model_id, current_step);
+            let step_dest = if pinned.contains(&current_step) && LOCAL_KERNELS.contains(&current_node.kernel_type) {{
+                None
+            }} else {{
+                step_route_dest(routing, input_img.model_id, current_step)
+            }};
             let dispatch_kt: u8 = if step_dest.is_some() {{ 0 }} else {{ current_node.kernel_type }};
 {lane_block}
 
