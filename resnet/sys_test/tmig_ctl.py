@@ -73,6 +73,33 @@ def gpu_taken_nvml():
     return any(not any(name.endswith(i) or i in name for i in IGNORE) for _, name in gpu_procs())
 
 
+_NVML = None
+
+
+def gpu_taken_nvml_lib():
+    """Mesma regra do gpu_taken_nvml, mas pela biblioteca NVML (pynvml): sem chamar o nvidia-smi,
+    < 1 ms por consulta. Pega processos de computação e gráficos (Vulkan aparece como gráfico)."""
+    global _NVML
+    import pynvml
+    if _NVML is None:
+        pynvml.nvmlInit()
+        _NVML = pynvml.nvmlDeviceGetHandleByIndex(0)
+    pids = set()
+    for f in (pynvml.nvmlDeviceGetComputeRunningProcesses, pynvml.nvmlDeviceGetGraphicsRunningProcesses):
+        try:
+            pids.update(p.pid for p in f(_NVML))
+        except pynvml.NVMLError:
+            pass
+    for pid in pids:
+        try:
+            name = open(f"/proc/{pid}/comm").read().strip()
+        except OSError:
+            continue
+        if not any(i in name for i in IGNORE):
+            return True
+    return False
+
+
 def pidfile_ms(pidfile):
     try:
         return int(os.path.getmtime(pidfile) * 1000)
@@ -98,9 +125,13 @@ def main():
     ap.add_argument("--a", required=True, help="grupo A (GPU que será tomada), ip:porta")
     ap.add_argument("--b", required=True, help="grupo B (outro dispositivo), ip:porta")
     ap.add_argument("--sys", required=True)
-    ap.add_argument("--k", type=int, default=19, help="partial: passos 1..K vão para B")
+    ap.add_argument("--k", type=int, default=19, help="partial: ponto de corte K")
+    ap.add_argument("--dir", choices=["head", "tail"], default="head",
+                    help="partial: head = passos 1..K vão para B (o resto fica em A); tail = 1..K ficam em A e K+1..fim vão para B")
     ap.add_argument("--pidfile", default="/tmp/prio.pid")
-    ap.add_argument("--trigger", choices=["pidfile", "gpu"], default="pidfile",
+    ap.add_argument("--prestage", action="store_true",
+                    help="prepara a configuração de destino já na partida; na detecção só grava")
+    ap.add_argument("--trigger", choices=["pidfile", "gpu", "nvml"], default="pidfile",
                     help="pidfile = sinal de admissão da aplicação; gpu = detecta pelo driver (nvidia-smi) outro processo na GPU")
     ap.add_argument("--poll-ms", type=float, default=20)
     ap.add_argument("--log", default="tmig.csv")
@@ -122,11 +153,24 @@ def main():
         w.writerow(["t_signal_ms", "t_ready_ms", "t_prepared_ms", "t_committed_ms", "event", "mode", "ranges", "ok",
                     "label", "trigger", "t_pidfile_ms"])
     procB = None
-    sense = (lambda: gpu_taken_nvml()) if a.trigger == "gpu" else (lambda: prio_running(a.pidfile))
+    sense = {"gpu": gpu_taken_nvml, "nvml": gpu_taken_nvml_lib}.get(a.trigger, lambda: prio_running(a.pidfile))
     taken = sense()
     cycles = 0
     print(f"[tmig] gatilho {a.trigger}; modo {a.mode}; modelo {a.model} ({last} passos); A={a.a} B={a.b}; GPU tomada agora: {taken}",
           flush=True)
+
+    def target_ranges():
+        if a.mode == "partial":
+            if a.dir == "head":
+                return [{"de": 1, "ate": a.k, "no": a.b}, {"de": a.k + 1, "ate": last, "no": a.a}]
+            return [{"de": 1, "ate": a.k, "no": a.a}, {"de": a.k + 1, "ate": last, "no": a.b}]
+        return [{"de": 1, "ate": last, "no": a.b}]
+
+    staged = False
+    if a.prestage and a.mode in ("full", "partial"):
+        rep = cc.to_all(sysa, {"op": "cut", "model": str(a.model), "ranges": target_ranges(), "commit": False})
+        staged = all(r.get("ok") for r in rep.values())
+        print(f"[tmig] pré-preparado: {staged}", flush=True)
 
     def move(ranges, event, t_sig, t_ready):
         ver = cc.next_version()
@@ -135,9 +179,12 @@ def main():
             rep = cc.to_all(sysa, {"op": "uncut", "model": str(a.model), "version": ver})
             ok = all(r.get("ok") for r in rep.values())
         else:
-            prep = cc.to_all(sysa, {"op": "cut", "model": str(a.model), "ranges": ranges, "commit": False})
+            if staged and event == "tomada":
+                ok = True
+            else:
+                prep = cc.to_all(sysa, {"op": "cut", "model": str(a.model), "ranges": ranges, "commit": False})
+                ok = all(r.get("ok") for r in prep.values())
             t1 = time.time()
-            ok = all(r.get("ok") for r in prep.values())
             if ok:
                 rep = cc.to_all(sysa, {"op": "cut", "model": str(a.model), "ranges": ranges, "commit": True,
                                        "version": ver})
@@ -176,7 +223,10 @@ def main():
                             time.sleep(0.01)
                         t_ready = time.time()
                     if a.mode == "partial":
-                        ranges = [{"de": 1, "ate": a.k, "no": a.b}, {"de": a.k + 1, "ate": last, "no": a.a}]
+                        if a.dir == "head":
+                            ranges = [{"de": 1, "ate": a.k, "no": a.b}, {"de": a.k + 1, "ate": last, "no": a.a}]
+                        else:
+                            ranges = [{"de": 1, "ate": a.k, "no": a.a}, {"de": a.k + 1, "ate": last, "no": a.b}]
                     else:
                         ranges = [{"de": 1, "ate": last, "no": a.b}]
                     move(ranges, "tomada", t_sig, t_ready)

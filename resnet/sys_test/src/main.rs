@@ -852,6 +852,11 @@ fn main() -> std::io::Result<()> {
 
     println!("SYS iniciado (composição dinâmica por grupo). Aguardando atualizações na porta 9999...");
 
+    // 16/11: o accept não-bloqueante era consultado a cada 50 ms (sleep no fim do laço), então
+    // cada mensagem de controle esperava 0–50 ms e a gravação (que chega logo depois do preparo)
+    // esperava ~50 ms. Agora o laço consulta a porta a cada 1 ms e só a sincronização com o
+    // arquivo local continua a cada 50 ms.
+    let mut last_sync = std::time::Instant::now();
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
@@ -859,7 +864,9 @@ fn main() -> std::io::Result<()> {
                     my_functions = updated;
                 }
             }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock && last_sync.elapsed() < std::time::Duration::from_millis(50) => {}
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                last_sync = std::time::Instant::now();
                 // Se não recebeu nada da rede, tenta sincronizar com o arquivo local
                 if let Ok(mut file) = File::open("routing_table.json") {
                     let mut content = String::new();
@@ -910,6 +917,6 @@ fn main() -> std::io::Result<()> {
 
             last_telemetry = Instant::now();
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(1));
     }
 }

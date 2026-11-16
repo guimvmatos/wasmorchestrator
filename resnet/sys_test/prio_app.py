@@ -49,6 +49,7 @@ def main():
     print(f"[prio] GPU: {adapter.info.get('device')} ({adapter.info.get('vendor')}, {adapter.info.get('adapter_type')})",
           flush=True)
     dev = adapter.request_device_sync()
+    t_device_ms = int(time.time() * 1000)   # contexto da GPU criado: a partir daqui o driver vê o processo
     n = a.n
     rng = np.random.default_rng(0)
     A = rng.random((n, n), dtype=np.float32)
@@ -79,7 +80,7 @@ def main():
     f = open(a.csv, "a", newline="")
     w = csv.writer(f)
     if new:
-        w.writerow(["timestamp_ms", "label", "matmul_per_s", "gflops", "t_proc_start_ms", "t_gpu_ready_ms"])
+        w.writerow(["timestamp_ms", "label", "matmul_per_s", "gflops", "t_proc_start_ms", "t_gpu_ready_ms", "t_device_ms"])
     t_gpu_ready_ms = int(time.time() * 1000)
     with open(a.pidfile, "w") as pf:
         pf.write(str(os.getpid()))
@@ -95,7 +96,7 @@ def main():
             dt = time.time() - t0
             rate = done / dt
             w.writerow([int(time.time() * 1000), a.label, round(rate, 2), round(rate * 2 * n ** 3 / 1e9, 1),
-                        T_PROC_START_MS, t_gpu_ready_ms])
+                        T_PROC_START_MS, t_gpu_ready_ms, t_device_ms])
             f.flush()
             if a.window >= 1 or int(time.time() * 4) % 4 == 0:
                 print(f"[prio] {time.strftime('%H:%M:%S')} {rate:.1f} matmul/s ({rate * 2 * n ** 3 / 1e9:.1f} GFLOP/s)", flush=True)
