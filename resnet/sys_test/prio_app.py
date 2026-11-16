@@ -14,6 +14,8 @@ import csv
 import os
 import time
 
+T_PROC_START_MS = int(time.time() * 1000)   # antes de abrir a GPU: base do atraso de detecção
+
 import numpy as np
 import wgpu
 
@@ -41,6 +43,7 @@ def main():
     ap.add_argument("--csv", default="prio.csv")
     ap.add_argument("--label", default="prio")
     ap.add_argument("--pidfile", default="/tmp/prio.pid")
+    ap.add_argument("--window", type=float, default=0.25, help="janela de medição da vazão (s)")
     a = ap.parse_args()
     adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
     print(f"[prio] GPU: {adapter.info.get('device')} ({adapter.info.get('vendor')}, {adapter.info.get('adapter_type')})",
@@ -76,7 +79,8 @@ def main():
     f = open(a.csv, "a", newline="")
     w = csv.writer(f)
     if new:
-        w.writerow(["timestamp_ms", "label", "matmul_per_s", "gflops"])
+        w.writerow(["timestamp_ms", "label", "matmul_per_s", "gflops", "t_proc_start_ms", "t_gpu_ready_ms"])
+    t_gpu_ready_ms = int(time.time() * 1000)
     with open(a.pidfile, "w") as pf:
         pf.write(str(os.getpid()))
     print(f"[prio] GPU tomada (pid {os.getpid()} em {a.pidfile}) por {a.seconds:.0f} s; n={n}", flush=True)
@@ -85,14 +89,16 @@ def main():
         while time.time() < t_end:
             t0 = time.time()
             done = 0
-            while time.time() - t0 < 1.0:
+            while time.time() - t0 < a.window:
                 step()
                 done += a.batch
             dt = time.time() - t0
             rate = done / dt
-            w.writerow([int(time.time() * 1000), a.label, round(rate, 2), round(rate * 2 * n ** 3 / 1e9, 1)])
+            w.writerow([int(time.time() * 1000), a.label, round(rate, 2), round(rate * 2 * n ** 3 / 1e9, 1),
+                        T_PROC_START_MS, t_gpu_ready_ms])
             f.flush()
-            print(f"[prio] {time.strftime('%H:%M:%S')} {rate:.1f} matmul/s ({rate * 2 * n ** 3 / 1e9:.1f} GFLOP/s)", flush=True)
+            if a.window >= 1 or int(time.time() * 4) % 4 == 0:
+                print(f"[prio] {time.strftime('%H:%M:%S')} {rate:.1f} matmul/s ({rate * 2 * n ** 3 / 1e9:.1f} GFLOP/s)", flush=True)
     finally:
         try:
             os.remove(a.pidfile)

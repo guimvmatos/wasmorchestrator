@@ -45,6 +45,41 @@ def prio_running(pidfile):
         return False
 
 
+IGNORE = ("runtime", "Xorg", "Xwayland", "gnome-shell")
+
+
+def gpu_procs():
+    """Processos na GPU NVIDIA segundo o driver: tabela 'Processes' do nvidia-smi (inclui Vulkan/gráfico,
+    que o --query-compute-apps pode não listar)."""
+    try:
+        out = subprocess.run(["nvidia-smi"], capture_output=True, text=True, timeout=2).stdout
+    except Exception:  # noqa: BLE001
+        return []
+    procs, inside = [], False
+    for line in out.splitlines():
+        if "Processes:" in line:
+            inside = True
+            continue
+        if not inside or not line.startswith("|"):
+            continue
+        tok = line.strip("| ").split()
+        if len(tok) >= 6 and tok[3].isdigit():
+            procs.append((int(tok[3]), tok[5]))
+    return procs
+
+
+def gpu_taken_nvml():
+    """GPU tomada = há na GPU um processo que não é o nosso runtime (nem o servidor gráfico)."""
+    return any(not any(name.endswith(i) or i in name for i in IGNORE) for _, name in gpu_procs())
+
+
+def pidfile_ms(pidfile):
+    try:
+        return int(os.path.getmtime(pidfile) * 1000)
+    except OSError:
+        return ""
+
+
 def port_open(addr):
     host, port = addr.rsplit(":", 1)
     try:
@@ -65,6 +100,8 @@ def main():
     ap.add_argument("--sys", required=True)
     ap.add_argument("--k", type=int, default=19, help="partial: passos 1..K vão para B")
     ap.add_argument("--pidfile", default="/tmp/prio.pid")
+    ap.add_argument("--trigger", choices=["pidfile", "gpu"], default="pidfile",
+                    help="pidfile = sinal de admissão da aplicação; gpu = detecta pelo driver (nvidia-smi) outro processo na GPU")
     ap.add_argument("--poll-ms", type=float, default=20)
     ap.add_argument("--log", default="tmig.csv")
     ap.add_argument("--label", default="tmig")
@@ -83,11 +120,12 @@ def main():
     w = csv.writer(f)
     if new:
         w.writerow(["t_signal_ms", "t_ready_ms", "t_prepared_ms", "t_committed_ms", "event", "mode", "ranges", "ok",
-                    "label"])
+                    "label", "trigger", "t_pidfile_ms"])
     procB = None
-    taken = prio_running(a.pidfile)
+    sense = (lambda: gpu_taken_nvml()) if a.trigger == "gpu" else (lambda: prio_running(a.pidfile))
+    taken = sense()
     cycles = 0
-    print(f"[tmig] modo {a.mode}; modelo {a.model} ({last} passos); A={a.a} B={a.b}; GPU tomada agora: {taken}",
+    print(f"[tmig] gatilho {a.trigger}; modo {a.mode}; modelo {a.model} ({last} passos); A={a.a} B={a.b}; GPU tomada agora: {taken}",
           flush=True)
 
     def move(ranges, event, t_sig, t_ready):
@@ -110,17 +148,18 @@ def main():
               f"prepara {1000 * (t1 - t_ready):.0f} ms, grava {1000 * (t2 - t1):.0f} ms; sinal→gravado "
               f"{1000 * (t2 - t_sig):.0f} ms] {'ok' if ok else 'FALHOU'}", flush=True)
         w.writerow([int(t_sig * 1000), int(t_ready * 1000), int(t1 * 1000), int(t2 * 1000), event, a.mode,
-                    desc, int(ok), a.label])
+                    desc, int(ok), a.label, a.trigger, pidfile_ms(a.pidfile)])
         f.flush()
 
     try:
         while True:
-            now = prio_running(a.pidfile)
+            now = sense()
             if now != taken:
                 t_sig = time.time()
                 taken = now
                 if a.mode == "off":
-                    w.writerow([int(t_sig * 1000), "", "", "", "tomada" if now else "liberada", a.mode, "", 1, a.label])
+                    w.writerow([int(t_sig * 1000), "", "", "", "tomada" if now else "liberada", a.mode, "", 1, a.label,
+                                a.trigger, pidfile_ms(a.pidfile)])
                     f.flush()
                     print(f"[tmig] {time.strftime('%H:%M:%S')} GPU {'tomada' if now else 'liberada'} (modo off: nada muda)",
                           flush=True)
